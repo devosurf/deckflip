@@ -1,0 +1,68 @@
+[
+  {
+    "code": "FLATTEN_OFFCANVAS",
+    "kind": "flattened",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > div:nth-child(2)"
+    },
+    "reason": "Element div.bleed-left extends beyond the canvas",
+    "hint": "PowerPoint clips at the slide edge; move div.bleed-left inside 1280x720"
+  },
+  {
+    "code": "FLATTEN_OFFCANVAS",
+    "kind": "flattened",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > div:nth-child(3)"
+    },
+    "reason": "Element div.bleed-bottom extends beyond the canvas",
+    "hint": "PowerPoint clips at the slide edge; move div.bleed-bottom inside 1280x720"
+  },
+  {
+    "code": "FLATTEN_OFFCANVAS",
+    "kind": "flattened",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > div:nth-child(4)"
+    },
+    "reason": "Element div.bleed-corner extends beyond the canvas",
+    "hint": "PowerPoint clips at the slide edge; move div.bleed-corner inside 1280x720"
+  },
+  {
+    "code": "DROPPED_OFFCANVAS",
+    "kind": "dropped",
+    "severity": "info",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > div:nth-child(5)"
+    },
+    "reason": "Element div.gone is fully outside the canvas",
+    "hint": "Delete it or move it inside"
+  },
+  {
+    "code": "DROPPED_OFFCANVAS",
+    "kind": "dropped",
+    "severity": "info",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(6)"
+    },
+    "reason": "Element p.gone-text is fully outside the canvas",
+    "hint": "Delete it or move it inside"
+  },
+  {
+    "code": "FLATTEN_OFFCANVAS",
+    "kind": "flattened",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(7)"
+    },
+    "reason": "Element p.clipped-text extends beyond the canvas",
+    "hint": "PowerPoint clips at the slide edge; move p.clipped-text inside 1280x720"
+  }
+]

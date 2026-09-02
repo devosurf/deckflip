@@ -1,0 +1,13 @@
+[
+  {
+    "code": "SUBSTITUTE_OPACITY",
+    "kind": "substituted",
+    "severity": "info",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > div:nth-child(6) > div:nth-child(4)"
+    },
+    "reason": "opacity 0.85 on div.s4 folded into fill, line and text alpha",
+    "hint": "Folded into fill/line/text alpha"
+  }
+]

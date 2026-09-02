@@ -1,4 +1,5 @@
-import type { Deck, Slide } from '../model/index.js';
+import type { Deck, Element, GroupElement, Slide } from '../model/index.js';
+import { pxToEmu } from '../ooxml/emu.js';
 import { CT, REL, type OpcPackage } from '../ooxml/opc.js';
 import { el, serialize, type XmlNode } from '../ooxml/xml.js';
 import { buildPicture, type MediaStore, type PictureEmissionContext } from './picture.js';
@@ -29,20 +30,48 @@ export function emitSlide(pkg: OpcPackage, slide: Slide, ctx: SlideEmissionConte
     addRelationship,
     media: ctx.media,
   };
-  const shapes = slide.elements.flatMap((element) => {
-    switch (element.kind) {
-      case 'picture':
-        return buildPicture(element, elementCtx, nextId);
-      case 'table':
-        return [buildTable(element, elementCtx, nextId)];
-      default:
-        return buildShape(element, elementCtx, nextId);
-    }
-  });
+  const shapes = slide.elements.flatMap((element) => buildElement(element, elementCtx, nextId));
 
   const xml = serialize(buildSlideXml(slide, shapes));
   pkg.addPart(partName, CT.slide, xml);
   return partName;
+}
+
+export function buildElement(element: Element, ctx: PictureEmissionContext, nextId: () => number): XmlNode[] {
+  switch (element.kind) {
+    case 'picture':
+      return buildPicture(element, ctx, nextId);
+    case 'table':
+      return [buildTable(element, ctx, nextId)];
+    case 'group':
+      return [buildGroup(element, ctx, nextId)];
+    default:
+      return buildShape(element, ctx, nextId);
+  }
+}
+
+/** `p:grpSp`: `off/ext` place the group, `chOff/chExt` name the child coordinate space, so children keep slide coordinates. */
+function buildGroup(group: GroupElement, ctx: PictureEmissionContext, nextId: () => number): XmlNode {
+  const id = nextId();
+  const children = group.children.flatMap((child) => buildElement(child, ctx, nextId));
+  return el(
+    'p:grpSp',
+    {},
+    el('p:nvGrpSpPr', {}, el('p:cNvPr', { id, name: group.name }), el('p:cNvGrpSpPr'), el('p:nvPr')),
+    el(
+      'p:grpSpPr',
+      {},
+      el(
+        'a:xfrm',
+        { rot: Math.round(group.rotation * 60000) },
+        el('a:off', { x: pxToEmu(group.box.x), y: pxToEmu(group.box.y) }),
+        el('a:ext', { cx: pxToEmu(group.box.w), cy: pxToEmu(group.box.h) }),
+        el('a:chOff', { x: pxToEmu(group.childBox.x), y: pxToEmu(group.childBox.y) }),
+        el('a:chExt', { cx: pxToEmu(group.childBox.w), cy: pxToEmu(group.childBox.h) }),
+      ),
+    ),
+    ...children,
+  );
 }
 
 function buildSlideXml(slide: Slide, shapes: XmlNode[]): XmlNode {

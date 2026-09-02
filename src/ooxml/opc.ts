@@ -69,18 +69,18 @@ export class OpcPackage {
     const date = opts?.date ?? DEFAULT_DATE;
     const compression = opts?.compression ?? 'DEFLATE';
 
-    zip.file('[Content_Types].xml', buildContentTypesXml(this.parts), { date, compression });
+    zip.file('[Content_Types].xml', buildContentTypesXml(this.parts), { date, compression, createFolders: false });
 
     const rootRelationships = this.relationships.get('/') ?? [];
     if (rootRelationships.length) {
-      zip.file('_rels/.rels', buildRelationshipsXml(rootRelationships), { date, compression });
+      zip.file('_rels/.rels', buildRelationshipsXml(rootRelationships), { date, compression, createFolders: false });
     }
 
     for (const [name, part] of this.parts) {
-      zip.file(zipPath(name), part.data, { date, compression });
+      zip.file(zipPath(name), part.data, { date, compression, createFolders: false });
       const rels = this.relationships.get(name) ?? [];
       if (rels.length) {
-        zip.file(relsPath(name), buildRelationshipsXml(rels), { date, compression });
+        zip.file(relsPath(name), buildRelationshipsXml(rels), { date, compression, createFolders: false });
       }
     }
 

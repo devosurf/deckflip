@@ -1,4 +1,4 @@
-import type { Align, AutonumScheme, Box, Bullet, Color, CornerRadius, Fill, Insets, Line, Paragraph, PictureElement, Run, RunStyle, ShapeElement, TableCell, TableElement, TableRow, TextBody } from '../model/index.js';
+import type { Align, AutonumScheme, Box, Bullet, Color, CornerRadius, Fill, GroupElement, Insets, Line, Paragraph, PictureElement, Run, RunStyle, ShapeElement, TableCell, TableElement, TableRow, TextBody } from '../model/index.js';
 
 export interface BrowserFontFace {
   family: string;
@@ -19,7 +19,9 @@ export type BrowserPictureSource = { kind: 'file'; url: string } | { kind: 'inli
 /** A picture as measured in the page; measure.ts loads the bytes and turns it into a `PictureElement`. */
 export type BrowserPicture = Omit<PictureElement, 'media' | 'vector'> & { source: BrowserPictureSource };
 
-export type BrowserElement = ShapeElement | BrowserPicture | TableElement;
+export type BrowserGroup = Omit<GroupElement, 'children'> & { children: BrowserElement[] };
+
+export type BrowserElement = ShapeElement | BrowserPicture | TableElement | BrowserGroup;
 
 export interface BrowserMeasureResult {
   meta: {
@@ -82,7 +84,53 @@ export function measureSlideDocument(): BrowserMeasureResult {
     if (isSkipped(el)) {
       return [];
     }
+    if (el.hasAttribute('data-group') && !isPictureElement(el) && el.tagName !== 'TABLE' && !isTextBlock(el)) {
+      return measureGroup(el);
+    }
+    return walkPainting(el);
+  }
 
+  /**
+   * `data-group`: the container's painting descendants (and its own shape first, when it paints) become one
+   * group. The subtree is measured with the container's transform disabled, so the children keep plain
+   * slide coordinates; the transform then places the group as a whole.
+   */
+  function measureGroup(el: HTMLElement): BrowserElement[] {
+    const cs = getComputedStyle(el);
+    const transformValue = cs.transform;
+    const children = withoutTransform(el, () => walkPainting(el));
+    if (children.length === 0) {
+      return [];
+    }
+    const childBox = unionBox(children.map((child) => child.box));
+    const transform = decomposeTransform(transformValue);
+    const containerBox = withoutTransform(el, () => measuredBox(el));
+    return [{
+      kind: 'group',
+      selector: cssPath(el),
+      name: elementName(el),
+      box: transform ? transformedBoxAround(cs, containerBox, childBox, transform) : childBox,
+      childBox,
+      rotation: transform?.rotation ?? 0,
+      children,
+    }];
+  }
+
+  function unionBox(boxes: Box[]): Box {
+    let left = Infinity;
+    let top = Infinity;
+    let right = -Infinity;
+    let bottom = -Infinity;
+    for (const box of boxes) {
+      left = Math.min(left, box.x);
+      top = Math.min(top, box.y);
+      right = Math.max(right, box.x + box.w);
+      bottom = Math.max(bottom, box.y + box.h);
+    }
+    return { x: round(left), y: round(top), w: round(right - left), h: round(bottom - top) };
+  }
+
+  function walkPainting(el: HTMLElement): BrowserElement[] {
     const info = analyze(el);
     if (!info.selfPaint) {
       const nested: BrowserElement[] = [];
@@ -951,7 +999,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
       lastParagraphGap: lineBox ? round(Math.max(0, contentBottom - lineBox.lastBottom)) : 0,
       wrap,
       rtl,
-      trailingGuard: resolveTrailingGuard(lineGroups, availWidth, align),
+      trailingGuard: resolveTrailingGuard(lineGroups, availWidth, align, { el, skipNestedLists: false }),
       paragraphs: paragraphs.length ? paragraphs : [{ align, lineHeight: 0, spaceBefore: 0, spaceAfter: 0, indent, marginLeft: 0, level: 0, runs: runs.length ? runs : [{ kind: 'text', text: '', style: styleFromElement(el) }] }],
     };
 
@@ -1039,7 +1087,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
           previousBottom = lineBox.lastBottom;
         }
         const availWidth = li.getBoundingClientRect().width - px(liStyle.borderLeftWidth) - px(liStyle.borderRightWidth) - px(liStyle.paddingLeft) - px(liStyle.paddingRight);
-        trailingGuard = Math.max(trailingGuard, resolveTrailingGuard(measureLineGroups(host, true), availWidth, align));
+        trailingGuard = Math.max(trailingGuard, resolveTrailingGuard(measureLineGroups(host, true), availWidth, align, { el: host, skipNestedLists: true }));
 
         paragraphs.push({
           align,
@@ -1307,14 +1355,52 @@ export function measureSlideDocument(): BrowserMeasureResult {
     return groups;
   }
 
-  function resolveTrailingGuard(groups: LineGroup[], availWidth: number, align: Align): number {
+  /**
+   * Wrap-width guard, both directions (spec 04). Positive: a line fills its width to within 0.5 px, so PowerPoint
+   * gets 1 px more (0.5 per side when centred) in case its advances come out wider. Negative: the block's breaks
+   * change when Chromium gets 0.5 px more, so PowerPoint (whose advances may come out narrower) gets 1 px less.
+   */
+  function resolveTrailingGuard(groups: LineGroup[], availWidth: number, align: Align, block?: { el: HTMLElement; skipNestedLists: boolean }): number {
     let guard = 0;
     for (const group of groups) {
       if (availWidth - Math.max(0, group.right - group.left) < 0.5) {
         guard = Math.max(guard, align === 'ctr' ? 0.5 : 1);
       }
     }
+    if (guard === 0 && block && groups.length > 1 && breaksChangeWhenWidened(block.el, 0.5, groups, block.skipNestedLists)) {
+      guard = align === 'ctr' ? -0.5 : -1;
+    }
     return guard;
+  }
+
+  function breaksChangeWhenWidened(el: HTMLElement, delta: number, before: LineGroup[], skipNestedLists: boolean): boolean {
+    const rect = el.getBoundingClientRect();
+    const style = el.style;
+    const prior = { width: style.getPropertyValue('width'), widthPriority: style.getPropertyPriority('width'), minWidth: style.getPropertyValue('min-width'), minWidthPriority: style.getPropertyPriority('min-width'), maxWidth: style.getPropertyValue('max-width'), maxWidthPriority: style.getPropertyPriority('max-width'), sizing: style.getPropertyValue('box-sizing'), sizingPriority: style.getPropertyPriority('box-sizing'), flex: style.getPropertyValue('flex'), flexPriority: style.getPropertyPriority('flex') };
+    const widened = `${rect.width + delta}px`;
+    style.setProperty('box-sizing', 'border-box', 'important');
+    style.setProperty('width', widened, 'important');
+    style.setProperty('min-width', widened, 'important');
+    style.setProperty('max-width', widened, 'important');
+    style.setProperty('flex', 'none', 'important');
+    let changed = false;
+    try {
+      if (Math.abs(el.getBoundingClientRect().width - rect.width - delta) < 0.01) {
+        const after = measureLineGroups(el, skipNestedLists);
+        changed = after.length !== before.length || after.some((group, index) => Math.abs((group.right - group.left) - (before[index]!.right - before[index]!.left)) > 0.01);
+      }
+    } finally {
+      const restore = (name: string, value: string, priority: string): void => {
+        if (value) style.setProperty(name, value, priority);
+        else style.removeProperty(name);
+      };
+      restore('width', prior.width, prior.widthPriority);
+      restore('min-width', prior.minWidth, prior.minWidthPriority);
+      restore('max-width', prior.maxWidth, prior.maxWidthPriority);
+      restore('box-sizing', prior.sizing, prior.sizingPriority);
+      restore('flex', prior.flex, prior.flexPriority);
+    }
+    return changed;
   }
 
   function mergeRuns(runs: Run[]): Run[] {

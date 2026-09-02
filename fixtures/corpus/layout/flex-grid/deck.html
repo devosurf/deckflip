@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="deckflip:canvas" content="1280x720">
+<title>flex-grid</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #ffffff; }
+  body { font-family: Arial; color: #111827; }
+  body > section { position: relative; box-sizing: border-box; overflow: hidden; padding: 48px 64px; display: flex; flex-direction: column; gap: 24px; }
+  h1 { margin: 0; font-size: 36px; line-height: 44px; }
+  .row { display: flex; gap: 24px; flex: 1; }
+  .col { flex: 1; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr; gap: 16px; }
+  .card { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 16px 20px; font-size: 20px; line-height: 28px; }
+  .card.wide { grid-column: 1 / -1; background: #eff6ff; }
+  .card h2 { margin: 0 0 8px; font-size: 22px; line-height: 30px; }
+  .card p { margin: 0; }
+  .side { width: 360px; display: flex; flex-direction: column; justify-content: space-between; background: #1e293b; color: #ffffff; border-radius: 16px; padding: 24px; }
+  .side p { margin: 0; font-size: 20px; line-height: 28px; }
+  .side .big { font-size: 64px; line-height: 72px; font-weight: 700; }
+  footer { display: flex; justify-content: space-between; font-size: 16px; line-height: 22px; color: #64748b; }
+</style>
+</head>
+<body>
+<section>
+  <h1>Flex and grid composition</h1>
+  <div class="row">
+    <div class="col">
+      <div class="card wide" data-group><h2>Wide card</h2><p>Spans both grid columns; the heading and body are separate text boxes inside one group.</p></div>
+      <div class="card"><p>Left cell with enough words to wrap at least once in the column.</p></div>
+      <div class="card"><p>Right cell.</p></div>
+    </div>
+    <aside class="side" data-group>
+      <p>Key figure</p>
+      <p class="big">42%</p>
+      <p>up from last quarter</p>
+    </aside>
+  </div>
+  <footer><span>deckflip corpus</span><span>layout / flex-grid</span></footer>
+</section>
+</body>
+</html>

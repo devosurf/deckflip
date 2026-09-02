@@ -433,4 +433,48 @@ describe.skipIf(!browserAvailable)('measureDeck', () => {
       await browser.close();
     }
   });
+
+  it('measures data-group containers as groups of their painting descendants, nesting allowed', async () => {
+    const loaded = await loadDeck('test/html/fixtures/groups.html', {});
+    const browser = await chromium.launch();
+    try {
+      const measured = await measureDeck(loaded, { browser });
+      expect(measured.entries).toEqual([]);
+      const elements = measured.deck.slides[0]!.elements;
+      // the empty group emits nothing
+      expect(elements.map((element) => `${element.kind} ${element.name}`)).toEqual(['group div.card', 'group div.wrapper', 'group div.rotated']);
+
+      // a painting container with data-group: its own shape is the first child of the group
+      const card = elements[0]!;
+      if (card.kind !== 'group') throw new Error('card is not a group');
+      expect(card.box).toEqual({ x: 40, y: 40, w: 300, h: 200 });
+      expect(card.rotation).toBe(0);
+      expect(card.children.map((child) => `${child.kind} ${child.name}`)).toEqual(['shape div.card', 'shape h2', 'shape div.badge']);
+      // children keep slide coordinates
+      expect(card.children[2]!.box).toEqual({ x: 259, y: 189, w: 60, h: 30 });
+
+      // a layout-only wrapper emits no shape of its own; nested groups nest
+      const wrapper = elements[1]!;
+      if (wrapper.kind !== 'group') throw new Error('wrapper is not a group');
+      expect(wrapper.box).toEqual({ x: 400, y: 40, w: 250, h: 200 });
+      expect(wrapper.children.map((child) => `${child.kind} ${child.name}`)).toEqual(['shape div.inner', 'group div.nested']);
+      const nested = wrapper.children[1]!;
+      if (nested.kind !== 'group') throw new Error('nested is not a group');
+      expect(nested.box).toEqual({ x: 550, y: 140, w: 100, h: 100 });
+      expect(nested.children).toHaveLength(2);
+
+      // a rotated group: children measured untransformed; the union box (centre 850,90) rotates 20deg about the
+      // container centre (900,90): centre -> (853.02, 72.9)
+      const rotated = elements[2]!;
+      if (rotated.kind !== 'group') throw new Error('rotated is not a group');
+      expect(rotated.rotation).toBe(20);
+      expect(rotated.childBox).toEqual({ x: 800, y: 40, w: 100, h: 100 });
+      expect(rotated.box.x).toBeCloseTo(803.02, 1);
+      expect(rotated.box.y).toBeCloseTo(72.9 - 50, 1);
+      expect(rotated.box.w).toBe(100);
+      expect(rotated.children[0]!.box).toEqual({ x: 800, y: 40, w: 100, h: 100 });
+    } finally {
+      await browser.close();
+    }
+  });
 });

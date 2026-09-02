@@ -128,13 +128,19 @@ interface GuardPlan {
 function planGuard(shape: ShapeElement): GuardPlan {
   const plan: GuardPlan = { widen: 0, shift: 0, insetL: 0, insetR: 0 };
   const text = shape.text;
-  if (!text || text.trailingGuard <= 0) {
+  if (!text || text.trailingGuard === 0) {
     return plan;
   }
-  const stroke = strokeInsets(shape);
   const align = text.paragraphs[0]?.align;
   const wantL = align === 'ctr' ? text.trailingGuard / 2 : align === 'r' || text.rtl ? text.trailingGuard : 0;
   const wantR = text.trailingGuard - wantL;
+  if (text.trailingGuard < 0) {
+    // narrowing: insets can always grow, the shape never moves
+    plan.insetL = wantL;
+    plan.insetR = wantR;
+    return plan;
+  }
+  const stroke = strokeInsets(shape);
   plan.insetL = Math.min(wantL, text.padding.l + stroke.l);
   plan.insetR = Math.min(wantR, text.padding.r + stroke.r);
   plan.shift = wantL - plan.insetL;
@@ -153,6 +159,17 @@ function buildTransform(shape: ShapeElement, frame: Frame): XmlNode {
 
 function buildGeometry(shape: ShapeElement, frame: Frame): XmlNode {
   const geometry = shape.geometry;
+  const strokeHalf = (shape.line?.width ?? 0) / 2;
+  if (geometry.preset === 'custom') {
+    return buildRoundedPath(geometry.radii, frame, strokeHalf);
+  }
+  // Preset roundRect/ellipse inset their text rectangle (by the corner, or to the inscribed rectangle), which
+  // changes wrapping; a custom path with a full text rect keeps Chromium's line breaks. Text-free shapes keep
+  // the preset so they stay editable as such.
+  if (shape.text && geometry.preset !== 'rect') {
+    const radius: CornerRadius = geometry.preset === 'ellipse' ? { x: shape.box.w / 2, y: shape.box.h / 2 } : { x: geometry.radius, y: geometry.radius };
+    return buildRoundedPath({ tl: radius, tr: radius, br: radius, bl: radius }, frame, strokeHalf);
+  }
   if (geometry.preset === 'ellipse') {
     return el('a:prstGeom', { prst: 'ellipse' }, el('a:avLst'));
   }
@@ -160,9 +177,6 @@ function buildGeometry(shape: ShapeElement, frame: Frame): XmlNode {
     const minSide = Math.min(shape.box.w, shape.box.h);
     const adj = minSide > 0 ? clamp(Math.round((geometry.radius / (minSide / 2)) * 50000), 0, 50000) : 0;
     return el('a:prstGeom', { prst: 'roundRect' }, el('a:avLst', {}, el('a:gd', { name: 'adj', fmla: `val ${adj}` })));
-  }
-  if (geometry.preset === 'custom') {
-    return buildRoundedPath(geometry.radii, frame, (shape.line?.width ?? 0) / 2);
   }
   return el('a:prstGeom', { prst: 'rect' }, el('a:avLst'));
 }

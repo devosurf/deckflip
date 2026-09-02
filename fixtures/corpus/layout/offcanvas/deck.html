@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="deckflip:canvas" content="1280x720">
+<title>offcanvas</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #ffffff; }
+  body { font-family: Arial; color: #111827; }
+  body > section { position: relative; box-sizing: border-box; overflow: hidden; }
+  .label { position: absolute; left: 80px; top: 40px; margin: 0; font-size: 22px; line-height: 30px; }
+  .bleed-left { position: absolute; left: -120px; top: 120px; width: 400px; height: 160px; background: #2563eb; border-radius: 0 80px 80px 0; }
+  .bleed-bottom { position: absolute; left: 480px; top: 600px; width: 320px; height: 240px; background: #16a34a; }
+  .bleed-corner { position: absolute; left: 1120px; top: -80px; width: 240px; height: 240px; border-radius: 50%; background: #f59e0b; }
+  .gone { position: absolute; left: 1400px; top: 100px; width: 200px; height: 100px; background: #dc2626; }
+  .gone-text { position: absolute; left: 100px; top: 800px; margin: 0; }
+  .clipped-text { position: absolute; left: 900px; top: 400px; width: 500px; margin: 0; padding: 20px; background: #fef3c7; font-size: 24px; line-height: 32px; }
+  .hidden { position: absolute; left: 300px; top: 300px; width: 100px; height: 100px; background: #000000; visibility: hidden; }
+  .none { display: none; }
+</style>
+</head>
+<body>
+<section>
+  <p class="label">Elements bleeding past the canvas are clipped; fully outside ones are dropped</p>
+  <div class="bleed-left"></div>
+  <div class="bleed-bottom"></div>
+  <div class="bleed-corner"></div>
+  <div class="gone"></div>
+  <p class="gone-text">never visible</p>
+  <p class="clipped-text">This text box extends past the right edge of the canvas and is clipped there by PowerPoint.</p>
+  <div class="hidden"></div>
+  <div class="none"></div>
+</section>
+</body>
+</html>

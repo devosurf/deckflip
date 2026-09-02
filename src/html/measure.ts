@@ -3,10 +3,10 @@ import { unlink, writeFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Browser, Page } from 'playwright-core';
-import type { Deck, Element, PictureElement, Slide } from '../model/index.js';
+import type { Canvas, Deck, Element, PictureElement, Slide } from '../model/index.js';
 import { entry as reportEntry } from '../report/codes.js';
 import type { Entry } from '../report/types.js';
-import type { BrowserMeasureResult, BrowserPicture } from './browser-script.js';
+import type { BrowserElement, BrowserMeasureResult, BrowserPicture } from './browser-script.js';
 import { loadMedia } from './media.js';
 import { measureSlideDocument } from './browser-script.js';
 import type { LoadedDeck, SlideDocument } from './load.js';
@@ -42,41 +42,7 @@ export async function measureDeck(loaded: LoadedDeck, opts: MeasureOptions): Pro
           entries.push(reportEntry(raised.code, { slide: document.index, locator: { selector: raised.selector }, reason: raised.reason }));
         }
 
-        const measuredElements: Element[] = [];
-        for (const measured of result.shapes) {
-          const offcanvas = classifyOffcanvas(measured.box, loaded.canvas.width, loaded.canvas.height);
-          if (offcanvas === 'dropped') {
-            entries.push({
-              code: 'DROPPED_OFFCANVAS',
-              kind: 'dropped',
-              severity: 'info',
-              slide: document.index,
-              locator: { selector: measured.selector },
-              reason: `Element ${measured.name} is fully outside the canvas`,
-              hint: DROPPED_OFFCANVAS_HINT,
-            });
-            continue;
-          }
-          if (offcanvas === 'flattened') {
-            entries.push({
-              code: 'FLATTEN_OFFCANVAS',
-              kind: 'flattened',
-              severity: 'warning',
-              slide: document.index,
-              locator: { selector: measured.selector },
-              reason: `Element ${measured.name} extends beyond the canvas`,
-              hint: FLATTEN_OFFCANVAS_HINT.replace('{el}', measured.name).replace('{W}', String(loaded.canvas.width)).replace('{H}', String(loaded.canvas.height)),
-            });
-          }
-          if (measured.kind === 'picture') {
-            const picture = await resolvePicture(page, measured, document.index, entries);
-            if (picture) {
-              measuredElements.push(picture);
-            }
-            continue;
-          }
-          measuredElements.push(measured);
-        }
+        const measuredElements = await resolveElements(page, result.shapes, document.index, loaded.canvas, entries);
 
         for (const face of result.fontFaces) {
           const normalized = { ...face, file: fileURLToPath(face.file) };
@@ -134,6 +100,53 @@ async function measureDocumentPage(page: Page, slideDoc: SlideDocument): Promise
   }
 }
 
+
+/** Off-canvas classification and picture byte loading, recursing into groups (whose children are already inside the group's box). */
+async function resolveElements(page: Page, measured: BrowserElement[], slide: number, canvas: Canvas, entries: Entry[]): Promise<Element[]> {
+  const out: Element[] = [];
+  for (const element of measured) {
+    const offcanvas = classifyOffcanvas(element.box, canvas.width, canvas.height);
+    if (offcanvas === 'dropped') {
+      entries.push({
+        code: 'DROPPED_OFFCANVAS',
+        kind: 'dropped',
+        severity: 'info',
+        slide,
+        locator: { selector: element.selector },
+        reason: `Element ${element.name} is fully outside the canvas`,
+        hint: DROPPED_OFFCANVAS_HINT,
+      });
+      continue;
+    }
+    if (offcanvas === 'flattened') {
+      entries.push({
+        code: 'FLATTEN_OFFCANVAS',
+        kind: 'flattened',
+        severity: 'warning',
+        slide,
+        locator: { selector: element.selector },
+        reason: `Element ${element.name} extends beyond the canvas`,
+        hint: FLATTEN_OFFCANVAS_HINT.replace('{el}', element.name).replace('{W}', String(canvas.width)).replace('{H}', String(canvas.height)),
+      });
+    }
+    if (element.kind === 'picture') {
+      const picture = await resolvePicture(page, element, slide, entries);
+      if (picture) {
+        out.push(picture);
+      }
+      continue;
+    }
+    if (element.kind === 'group') {
+      const children = await resolveElements(page, element.children, slide, canvas, entries);
+      if (children.length > 0) {
+        out.push({ ...element, children });
+      }
+      continue;
+    }
+    out.push(element);
+  }
+  return out;
+}
 
 /**
  * Loads the picture's bytes: PNG/JPEG as they are, GIF/WebP re-encoded (`SUBSTITUTE_IMAGE_FORMAT`), SVG as the

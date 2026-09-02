@@ -41,7 +41,22 @@ export interface Slide {
   notes?: TextBody;
 }
 
-export type Element = ShapeElement | PictureElement | TableElement;
+export type Element = ShapeElement | PictureElement | TableElement | GroupElement;
+
+/** A `data-group` container: `p:grpSp` around its painting descendants (spec 03 rule 4). */
+export interface GroupElement {
+  kind: 'group';
+  selector: string;
+  name: string;
+  /** placement on the Slide after the container's transform, CSS px -> `a:off`/`a:ext` */
+  box: Box;
+  /** union of the children's boxes in their own (untransformed) coordinates -> `a:chOff`/`a:chExt` */
+  childBox: Box;
+  /** degrees clockwise */
+  rotation: number;
+  /** paint order; a painting container's own shape comes first */
+  children: Element[];
+}
 
 /** A `table`, emitted as `a:tbl` in a `p:graphicFrame`. */
 export interface TableElement {
@@ -196,7 +211,7 @@ export interface TextBody {
   /** false for `white-space: nowrap|pre` */
   wrap: boolean;
   rtl: boolean;
-  /** widening applied on the trailing side when a line is within 0.5 px of the wrap width (0, 0.5 or 1) */
+  /** wrap-width guard on the trailing side, CSS px: +0.5/+1 when a line fills its width to within 0.5 px, -0.5/-1 when 0.5 px more would move a break, else 0 */
   trailingGuard: number;
   paragraphs: Paragraph[];
 }
@@ -274,7 +289,7 @@ export interface ResolvedFont {
   fsType: number;
 }
 
-/** Every text body an element owns, with the selector to report against: shapes have at most one, tables one per origin cell. */
+/** Every text body an element owns, with the selector to report against: shapes have at most one, tables one per origin cell, groups recurse. */
 export function* textBodiesOf(element: Element): Generator<{ body: TextBody; selector: string }> {
   if (element.kind === 'shape') {
     if (element.text) yield { body: element.text, selector: element.selector };
@@ -283,6 +298,10 @@ export function* textBodiesOf(element: Element): Generator<{ body: TextBody; sel
       for (const cell of row.cells) {
         if (!cell.merged) yield { body: cell.text, selector: element.selector };
       }
+    }
+  } else if (element.kind === 'group') {
+    for (const child of element.children) {
+      yield* textBodiesOf(child);
     }
   }
 }

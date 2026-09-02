@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Groups fixture</title>
+    <style>
+      section {
+        font-family: Arial, sans-serif;
+        font-size: 20px;
+        line-height: 1.2;
+        color: #111827;
+      }
+      .card {
+        position: absolute;
+        left: 40px;
+        top: 40px;
+        width: 300px;
+        height: 200px;
+        background: #f8fafc;
+        border: 1px solid #cbd5e1;
+        box-sizing: border-box;
+      }
+      .card h2 {
+        position: absolute;
+        left: 20px;
+        top: 20px;
+        margin: 0;
+        width: 260px;
+      }
+      .card .badge {
+        position: absolute;
+        right: 20px;
+        bottom: 20px;
+        width: 60px;
+        height: 30px;
+        background: #2563eb;
+      }
+      .wrapper {
+        position: absolute;
+        left: 400px;
+        top: 40px;
+        width: 300px;
+        height: 200px;
+      }
+      .wrapper .inner {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100px;
+        height: 100px;
+        background: #16a34a;
+      }
+      .wrapper .nested {
+        position: absolute;
+        left: 150px;
+        top: 100px;
+        width: 100px;
+        height: 100px;
+      }
+      .nested div {
+        position: absolute;
+        width: 40px;
+        height: 40px;
+        background: #dc2626;
+      }
+      .nested .b {
+        left: 60px;
+        top: 60px;
+      }
+      .rotated {
+        position: absolute;
+        left: 800px;
+        top: 40px;
+        width: 200px;
+        height: 100px;
+        transform: rotate(20deg);
+      }
+      .rotated div {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100px;
+        height: 100px;
+        background: #7c3aed;
+      }
+      .empty {
+        position: absolute;
+        left: 1100px;
+        top: 40px;
+        width: 100px;
+        height: 100px;
+      }
+    </style>
+  </head>
+  <body>
+    <section id="slide-1">
+      <div class="card" data-group>
+        <h2>Card title</h2>
+        <div class="badge"></div>
+      </div>
+      <div class="wrapper" data-group>
+        <div class="inner"></div>
+        <div class="nested" data-group>
+          <div class="a"></div>
+          <div class="b"></div>
+        </div>
+      </div>
+      <div class="rotated" data-group>
+        <div></div>
+      </div>
+      <div class="empty" data-group></div>
+    </section>
+  </body>
+</html>

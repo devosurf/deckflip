@@ -395,6 +395,50 @@ describe('emitPptx', () => {
     expect(slideXml).toMatch(/<a:tc hMerge="1"><a:txBody><a:bodyPr\/><a:lstStyle\/><a:p><a:endParaRPr lang="en-US" sz="1500"\/><\/a:p><\/a:txBody><a:tcPr\/>/);
   });
 
+  it('emits groups as p:grpSp with child coordinate space and nested ids in document order', async () => {
+    const groupDeck = deck();
+    const [rect, textbox] = [shapeAt(groupDeck, 0), shapeAt(groupDeck, 1)];
+    groupDeck.slides[0]!.elements = [
+      {
+        kind: 'group',
+        selector: '#g',
+        name: 'div.card',
+        box: { x: 103.02, y: 22.9, w: 100, h: 100 },
+        childBox: { x: 30, y: 20, w: 200, h: 100 },
+        rotation: 20,
+        children: [rect, { kind: 'group', selector: '#n', name: 'div.nested', box: { x: 30, y: 40, w: 200, h: 80 }, childBox: { x: 30, y: 40, w: 200, h: 80 }, rotation: 0, children: [textbox] }],
+      },
+    ];
+
+    const zip = await JSZip.loadAsync(await emitPptx(groupDeck, { created, appVersion: '1.2.3' }));
+    const slideXml = await zip.file('ppt/slides/slide1.xml')!.async('string');
+
+    expect(slideXml).toContain(
+      '<p:grpSp><p:nvGrpSpPr><p:cNvPr id="2" name="div.card"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>'
+        + '<p:grpSpPr><a:xfrm rot="1200000"><a:off x="981266" y="218123"/><a:ext cx="952500" cy="952500"/><a:chOff x="285750" y="190500"/><a:chExt cx="1905000" cy="952500"/></a:xfrm></p:grpSpPr>'
+        + '<p:sp><p:nvSpPr><p:cNvPr id="3" name="rect"/>',
+    );
+    expect(slideXml).toContain('<p:grpSp><p:nvGrpSpPr><p:cNvPr id="4" name="div.nested"/>');
+    expect(slideXml).toContain('<p:cNvPr id="5" name="textbox"/>');
+    expect(slideXml.match(/<\/p:grpSp>/g)).toHaveLength(2);
+  });
+
+  it('emits text-bearing rounded shapes as a custom path with a full text rectangle', async () => {
+    const roundedDeck = deck();
+    shapeAt(roundedDeck, 0).geometry = { preset: 'roundRect', radius: 10 };
+    shapeAt(roundedDeck, 1).geometry = { preset: 'roundRect', radius: 20 };
+
+    const zip = await JSZip.loadAsync(await emitPptx(roundedDeck, { created, appVersion: '1.2.3' }));
+    const slideXml = await zip.file('ppt/slides/slide1.xml')!.async('string');
+
+    // text-free: the preset keeps the shape editable as a rounded rectangle
+    expect(slideXml).toContain('<p:cNvPr id="2" name="rect"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm rot="0"><a:off x="762000" y="190500"/><a:ext cx="952500" cy="476250"/></a:xfrm><a:prstGeom prst="roundRect">');
+    // with text: PowerPoint insets a preset roundRect\'s text rectangle by the radius, which changes wrapping
+    expect(slideXml).toContain('<p:cNvPr id="3" name="textbox"/>');
+    expect(slideXml).toContain('<a:custGeom><a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/><a:rect l="0" t="0" r="r" b="b"/><a:pathLst><a:path w="1905000" h="762000"><a:moveTo><a:pt x="190500" y="0"/></a:moveTo>');
+    expect(slideXml).not.toContain('<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val 25000"/>');
+  });
+
   it.skipIf(!sofficeAvailable)('opens in LibreOffice and converts to PDF', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'deckflip-emit-'));
     const pptxPath = join(dir, 'deck.pptx');

@@ -139,7 +139,10 @@ function uniqueFonts(deck: Deck): ResolvedFont[] {
   return [...fonts.values()];
 }
 
-function inspectElement(element: Element) {
+function inspectElement(element: Element): Record<string, unknown> {
+  if (element.kind === 'group') {
+    return { kind: 'group', selector: element.selector, box: element.box, children: element.children.map((child) => inspectElement(child)) };
+  }
   if (element.kind === 'picture' || element.kind === 'table') {
     return { kind: element.kind, selector: element.selector, box: element.box };
   }

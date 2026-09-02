@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="deckflip:canvas" content="1280x720">
+<title>overlap</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #ffffff; }
+  body { font-family: Arial; color: #111827; }
+  body > section { position: relative; box-sizing: border-box; overflow: hidden; }
+  .band { position: absolute; left: 0; top: 0; width: 1280px; height: 320px; background: linear-gradient(120deg, #0f172a, #1d4ed8); }
+  .title { position: absolute; left: 80px; top: 96px; width: 800px; margin: 0; color: #ffffff; font-size: 48px; line-height: 56px; }
+  .circle { position: absolute; left: 960px; top: 60px; width: 240px; height: 240px; border-radius: 50%; background: #f59e0b; }
+  .circle-2 { position: absolute; left: 1080px; top: 180px; width: 160px; height: 160px; border-radius: 50%; background: rgba(236, 72, 153, 0.8); }
+  .panel { position: absolute; left: 80px; top: 260px; width: 560px; height: 300px; background: #ffffff; border-radius: 16px; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.25); padding: 32px; box-sizing: border-box; }
+  .panel h2 { margin: 0 0 12px; font-size: 26px; line-height: 34px; }
+  .panel p { margin: 0; font-size: 20px; line-height: 28px; }
+  .stack { position: absolute; left: 720px; top: 380px; }
+  .stack div { position: absolute; width: 200px; height: 120px; border-radius: 8px; }
+  .stack .s1 { left: 0; top: 0; background: #22c55e; }
+  .stack .s2 { left: 40px; top: 40px; background: #3b82f6; transform: rotate(-6deg); }
+  .stack .s3 { left: 80px; top: 80px; background: #a855f7; transform: rotate(6deg); }
+  .stack .s4 { left: 120px; top: 120px; background: #ef4444; opacity: 0.85; }
+  .tag { position: absolute; left: 1040px; top: 620px; margin: 0; padding: 8px 16px; background: #111827; color: #ffffff; font-size: 18px; line-height: 24px; border-radius: 999px; }
+</style>
+</head>
+<body>
+<section>
+  <div class="band"></div>
+  <h1 class="title">Overlapping layers keep their paint order</h1>
+  <div class="circle"></div>
+  <div class="circle-2"></div>
+  <div class="panel">
+    <h2>A panel over the band</h2>
+    <p>The white panel sits across the gradient edge with a soft shadow; z-order follows document order, so it paints above the band and below nothing.</p>
+  </div>
+  <div class="stack" data-group>
+    <div class="s1"></div>
+    <div class="s2"></div>
+    <div class="s3"></div>
+    <div class="s4"></div>
+  </div>
+  <p class="tag">pill label</p>
+</section>
+</body>
+</html>
