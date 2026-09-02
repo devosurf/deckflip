@@ -1,0 +1,3 @@
+# Line spacing is always emitted as measured `spcPts`, never `spcPct`
+
+Every paragraph gets `a:lnSpc/a:spcPts` equal to the line-box height Chromium measured, plus a font-metric correction folded into `tIns` for the first baseline; CSS unitless `line-height` is never mapped to `a:spcPct`. The spike showed that `spcPct` is a percentage of PowerPoint's own font-dependent natural line height (about 1.15-1.25 em for Arial), so `line-height: 1.4` -> `140%` drifts by 6 px per line, while measured `spcPts` reproduced the pitch exactly. The cost is that a user changing font size in PowerPoint keeps a fixed line pitch until they reset spacing, which is the same behaviour PowerPoint gives any "Exactly" spaced text.
