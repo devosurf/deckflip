@@ -82,7 +82,7 @@ async function runHtmlPipeline(
   const browser =
     opts.browser ?? (await launchChromium({ ...(opts.browserPath === undefined ? {} : { browserPath: opts.browserPath }), offline: opts.offline }));
   try {
-    const measured = await measureDeck(loaded, { browser });
+    const measured = await measureDeck(loaded, { browser, rasterDpi: opts.rasterDpi });
     const catalog = await FontCatalog.scan({ extraFiles: measured.deck.fontFaces.map((face) => face.file) });
     const fontEntries = resolveDeckFonts(measured.deck, catalog, { embedFonts: opts.embedFonts });
     const entries = [...baseEntries, ...measured.entries, ...fontEntries];

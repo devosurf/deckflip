@@ -12,16 +12,37 @@ export interface BrowserEntry {
   code: string;
   selector: string;
   reason: string;
+  /** hint template substitutions (`{decl}`, `{el}`) */
+  params?: Record<string, string>;
 }
 
 export type BrowserPictureSource = { kind: 'file'; url: string } | { kind: 'inline-svg'; svg: string };
 
 /** A picture as measured in the page; measure.ts loads the bytes and turns it into a `PictureElement`. */
-export type BrowserPicture = Omit<PictureElement, 'media' | 'vector'> & { source: BrowserPictureSource };
+export type BrowserPicture = Omit<PictureElement, 'media' | 'vector' | 'source' | 'explicit'> & { source: BrowserPictureSource };
 
 export type BrowserGroup = Omit<GroupElement, 'children'> & { children: BrowserElement[] };
 
-export type BrowserElement = ShapeElement | BrowserPicture | TableElement | BrowserGroup;
+/** The raster trigger family suffix (`RASTER_<X>` / `FLATTEN_<X>`) plus the offending declaration. */
+export interface RasterTrigger {
+  suffix: string;
+  decl: string;
+}
+
+/**
+ * A subtree the raster pass captures as one picture (spec 05): `box` is the painted extent as rendered
+ * (transforms applied, shadow/filter/outline overflow and descendants included), in slide coordinates,
+ * not yet clipped to the Canvas. `trigger` is absent for `data-raster`.
+ */
+export interface BrowserRaster {
+  kind: 'raster';
+  selector: string;
+  name: string;
+  box: Box;
+  trigger?: RasterTrigger;
+}
+
+export type BrowserElement = ShapeElement | BrowserPicture | TableElement | BrowserGroup | BrowserRaster;
 
 export interface BrowserMeasureResult {
   meta: {
@@ -37,6 +58,9 @@ export interface BrowserMeasureResult {
   entries: BrowserEntry[];
   fontFaces: BrowserFontFace[];
 }
+
+/** Marks the stylesheet measure.ts injects to freeze animations; `validateDocument` lifts it while reading `transition`. */
+export const FREEZE_ATTR = 'data-deckflip-freeze';
 
 export function measureSlideDocument(): BrowserMeasureResult {
   type LineGroup = { top: number; left: number; right: number; bottom: number; height: number };
@@ -68,6 +92,12 @@ export function measureSlideDocument(): BrowserMeasureResult {
 
   const shapes: BrowserElement[] = [];
   const entries: BrowserEntry[] = [];
+  validateDocument(section);
+  // Spec 03 rule 3 applies to the Slide too: a section with a background, border or shadow paints a full-Canvas
+  // shape behind everything else. Its text always belongs to descendants, so the shape is text-free.
+  if (paintsBox(section)) {
+    shapes.push(makeShape(section, measuredBox(section)));
+  }
   for (const child of Array.from(section.children) as HTMLElement[]) {
     shapes.push(...walkElement(child));
   }
@@ -80,14 +110,363 @@ export function measureSlideDocument(): BrowserMeasureResult {
   };
 
 
+  /**
+   * `VALIDATE_TEXT_CSS` and `VALIDATE_POSITION` (spec 03 "Rejected by validate"): computed styles the emitter
+   * cannot map to one box or to PowerPoint line breaks. Inherited properties are reported once, on the element
+   * whose computed value differs from its parent's, so a declaration on a container yields one entry.
+   */
+  function validateDocument(root: HTMLElement): void {
+    if (Array.from(document.styleSheets).some(hasPageRule)) {
+      entries.push({ code: 'VALIDATE_POSITION', selector: 'body > section', reason: '@page rule in a stylesheet' });
+    }
+    // The measurement page freezes animations and removes transitions; lift that sheet so computed
+    // `transition-*` still shows what the author wrote. Nothing changes value meanwhile, so nothing animates.
+    const freeze = document.querySelector('style[data-deckflip-freeze]') as HTMLStyleElement | null; // FREEZE_ATTR; the page script cannot see module constants
+    if (freeze) {
+      freeze.disabled = true;
+    }
+    try {
+      for (const child of Array.from(root.children) as HTMLElement[]) {
+        validateSubtree(child, getComputedStyle(root));
+      }
+    } finally {
+      if (freeze) {
+        freeze.disabled = false;
+      }
+    }
+  }
+
+  function hasPageRule(sheet: CSSStyleSheet): boolean {
+    try {
+      return Array.from(sheet.cssRules).some((rule) => rule instanceof CSSPageRule);
+    } catch {
+      return false;
+    }
+  }
+
+  function validateSubtree(el: HTMLElement, parent: CSSStyleDeclaration): void {
+    if (isSkipped(el)) {
+      return;
+    }
+    const cs = getComputedStyle(el);
+    const name = elementName(el);
+    for (const decl of rejectedTextDeclarations(cs, parent)) {
+      entries.push({ code: 'VALIDATE_TEXT_CSS', selector: cssPath(el), reason: `${decl} on ${name}`, params: { decl } });
+    }
+    for (const decl of rejectedPositionDeclarations(cs, parent)) {
+      entries.push({ code: 'VALIDATE_POSITION', selector: cssPath(el), reason: `${decl} on ${name}` });
+    }
+    for (const { code, decl } of flattenedDeclarations(el, cs, parent)) {
+      entries.push({ code, selector: cssPath(el), reason: `${decl} on ${name}` });
+    }
+    if (el.tagName === 'VIDEO' && !el.hasAttribute('poster')) {
+      entries.push({ code: 'FLATTEN_MEDIA_POSTER', selector: cssPath(el), reason: `${name} has no poster` });
+    }
+    for (const child of Array.from(el.children) as HTMLElement[]) {
+      validateSubtree(child, cs);
+    }
+  }
+
+  /**
+   * Text effects without a DrawingML mapping (spec 08 `FLATTEN_TEXT_*`, reported once on the element that
+   * declares them and only where text is rendered) and `animation`/`transition` (`FLATTEN_ANIMATION`, info).
+   */
+  function flattenedDeclarations(el: HTMLElement, cs: CSSStyleDeclaration, parent: CSSStyleDeclaration): Array<{ code: string; decl: string }> {
+    const out: Array<{ code: string; decl: string }> = [];
+    const changed = (property: string): string | undefined => {
+      const value = cs.getPropertyValue(property);
+      return value !== parent.getPropertyValue(property) ? value : undefined;
+    };
+    if (bearsText(el)) {
+      const strokeWidth = changed('-webkit-text-stroke-width');
+      if (strokeWidth !== undefined && px(strokeWidth) > 0) {
+        out.push({ code: 'FLATTEN_TEXT_STROKE', decl: `-webkit-text-stroke: ${strokeWidth} ${cs.getPropertyValue('-webkit-text-stroke-color')}` });
+      }
+      if (changed('background-clip') === 'text' || changed('-webkit-background-clip') === 'text') {
+        out.push({ code: 'FLATTEN_TEXT_BACKGROUND_CLIP', decl: 'background-clip: text' });
+      }
+      const decorationStyle = changed('text-decoration-style');
+      if (decorationStyle !== undefined && decorationStyle !== 'solid' && cs.textDecorationLine !== 'none') {
+        out.push({ code: 'FLATTEN_TEXT_DECORATION_STYLE', decl: `text-decoration-style: ${decorationStyle}` });
+      }
+      for (const property of ['font-variant-caps', 'font-variant-numeric', 'font-variant-ligatures', 'font-variant-east-asian', 'font-variant-alternates', 'font-variant-position']) {
+        const value = changed(property);
+        if (value !== undefined && value !== 'normal' && !(property === 'font-variant-caps' && value === 'small-caps')) {
+          out.push({ code: 'FLATTEN_TEXT_FONT_VARIANT', decl: `${property}: ${value}` });
+        }
+      }
+      const textShadow = changed('text-shadow');
+      if (textShadow !== undefined && textShadow !== 'none' && splitTopLevel(textShadow).length > 1) {
+        out.push({ code: 'FLATTEN_TEXT_SHADOW_MULTI', decl: `text-shadow: ${textShadow}` });
+      }
+    }
+    if (cs.animationName !== 'none') {
+      out.push({ code: 'FLATTEN_ANIMATION', decl: `animation: ${cs.animationName}` });
+    }
+    const transitions = cs.transitionDuration.split(',').map((d) => parseFloat(d));
+    if (transitions.some((duration) => duration > 0)) {
+      out.push({ code: 'FLATTEN_ANIMATION', decl: `transition: ${cs.transitionProperty} ${cs.transitionDuration}` });
+    }
+    return out;
+  }
+
+  function rejectedTextDeclarations(cs: CSSStyleDeclaration, parent: CSSStyleDeclaration): string[] {
+    const out: string[] = [];
+    const changed = (property: string): string | undefined => {
+      const value = cs.getPropertyValue(property);
+      return value !== parent.getPropertyValue(property) ? value : undefined;
+    };
+    const hyphens = changed('hyphens');
+    if (hyphens === 'auto') {
+      out.push('hyphens: auto');
+    }
+    const wrap = changed('text-wrap-style') ?? changed('text-wrap');
+    if (wrap === 'balance' || wrap === 'pretty') {
+      out.push(`text-wrap: ${wrap}`);
+    }
+    const writingMode = changed('writing-mode');
+    if (writingMode !== undefined && writingMode !== 'horizontal-tb') {
+      out.push(`writing-mode: ${writingMode}`);
+    }
+    for (const property of ['column-count', 'column-width']) {
+      const value = changed(property);
+      if (value !== undefined && value !== 'auto') {
+        out.push(`${property}: ${value}`);
+      }
+    }
+    const orientation = changed('text-orientation');
+    if (orientation !== undefined && orientation !== 'mixed') {
+      out.push(`text-orientation: ${orientation}`);
+    }
+    const sizeAdjust = changed('font-size-adjust');
+    if (sizeAdjust !== undefined && sizeAdjust !== 'none') {
+      out.push(`font-size-adjust: ${sizeAdjust}`);
+    }
+    const stretch = changed('font-stretch');
+    if (stretch !== undefined && stretch !== '100%' && stretch !== 'normal') {
+      out.push(`font-stretch: ${stretch}`);
+    }
+    return out;
+  }
+
+  function rejectedPositionDeclarations(cs: CSSStyleDeclaration, parent: CSSStyleDeclaration): string[] {
+    const out: string[] = [];
+    if (cs.position === 'fixed' || cs.position === 'sticky') {
+      out.push(`position: ${cs.position}`);
+    }
+    const zoom = cs.getPropertyValue('zoom');
+    if (zoom !== '' && zoom !== '1' && zoom !== 'normal' && zoom !== parent.getPropertyValue('zoom')) {
+      out.push(`zoom: ${zoom}`);
+    }
+    return out;
+  }
+
   function walkElement(el: HTMLElement): BrowserElement[] {
     if (isSkipped(el)) {
       return [];
+    }
+    const raster = classifyRaster(el);
+    if (raster) {
+      return [raster];
     }
     if (el.hasAttribute('data-group') && !isPictureElement(el) && el.tagName !== 'TABLE' && !isTextBlock(el)) {
       return measureGroup(el);
     }
     return walkPainting(el);
+  }
+
+  /**
+   * Spec 05: `data-raster` rasterises the subtree, text and all. Otherwise the first raster trigger on a
+   * text-free element rasterises it; on a text-bearing element the effect is flattened (`FLATTEN_<X>` entry,
+   * the element is measured as if the declaration were absent) and the walk continues.
+   */
+  function classifyRaster(el: HTMLElement): BrowserRaster | undefined {
+    const selector = cssPath(el);
+    const name = elementName(el);
+    if (el.hasAttribute('data-raster')) {
+      return { kind: 'raster', selector, name, box: paintedExtent(el) };
+    }
+    const cs = getComputedStyle(el);
+    const trigger = rasterTrigger(el, cs);
+    if (!trigger) {
+      return undefined;
+    }
+    if (bearsText(el)) {
+      entries.push({ code: `FLATTEN_${trigger.suffix}`, selector, reason: `${trigger.decl} on ${name} cannot be applied to editable text`, params: { decl: trigger.decl } });
+      return undefined;
+    }
+    return { kind: 'raster', selector, name, box: paintedExtent(el), trigger };
+  }
+
+  /** Whether any rendered text lives in the subtree: hidden branches and speaker notes do not count. */
+  function bearsText(el: HTMLElement): boolean {
+    for (const node of Array.from(el.childNodes)) {
+      if (node.nodeType === Node.TEXT_NODE && (node.textContent ?? '').replace(/[\s\u00AD\u200B\u200C\u200D]/g, '') !== '') {
+        return true;
+      }
+      if (node.nodeType === Node.ELEMENT_NODE && !isSkipped(node as HTMLElement) && bearsText(node as HTMLElement)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** The first trigger in spec order (08-report-codes.md, RASTER_*), or undefined when everything maps natively. */
+  function rasterTrigger(el: HTMLElement, cs: CSSStyleDeclaration): RasterTrigger | undefined {
+    if (cs.filter !== 'none') {
+      return { suffix: 'CSS_FILTER', decl: `filter: ${cs.filter}` };
+    }
+    const backdrop = cs.getPropertyValue('backdrop-filter');
+    if (backdrop && backdrop !== 'none') {
+      return { suffix: 'BACKDROP_FILTER', decl: `backdrop-filter: ${backdrop}` };
+    }
+    if (cs.mixBlendMode !== 'normal') {
+      return { suffix: 'BLEND_MODE', decl: `mix-blend-mode: ${cs.mixBlendMode}` };
+    }
+    const mask = cs.getPropertyValue('mask-image') || cs.getPropertyValue('-webkit-mask-image');
+    if (mask && mask !== 'none') {
+      return { suffix: 'MASK', decl: `mask-image: ${mask}` };
+    }
+    if (cs.clipPath !== 'none' && !(el.tagName === 'IMG' && parseClipInset(cs.clipPath, 1, 1))) {
+      return { suffix: 'CLIP_PATH', decl: `clip-path: ${cs.clipPath}` };
+    }
+    const gradient = unsupportedGradient(cs.backgroundImage);
+    if (gradient) {
+      return { suffix: 'GRADIENT', decl: `background-image: ${gradient}` };
+    }
+    if (cs.boxShadow !== 'none' && !parseShadow(cs.boxShadow) && shadowLayers(cs.boxShadow).some((layer) => layer.color.alpha > 0)) {
+      return { suffix: 'SHADOW', decl: `box-shadow: ${cs.boxShadow}` };
+    }
+    const borderStyle = unsupportedBorderStyle(cs);
+    if (borderStyle) {
+      return { suffix: 'BORDER_STYLE', decl: borderStyle };
+    }
+    if (cs.borderImageSource !== 'none') {
+      return { suffix: 'BORDER_IMAGE', decl: `border-image: ${cs.borderImageSource}` };
+    }
+    if (cs.transform !== 'none' && !decomposeTransform(cs.transform)) {
+      return { suffix: 'TRANSFORM', decl: `transform: ${cs.transform}` };
+    }
+    const outline = unsupportedOutline(cs);
+    if (outline) {
+      return { suffix: 'OUTLINE', decl: outline };
+    }
+    return undefined;
+  }
+
+  /** conic, repeating, layered, or gradient-plus-image backgrounds: the offending layer list, else undefined. */
+  function unsupportedGradient(backgroundImage: string): string | undefined {
+    const value = backgroundImage.trim();
+    if (!value || value === 'none') {
+      return undefined;
+    }
+    const layers = splitTopLevel(value);
+    if (layers.length > 1 && layers.some((layer) => /-gradient\(/.test(layer))) {
+      return value;
+    }
+    return /^(conic|repeating-[a-z]+)-gradient\(/.test(layers[0]!.trim()) ? value : undefined;
+  }
+
+  /** `double`, `groove`, `ridge`, `inset`, `outset` on any side that paints. */
+  function unsupportedBorderStyle(cs: CSSStyleDeclaration): string | undefined {
+    const sides: Array<[string, string, string]> = [
+      ['border-top-style', cs.borderTopStyle, cs.borderTopWidth],
+      ['border-right-style', cs.borderRightStyle, cs.borderRightWidth],
+      ['border-bottom-style', cs.borderBottomStyle, cs.borderBottomWidth],
+      ['border-left-style', cs.borderLeftStyle, cs.borderLeftWidth],
+    ];
+    for (const [property, style, width] of sides) {
+      if (['double', 'groove', 'ridge', 'inset', 'outset'].includes(style) && px(width) > 0) {
+        return `${property}: ${style}`;
+      }
+    }
+    return undefined;
+  }
+
+  /** An outline that is not a plain solid/dashed/dotted line hugging the border box, or that doubles a border. */
+  function unsupportedOutline(cs: CSSStyleDeclaration): string | undefined {
+    if (cs.outlineStyle === 'none' || px(cs.outlineWidth) <= 0 || (parseColor(cs.outlineColor)?.alpha ?? 0) <= 0) {
+      return undefined;
+    }
+    if (!['solid', 'dashed', 'dotted'].includes(cs.outlineStyle) || px(cs.outlineOffset) !== 0 || parseBorderSides(cs)) {
+      return `outline: ${cs.outlineWidth} ${cs.outlineStyle} ${cs.outlineColor}${px(cs.outlineOffset) !== 0 ? `; outline-offset: ${cs.outlineOffset}` : ''}`;
+    }
+    return undefined;
+  }
+
+  /** Computed `box-shadow` layers: colour, offsets, blur, spread, inset. */
+  function shadowLayers(value: string): Array<{ color: Color; x: number; y: number; blur: number; spread: number; inset: boolean }> {
+    const layers: Array<{ color: Color; x: number; y: number; blur: number; spread: number; inset: boolean }> = [];
+    if (!value || value === 'none') {
+      return layers;
+    }
+    for (const layer of splitTopLevel(value)) {
+      const match = layer.trim().match(/^(rgba?\([^)]*\)|transparent)\s+(-?[\d.]+)px\s+(-?[\d.]+)px\s+(-?[\d.]+)px\s+(-?[\d.]+)px(\s+inset)?$/i);
+      const color = match ? parseColor(match[1]!) : undefined;
+      if (!match || !color) {
+        continue;
+      }
+      layers.push({ color, x: parseFloat(match[2]!), y: parseFloat(match[3]!), blur: parseFloat(match[4]!), spread: parseFloat(match[5]!), inset: Boolean(match[6]) });
+    }
+    return layers;
+  }
+
+  /**
+   * The clip rectangle of a raster (spec 05): the subtree's rendered bounds (transforms applied) grown by the
+   * element's painted overflow: outer shadows, `filter` blur / drop-shadow radii, outline.
+   */
+  function paintedExtent(el: HTMLElement): Box {
+    const cs = getComputedStyle(el);
+    let left = Infinity;
+    let top = Infinity;
+    let right = -Infinity;
+    let bottom = -Infinity;
+    const include = (node: HTMLElement): void => {
+      if (node !== el && isSkipped(node)) {
+        return;
+      }
+      const rect = node.getBoundingClientRect();
+      left = Math.min(left, rect.left);
+      top = Math.min(top, rect.top);
+      right = Math.max(right, rect.right);
+      bottom = Math.max(bottom, rect.bottom);
+      for (const child of Array.from(node.children) as HTMLElement[]) {
+        include(child);
+      }
+    };
+    include(el);
+    const overflow = { l: 0, t: 0, r: 0, b: 0 };
+    const grow = (l: number, t: number, r: number, b: number): void => {
+      overflow.l = Math.max(overflow.l, l);
+      overflow.t = Math.max(overflow.t, t);
+      overflow.r = Math.max(overflow.r, r);
+      overflow.b = Math.max(overflow.b, b);
+    };
+    for (const layer of shadowLayers(cs.boxShadow)) {
+      if (!layer.inset && layer.color.alpha > 0) {
+        grow(layer.blur + layer.spread - layer.x, layer.blur + layer.spread - layer.y, layer.blur + layer.spread + layer.x, layer.blur + layer.spread + layer.y);
+      }
+    }
+    for (const match of cs.filter.matchAll(/blur\((-?[\d.]+)px\)/g)) {
+      const radius = 3 * parseFloat(match[1]!);
+      grow(radius, radius, radius, radius);
+    }
+    for (const match of cs.filter.matchAll(/drop-shadow\((?:rgba?\([^)]*\)\s+)?(-?[\d.]+)px\s+(-?[\d.]+)px(?:\s+(-?[\d.]+)px)?/g)) {
+      const x = parseFloat(match[1]!);
+      const y = parseFloat(match[2]!);
+      const radius = 3 * parseFloat(match[3] ?? '0');
+      grow(radius - x, radius - y, radius + x, radius + y);
+    }
+    if (cs.outlineStyle !== 'none' && px(cs.outlineWidth) > 0) {
+      const reach = px(cs.outlineWidth) + px(cs.outlineOffset);
+      grow(reach, reach, reach, reach);
+    }
+    return {
+      x: round(left - overflow.l - sectionRect.left),
+      y: round(top - overflow.t - sectionRect.top),
+      w: round(right - left + overflow.l + overflow.r),
+      h: round(bottom - top + overflow.t + overflow.b),
+    };
   }
 
   /**
@@ -1883,9 +2262,11 @@ export function measureSlideDocument(): BrowserMeasureResult {
   }
 
   function paints(el: HTMLElement): boolean {
-    if (isTextBlock(el)) {
-      return true;
-    }
+    return isTextBlock(el) || paintsBox(el);
+  }
+
+  /** Visible fill, border or shadow, or an element that is a picture/table/media by nature: paints without needing text. */
+  function paintsBox(el: HTMLElement): boolean {
     const cs = getComputedStyle(el);
     if ((parseColor(cs.backgroundColor)?.alpha ?? 0) > 0 || /-gradient\(/.test(cs.backgroundImage)) {
       return true;

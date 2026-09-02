@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
-import type { Deck, Line, Paragraph, ResolvedFont, RunStyle, ShapeElement, TableCell, TextBody } from '../../src/model/index.js';
+import type { Deck, Element, Line, Paragraph, ResolvedFont, RunStyle, ShapeElement, TableCell, TextBody } from '../../src/model/index.js';
 import { emitPptx } from '../../src/emit/index.js';
 
 const sofficeAvailable = Boolean(spawnSync('soffice', ['--version'], { stdio: 'ignore' }).status === 0);
@@ -337,6 +337,50 @@ describe('emitPptx', () => {
     expect(slideXml).toContain(
       '<a:blip r:embed="rId3"><a:extLst><a:ext uri="{96DAC541-7B7A-43D3-8B79-37D633B846F1}"><asvg:svgBlip xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main" r:embed="rId4"/></a:ext></a:extLst></a:blip>',
     );
+  });
+
+  it('emits raster pictures as raster-<hash>.png media parts, shared when the captures are identical', async () => {
+    const png = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c636000010000050001', 'hex');
+    const rasterDeck = deck();
+    const raster = (selector: string): Element => ({
+      kind: 'picture',
+      source: 'raster',
+      explicit: false,
+      selector,
+      name: 'div.badge',
+      box: { x: 100, y: 50, w: 200, h: 100 },
+      rotation: 0,
+      crop: { l: 0, t: 0, r: 0, b: 0 },
+      geometry: { preset: 'rect' },
+      media: { data: png, contentType: 'image/png' },
+    });
+    rasterDeck.slides[0]!.elements = [raster('#a'), raster('#b')];
+
+    const pptx = await emitPptx(rasterDeck, { created, appVersion: '1.2.3' });
+    const media = (await zipEntries(pptx)).filter((name) => name.startsWith('ppt/media/'));
+    expect(media).toHaveLength(1);
+    expect(media[0]).toMatch(/^ppt\/media\/raster-[0-9a-f]{16}\.png$/);
+    const rels = await (await JSZip.loadAsync(pptx)).file('ppt/slides/_rels/slide1.xml.rels')!.async('string');
+    expect(rels.match(new RegExp(`Target="../media/${media[0]!.slice('ppt/media/'.length)}"`, 'g'))).toHaveLength(2);
+  });
+
+  it('emits slide jumps as hlinksldjump over a slide relationship and external links over a hyperlink relationship', async () => {
+    const linkDeck = deck();
+    linkDeck.slides.push({ ...linkDeck.slides[0]!, index: 2, id: 'closing', name: 'Closing', elements: [] });
+    const textbox = shapeAt(linkDeck, 1);
+    textbox.text!.paragraphs[0]!.runs = [
+      { kind: 'text', text: 'jump', style: runStyle({ link: '#closing' }) },
+      { kind: 'text', text: 'out', style: runStyle({ link: 'https://example.com/' }) },
+    ];
+
+    const pptx = await emitPptx(linkDeck, { created, appVersion: '1.2.3' });
+    const zip = await JSZip.loadAsync(pptx);
+    const slideXml = await zip.file('ppt/slides/slide1.xml')!.async('string');
+    const rels = await zip.file('ppt/slides/_rels/slide1.xml.rels')!.async('string');
+    expect(slideXml).toContain('<a:hlinkClick r:id="rId2" action="ppaction://hlinksldjump"/>');
+    expect(rels).toContain('<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slide2.xml"/>');
+    expect(slideXml).toContain('<a:hlinkClick r:id="rId3"/>');
+    expect(rels).toContain('<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.com/" TargetMode="External"/>');
   });
 
   it('emits tables as a graphic frame with grid columns, merged cells, per-edge borders and cell insets', async () => {

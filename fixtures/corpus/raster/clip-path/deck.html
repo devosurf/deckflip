@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="deckflip:canvas" content="1280x720">
+<title>clip-path</title>
+<style>
+  body { font-family: Arial; }
+  .label { position: absolute; left: 80px; top: 40px; margin: 0; font-size: 22px; line-height: 30px; color: #111827; }
+  .under { position: absolute; left: 60px; top: 100px; width: 1160px; height: 200px; background: linear-gradient(90deg, #bfdbfe, #fecaca); }
+  .tile { position: absolute; top: 130px; width: 240px; height: 140px; box-sizing: border-box; background: #dbeafe; }
+  .shape { left: 120px; }
+  .text { left: 520px; margin: 0; padding: 16px; font-size: 22px; line-height: 30px; color: #111827; }
+  .effect { clip-path: polygon(0 0, 100% 0, 85% 100%, 0 100%); }
+  .plain { position: absolute; left: 920px; top: 130px; width: 240px; height: 140px; box-sizing: border-box; margin: 0; padding: 16px; background: #dbeafe; font-size: 22px; line-height: 30px; color: #111827; }
+</style>
+</head>
+<body>
+<section>
+  <p class="label">Clip path: rasterised on the text-free tile, flattened on the text tile</p>
+  <div class="tile shape effect"></div>
+  <p class="tile text effect">Text stays editable</p>
+  <p class="plain">No effect for comparison</p>
+</section>
+</body>
+</html>

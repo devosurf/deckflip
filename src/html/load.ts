@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import type { Canvas } from '../model/index.js';
 import type { Entry } from '../report/types.js';
 import { baseStylesheet } from './base.css.js';
+import { staticEntries } from './validate.js';
 
 export interface SlideDocument {
   index: number;
@@ -76,7 +77,7 @@ interface HtmlDocumentSource {
 async function loadDeckFile(file: string, inputPath: string, size?: string): Promise<LoadedDeck> {
   const source = await readDocument(file, { validateMeta: true });
   const { sections, stray } = splitTopLevelSections(source.bodyInner);
-  const entries = [...source.entries];
+  const entries = [...source.entries, ...staticEntries(source.headInner)];
   if (stray) {
     entries.push(errorEntry('VALIDATE_STRAY_CONTENT', 'Found non-section content in the deck body', STRAY_CONTENT_HINT));
   }
@@ -88,8 +89,10 @@ async function loadDeckFile(file: string, inputPath: string, size?: string): Pro
     if (dataSrc) {
       const sourceFile = resolve(dirname(file), dataSrc);
       const slideDoc = await readDocument(sourceFile, { validateMeta: true });
+      entries.push(...staticEntries(slideDoc.html, index));
       documents.push({ index, html: slideDoc.html, baseUrl: pathToFileURL(sourceFile).href, sourceFile });
     } else {
+      entries.push(...staticEntries(sectionHtml, index));
       documents.push({
         index,
         html: assembleDocument({ doctype: source.doctype, htmlAttrs: source.htmlAttrs, headInner: source.headInner, bodyInner: sectionHtml, lang: source.lang }),
@@ -131,7 +134,7 @@ async function loadPerFileDirectory(dir: string, inputPath: string, size?: strin
       lang = doc.lang;
     }
     documents.push({ index, html: doc.html, baseUrl: pathToFileURL(file).href, sourceFile: file });
-    entries.push(...doc.entries);
+    entries.push(...doc.entries, ...staticEntries(doc.html, index));
     index += 1;
   }
 

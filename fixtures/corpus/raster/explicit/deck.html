@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="deckflip:canvas" content="1280x720">
+<title>explicit</title>
+<style>
+  body { font-family: Arial; }
+  .label { position: absolute; left: 80px; top: 40px; margin: 0; font-size: 22px; line-height: 30px; color: #111827; }
+  .chart { position: absolute; left: 120px; top: 130px; width: 480px; height: 300px; background: #ffffff; border: 1px solid #cbd5e1; }
+  .bar { position: absolute; bottom: 40px; width: 60px; background: #2563eb; }
+  .bar span { position: absolute; top: 100%; left: 0; width: 60px; margin-top: 8px; text-align: center; font-size: 16px; line-height: 20px; color: #334155; }
+  .caption { position: absolute; left: 680px; top: 130px; margin: 0; width: 480px; font-size: 22px; line-height: 30px; color: #111827; }
+</style>
+</head>
+<body>
+<section>
+  <p class="label">data-raster: the chart becomes one picture, labels included</p>
+  <div class="chart" data-raster>
+    <div class="bar" style="left: 40px; height: 120px"><span>Q1</span></div>
+    <div class="bar" style="left: 140px; height: 200px"><span>Q2</span></div>
+    <div class="bar" style="left: 240px; height: 160px"><span>Q3</span></div>
+    <div class="bar" style="left: 340px; height: 240px"><span>Q4</span></div>
+  </div>
+  <p class="caption">The caption next to the chart is a native text box; the chart itself is an explicit raster with an info entry.</p>
+</section>
+</body>
+</html>

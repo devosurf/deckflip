@@ -3,11 +3,12 @@ import { extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Command, InvalidArgumentError, Option } from 'commander';
 import type { Browser } from 'playwright-core';
-import { textBodiesOf, type Canvas, type Deck, type Element, type ResolvedFont, type TextBody } from '../model/index.js';
+import type { Canvas } from '../model/index.js';
 import { convertHtmlToPptx, validateHtml } from '../convert.js';
 import { FontCatalog, resolveDeckFonts } from '../fonts/index.js';
 import { loadDeck } from '../html/load.js';
 import { measureDeck } from '../html/measure.js';
+import { inspectDeck } from '../inspect/index.js';
 import { launchChromium, renderHtml } from '../render/chromium.js';
 import { renderPptxLibreOffice } from '../render/libreoffice.js';
 import { renderPptxPowerPoint } from '../render/powerpoint.js';
@@ -93,6 +94,15 @@ function parsePositiveInt(value: string, flag: string): number {
   return parsed;
 }
 
+/** `--raster-dpi`: 96 (1x the Canvas) to 384 (4x), spec 05. */
+export function parseRasterDpi(value: string): number {
+  const dpi = parsePositiveInt(value, 'raster-dpi');
+  if (dpi < 96 || dpi > 384) {
+    throw new InvalidArgumentError('expected --raster-dpi between 96 and 384');
+  }
+  return dpi;
+}
+
 function inferInputKind(input: string): 'html' | 'pptx' {
   return extname(input).toLowerCase() === '.pptx' ? 'pptx' : 'html';
 }
@@ -107,65 +117,6 @@ function defaultValidateReportPath(input: string): string {
     return `${input.slice(0, -extension.length)}.report.json`;
   }
   return `${input}.report.json`;
-}
-
-function previewText(body: TextBody): string {
-  let text = '';
-  for (const paragraph of body.paragraphs) {
-    for (const run of paragraph.runs) {
-      text += run.kind === 'text' ? run.text : '\n';
-    }
-    text += '\n';
-  }
-  return text.trimEnd().slice(0, 120);
-}
-
-function uniqueFonts(deck: Deck): ResolvedFont[] {
-  const fonts = new Map<string, ResolvedFont>();
-  for (const slide of deck.slides) {
-    for (const element of slide.elements) {
-      for (const { body } of textBodiesOf(element)) {
-        for (const paragraph of body.paragraphs) {
-          for (const run of paragraph.runs) {
-            if (run.kind !== 'text' || run.style.font === undefined) {
-              continue;
-            }
-            fonts.set(run.style.font.file, run.style.font);
-          }
-        }
-      }
-    }
-  }
-  return [...fonts.values()];
-}
-
-function inspectElement(element: Element): Record<string, unknown> {
-  if (element.kind === 'group') {
-    return { kind: 'group', selector: element.selector, box: element.box, children: element.children.map((child) => inspectElement(child)) };
-  }
-  if (element.kind === 'picture' || element.kind === 'table') {
-    return { kind: element.kind, selector: element.selector, box: element.box };
-  }
-  return {
-    kind: element.text === undefined ? 'shape' : 'text',
-    selector: element.selector,
-    box: element.box,
-    ...(element.text === undefined ? {} : { text: previewText(element.text) }),
-  };
-}
-
-function inspectJson(deck: Deck) {
-  return {
-    schemaVersion: 1 as const,
-    canvas: deck.canvas,
-    slides: deck.slides.map((slide) => ({
-      index: slide.index,
-      id: slide.id,
-      name: slide.name,
-      elements: slide.elements.map((element) => inspectElement(element)),
-    })),
-    fonts: uniqueFonts(deck),
-  };
 }
 
 async function printSummary(report: Report, color: boolean): Promise<void> {
@@ -272,7 +223,7 @@ async function handleInspect(input: string): Promise<number> {
     const measured = await measureDeck(loaded, { browser });
     const catalog = await FontCatalog.scan({ extraFiles: measured.deck.fontFaces.map((face) => face.file) });
     resolveDeckFonts(measured.deck, catalog, { embedFonts: false });
-    process.stdout.write(`${JSON.stringify(inspectJson(measured.deck), null, 2)}\n`);
+    process.stdout.write(`${JSON.stringify(inspectDeck(measured.deck), null, 2)}\n`);
     return 0;
   } finally {
     await browser.close();
@@ -319,9 +270,10 @@ type RenderCliOptions = {
 
 function buildProgram(): Command {
   const program = new Command();
-  program.name('deckflip').version(VERSION);
+  program.name('deckflip').version(VERSION).description('HTML slides <-> PowerPoint, built for coding agents.');
   program.exitOverride();
   program.showHelpAfterError();
+  program.addHelpText('after', '\nAgent skill (authoring rules, the validate -> convert --strict -> render -> inspect loop, templates):\n  npx skills add devosurf/deckflip\n\nExit codes: 0 ok · 1 no output produced · 2 validation failed · 3 bad invocation · 4 --strict with a non-empty report\n');
 
   program
     .command('convert <input>')
@@ -332,7 +284,7 @@ function buildProgram(): Command {
     .option('-o, --output <output>', 'output PPTX path')
     .option('--size <size>', 'override the canvas size')
     .option('--embed-fonts [names]', 'embed all safe fonts or a comma-separated list', parseEmbedFonts, false)
-    .option('--raster-dpi <n>', 'rasterisation DPI', (value) => parsePositiveInt(value, 'raster-dpi'), 192)
+    .option('--raster-dpi <n>', 'raster density for captured subtrees, 96-384', parseRasterDpi, 192)
     .option('--report <path>', 'report sidecar path')
     .option('--strict', 'treat any report entry as a failure')
     .option('--json', 'print the report JSON to stdout')
@@ -351,7 +303,7 @@ function buildProgram(): Command {
     )
     .option('--size <size>', 'override the canvas size')
     .option('--embed-fonts [names]', 'embed all safe fonts or a comma-separated list', parseEmbedFonts, false)
-    .option('--raster-dpi <n>', 'rasterisation DPI', (value) => parsePositiveInt(value, 'raster-dpi'), 192)
+    .option('--raster-dpi <n>', 'raster density for captured subtrees, 96-384', parseRasterDpi, 192)
     .option('--report <path>', 'report sidecar path')
     .option('--strict', 'treat any report entry as a failure')
     .option('--json', 'print the report JSON to stdout')

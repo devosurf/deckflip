@@ -192,8 +192,9 @@ function buildHyperlink(link: string, ctx: TextEmissionContext): XmlNode | undef
     if (!targetPart) {
       throw new Error(`Unknown slide link target ${link}`);
     }
-    const target = path.posix.relative(path.posix.dirname(ctx.sourceSlidePart), targetPart.slice(1));
-    const rId = ctx.addRelationship(REL.hyperlink, target);
+    // A slide jump is an internal relationship of type `slide`; PowerPoint repairs a `hyperlink` relationship pointing at a part.
+    const target = path.posix.relative(path.posix.dirname(ctx.sourceSlidePart), targetPart);
+    const rId = ctx.addRelationship(REL.slide, target);
     return el('a:hlinkClick', { 'r:id': rId, action: 'ppaction://hlinksldjump' });
   }
   const rId = ctx.addRelationship(REL.hyperlink, link, { external: true });

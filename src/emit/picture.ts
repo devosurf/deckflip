@@ -18,17 +18,17 @@ const EXTENSION: Record<Media['contentType'], string> = {
 
 /** Media parts are content-hash named and shared across slides (spec 11: determinism). */
 export class MediaStore {
-  private readonly parts = new Map<string, string>();
+  private readonly parts = new Set<string>();
 
   constructor(private readonly pkg: OpcPackage) {}
 
-  /** Adds the bytes once and returns the part name. */
-  add(media: Media): string {
+  /** Adds the bytes once and returns the part name; rasters are `raster-<hash>` so a reader can tell captures from assets (spec 05). */
+  add(media: Media, prefix = ''): string {
     const hash = createHash('sha1').update(media.data).digest('hex').slice(0, 16);
-    const partName = `/ppt/media/${hash}.${EXTENSION[media.contentType]}`;
-    if (!this.parts.has(hash)) {
+    const partName = `/ppt/media/${prefix}${hash}.${EXTENSION[media.contentType]}`;
+    if (!this.parts.has(partName)) {
       this.pkg.addPart(partName, media.contentType, media.data);
-      this.parts.set(hash, partName);
+      this.parts.add(partName);
     }
     return partName;
   }
@@ -40,7 +40,7 @@ export interface PictureEmissionContext extends ShapeEmissionContext {
 
 /** `p:pic` for the visible frame, plus an outline shape on the border box when the element has a border. */
 export function buildPicture(picture: PictureElement, ctx: PictureEmissionContext, nextId: () => number): XmlNode[] {
-  const embed = relate(picture.media, ctx);
+  const embed = relate(picture.media, ctx, picture.source === 'raster' ? 'raster-' : '');
   const blipChildren: XmlNode[] = [];
   if (picture.opacity !== undefined) {
     blipChildren.push(el('a:alphaModFix', { amt: Math.round(picture.opacity * 100000) }));
@@ -102,8 +102,8 @@ function buildPictureGeometry(picture: PictureElement): XmlNode {
   return el('a:prstGeom', { prst: 'rect' }, el('a:avLst'));
 }
 
-function relate(media: Media, ctx: PictureEmissionContext): string {
-  const partName = ctx.media.add(media);
+function relate(media: Media, ctx: PictureEmissionContext, prefix = ''): string {
+  const partName = ctx.media.add(media, prefix);
   const target = path.posix.relative(path.posix.dirname(ctx.sourceSlidePart), partName);
   return ctx.addRelationship(REL.image, target);
 }

@@ -1,0 +1,24 @@
+[
+  {
+    "code": "FLATTEN_TRANSFORM",
+    "kind": "flattened",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(3)"
+    },
+    "reason": "transform: matrix(1, 0, -0.212557, 1, 0, 0) on p.tile cannot be applied to editable text",
+    "hint": "transform: matrix(1, 0, -0.212557, 1, 0, 0) was dropped to keep the text editable; put the effect on a text-free sibling behind the text"
+  },
+  {
+    "code": "RASTER_TRANSFORM",
+    "kind": "rasterised",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > div:nth-child(2)"
+    },
+    "reason": "transform: matrix(1, 0, -0.212557, 1, 0, 0) on div.tile has no DrawingML equivalent",
+    "hint": "Only rotate, scale and translate are native"
+  }
+]

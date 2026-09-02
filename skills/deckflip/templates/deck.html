@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Deck title</title>
+  <meta name="deckflip:canvas" content="16:9">
+  <link rel="stylesheet" href="slides.css">
+</head>
+<body>
+<section id="title" class="slide title" data-title="Title">
+  <p class="small">Company · Team · Date</p>
+  <h1>Deck title that fits on two lines at most</h1>
+  <p class="lede">A one-sentence subtitle that says what the audience gets.</p>
+  <div class="rule"></div>
+  <aside class="notes"><p>Open with the one thing the audience should remember.</p></aside>
+</section>
+
+<section id="part-1" class="slide divider" data-title="Part 1" data-section="Part 1">
+  <p class="small">Part 1</p>
+  <h1>Section title</h1>
+  <p class="lede">What this part covers, in one line.</p>
+</section>
+
+<section id="bullets" class="slide bullets" data-title="Key points">
+  <h2>Three to five points per slide</h2>
+  <ul>
+    <li>Lead with the claim, then the evidence.</li>
+    <li>Keep each bullet to one line or two; wrap is fine, walls of text are not.</li>
+    <li>Nested lists work for supporting detail:
+      <ul>
+        <li>one level down, same rules</li>
+      </ul>
+    </li>
+    <li><strong>Bold</strong>, <em>italic</em> and <a href="#closing">links to slides</a> stay editable.</li>
+  </ul>
+  <div class="footer"><span>Deck title</span><span>3</span></div>
+</section>
+
+<section id="columns" class="slide columns" data-title="Two columns">
+  <h2>Compare two things side by side</h2>
+  <div class="cols">
+    <div class="col">
+      <div class="card">
+        <h3>Option A</h3>
+        <p>What it is and when it wins. Cards are plain boxes with a uniform border and a radius, which PowerPoint keeps editable.</p>
+      </div>
+      <p class="small">Footnote for the left column.</p>
+    </div>
+    <div class="col">
+      <div class="card">
+        <h3>Option B</h3>
+        <p>The counterpart. Use the same structure on both sides so the eye can compare.</p>
+      </div>
+      <p class="small">Footnote for the right column.</p>
+    </div>
+  </div>
+</section>
+
+<section id="figure" class="slide figure" data-title="Image with caption">
+  <h2>Show the thing</h2>
+  <figure class="media">
+    <img src="assets/sample.png" alt="Sample image">
+    <figcaption>The caption sits beside the image and explains what to look at. Photos go in as pictures, cropped by object-fit; replace the sample file with your own.</figcaption>
+  </figure>
+</section>
+
+<section id="number" class="slide number" data-title="Big number">
+  <p class="small">The metric that matters</p>
+  <p class="value">42%</p>
+  <p class="lede">What the number means and why it changed.</p>
+</section>
+
+<section id="closing" class="slide closing" data-title="Closing">
+  <h1>Thank you</h1>
+  <div class="rule"></div>
+  <p class="lede">Next steps, contact, or the one-line ask.</p>
+  <p class="small">name@example.com</p>
+</section>
+</body>
+</html>

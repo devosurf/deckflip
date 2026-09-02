@@ -95,9 +95,13 @@ export interface Media {
   contentType: 'image/png' | 'image/jpeg' | 'image/gif' | 'image/svg+xml';
 }
 
-/** An `img` or inline `svg`, emitted as `p:pic`. */
+/** An `img`, an inline `svg`, or a rasterised subtree (spec 05), emitted as `p:pic`. */
 export interface PictureElement {
   kind: 'picture';
+  /** present for rasterised subtrees: the capture of the source element instead of an image asset */
+  source?: 'raster';
+  /** raster pictures: `true` when the author asked for it with `data-raster` */
+  explicit?: boolean;
   selector: string;
   name: string;
   /** the visible frame (content box, or the fitted rect for `object-fit: contain`), before rotation, CSS px */

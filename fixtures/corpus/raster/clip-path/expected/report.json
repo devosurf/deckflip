@@ -1,0 +1,24 @@
+[
+  {
+    "code": "FLATTEN_CLIP_PATH",
+    "kind": "flattened",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(3)"
+    },
+    "reason": "clip-path: polygon(0px 0px, 100% 0px, 85% 100%, 0px 100%) on p.tile cannot be applied to editable text",
+    "hint": "clip-path: polygon(0px 0px, 100% 0px, 85% 100%, 0px 100%) was dropped to keep the text editable; put the effect on a text-free sibling behind the text"
+  },
+  {
+    "code": "RASTER_CLIP_PATH",
+    "kind": "rasterised",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > div:nth-child(2)"
+    },
+    "reason": "clip-path: polygon(0px 0px, 100% 0px, 85% 100%, 0px 100%) on div.tile has no DrawingML equivalent",
+    "hint": "Use border-radius, overflow: hidden with a rectangle, or pre-crop the image"
+  }
+]

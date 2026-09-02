@@ -1,0 +1,24 @@
+[
+  {
+    "code": "FLATTEN_BLEND_MODE",
+    "kind": "flattened",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(3)"
+    },
+    "reason": "mix-blend-mode: multiply on p.tile cannot be applied to editable text",
+    "hint": "mix-blend-mode: multiply was dropped to keep the text editable; put the effect on a text-free sibling behind the text"
+  },
+  {
+    "code": "RASTER_BLEND_MODE",
+    "kind": "rasterised",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > div:nth-child(2)"
+    },
+    "reason": "mix-blend-mode: multiply on div.tile has no DrawingML equivalent",
+    "hint": "Remove mix-blend-mode: multiply or pre-compose the image"
+  }
+]

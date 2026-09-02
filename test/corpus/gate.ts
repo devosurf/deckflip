@@ -3,11 +3,26 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import type { Browser } from 'playwright-core';
-import { comparePng } from '../../src/render/compare.js';
+import { comparePng, type IgnoreRegion } from '../../src/render/compare.js';
 import { findSoffice, renderPptxLibreOffice } from '../../src/render/libreoffice.js';
 import { launchChromium, renderHtml } from '../../src/render/chromium.js';
 import { loadDeck } from '../../src/html/load.js';
 import { convertHtmlToPptx } from '../../src/convert.js';
+
+/**
+ * Optional `expected/ignore.json`: `{ "<slide>": [{ x1, y1, x2, y2 }] }` in CSS px, for regions the fixture
+ * deliberately renders differently (a flattened effect the spec says is dropped). Keep them small and named in
+ * the fixture's deck.html, so the gate still covers everything the converter is meant to reproduce.
+ */
+async function ignoreRegions(fixtureDir: string, slide: number): Promise<IgnoreRegion[]> {
+  const path = join(fixtureDir, 'expected', 'ignore.json');
+  const json = await readFile(path, 'utf8').catch(() => undefined);
+  if (json === undefined) {
+    return [];
+  }
+  const regions = JSON.parse(json) as Record<string, IgnoreRegion[]>;
+  return regions[String(slide)] ?? [];
+}
 
 /** Chromium screenshot vs LibreOffice render of the converted deck (spec 10), plus the expected report entries. */
 export const LIBREOFFICE_GATE_PERCENT = 2.0;
@@ -62,7 +77,7 @@ export function corpusGate(category: string, fixtures: readonly string[]): void 
           const expectedPath = join(chromiumDir, `slide-${String(index).padStart(3, '0')}.png`);
           const actualPath = join(workDir, `slide-${String(index).padStart(3, '0')}.png`);
           await writeFile(actualPath, actualPng!);
-          const diff = await comparePng(expectedPath, actualPath, {});
+          const diff = await comparePng(expectedPath, actualPath, { ignoreRegions: await ignoreRegions(fixtureDir, index) });
           rows.push({ slide: index, diffPercentage: diff.diffPercentage.toFixed(3) });
           expect(diff.diffPercentage).toBeLessThanOrEqual(LIBREOFFICE_GATE_PERCENT);
         }

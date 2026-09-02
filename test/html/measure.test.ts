@@ -1,3 +1,6 @@
+import { mkdtemp, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { chromium } from 'playwright-core';
 import { describe, expect, it } from 'vitest';
 import { loadDeck } from '../../src/html/load.js';
@@ -204,7 +207,7 @@ describe.skipIf(!browserAvailable)('measureDeck', () => {
           { position: 1, color: { hex: '000000', alpha: 1 } },
         ],
       });
-      expect(measured.entries.filter((entry) => entry.code !== 'SUBSTITUTE_BORDER_SIDES')).toEqual([
+      expect(measured.entries.filter((entry) => entry.code !== 'SUBSTITUTE_BORDER_SIDES' && entry.code !== 'RASTER_SHADOW')).toEqual([
         expect.objectContaining({ code: 'SUBSTITUTE_GRADIENT_RADIAL', slide: 1, locator: { selector: 'section:nth-of-type(1) > div:nth-child(3)' } }),
         expect.objectContaining({ code: 'SUBSTITUTE_OPACITY', slide: 1, locator: { selector: 'section:nth-of-type(1) > div:nth-child(4)' } }),
         expect.objectContaining({ code: 'SUBSTITUTE_OPACITY', slide: 1, locator: { selector: 'section:nth-of-type(1) > div:nth-child(5) > div:nth-child(1)' } }),
@@ -223,15 +226,19 @@ describe.skipIf(!browserAvailable)('measureDeck', () => {
     }
   });
 
-  it('measures a single spread-free box-shadow as an outer or inner shadow', async () => {
+  it('measures a single spread-free box-shadow as an outer or inner shadow; spread or multiple shadows rasterise the box', async () => {
     const loaded = await loadDeck('test/html/fixtures/shapes.html', {});
     const browser = await chromium.launch();
     try {
       const measured = await measureDeck(loaded, { browser });
       expect(shapeByName(measured.deck, 'div.shadow').shadow).toEqual({ inset: false, offsetX: 4, offsetY: 6, blur: 12, color: { hex: '000000', alpha: 0.3 } });
       expect(shapeByName(measured.deck, 'div.inset').shadow).toEqual({ inset: true, offsetX: 0, offsetY: 2, blur: 4, color: { hex: '000000', alpha: 1 } });
-      expect(shapeByName(measured.deck, 'div.spread').shadow).toBeUndefined();
-      expect(shapeByName(measured.deck, 'div.multi').shadow).toBeUndefined();
+      expect(pictureByName(measured.deck, 'div.spread').source).toBe('raster');
+      expect(pictureByName(measured.deck, 'div.multi').source).toBe('raster');
+      expect(measured.entries.filter((entry) => entry.code === 'RASTER_SHADOW').map((entry) => entry.locator)).toEqual([
+        { selector: 'section:nth-of-type(1) > div:nth-child(8)' },
+        { selector: 'section:nth-of-type(1) > div:nth-child(9)' },
+      ]);
     } finally {
       await browser.close();
     }
@@ -473,6 +480,26 @@ describe.skipIf(!browserAvailable)('measureDeck', () => {
       expect(rotated.box.y).toBeCloseTo(72.9 - 50, 1);
       expect(rotated.box.w).toBe(100);
       expect(rotated.children[0]!.box).toEqual({ x: 800, y: 40, w: 100, h: 100 });
+    } finally {
+      await browser.close();
+    }
+  });
+
+  it('emits a painting section as a full-canvas backmost shape', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'deckflip-section-'));
+    const file = join(dir, 'deck.html');
+    await writeFile(file, `<!doctype html><html><head><title>Deck</title><style>
+      #bg { background: linear-gradient(90deg, #2563eb, #7c3aed); padding: 60px }
+    </style></head><body><section id="bg"><h1>Title</h1></section><section id="plain"><h1>Title</h1></section></body></html>`, 'utf8');
+    const loaded = await loadDeck(file, {});
+    const browser = await chromium.launch();
+    try {
+      const measured = await measureDeck(loaded, { browser });
+      expect(measured.entries).toEqual([]);
+      const [background, title] = measured.deck.slides[0]!.elements;
+      expect(background).toMatchObject({ kind: 'shape', selector: '#bg', box: { x: 0, y: 0, w: 1280, h: 720 }, fill: { type: 'gradient', kind: 'linear', angle: 90 } });
+      expect(background!.kind === 'shape' && background!.text).toBeUndefined();
+      expect(title).toMatchObject({ kind: 'shape', box: { x: 60, w: 1160 } });
     } finally {
       await browser.close();
     }

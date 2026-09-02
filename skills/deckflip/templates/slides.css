@@ -1,0 +1,107 @@
+/* deckflip template stylesheet. Canvas 1280x720 CSS px. Every rule maps natively: solid colours, one
+   linear-gradient, uniform borders, plain text. Change the look through the custom properties; keep the
+   type scale and the .slide padding, they are tuned to wrap safely at Canvas size. */
+
+:root {
+  --ink: #111827;
+  --muted: #4b5563;
+  --accent: #2563eb;
+  --accent-2: #7c3aed;
+  --surface: #ffffff;
+  --surface-alt: #f3f4f6;
+  --rule: #d1d5db;
+  --body-font: Arial, Helvetica, sans-serif;
+  /* Arial has a metric-compatible substitute (Liberation Sans) wherever PowerPoint is absent; Georgia does not */
+  --heading-font: Arial, Helvetica, sans-serif;
+}
+
+body {
+  font-family: var(--body-font);
+  color: var(--ink);
+}
+
+/* Every Slide: padding is the safe area; layout inside is flex. */
+.slide {
+  padding: 64px 80px;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+}
+
+.slide > * {
+  margin: 0;
+}
+
+/* Type scale (font-size / line-height) */
+.slide h1 { font-family: var(--heading-font); font-size: 56px; line-height: 64px; font-weight: 700; }
+.slide h2 { font-family: var(--heading-font); font-size: 40px; line-height: 48px; font-weight: 700; }
+.slide h3 { font-size: 26px; line-height: 34px; font-weight: 700; }
+.slide p, .slide li { font-size: 24px; line-height: 34px; }
+.slide .small { font-size: 18px; line-height: 26px; color: var(--muted); }
+.slide .lede { font-size: 28px; line-height: 40px; color: var(--muted); }
+
+.slide ul, .slide ol { padding-left: 36px; }
+.slide li { margin-bottom: 12px; }
+.slide li:last-child { margin-bottom: 0; }
+
+/* Accent rule under a heading */
+.rule {
+  width: 96px;
+  height: 6px;
+  background: var(--accent);
+}
+
+/* Footer line pinned to the bottom of the safe area */
+.footer {
+  position: absolute;
+  left: 80px;
+  right: 80px;
+  bottom: 40px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 16px;
+  line-height: 24px;
+  color: var(--muted);
+}
+
+/* Title slide */
+.slide.title { justify-content: center; gap: 24px; }
+
+/* Section divider: one linear gradient, white text */
+.slide.divider {
+  justify-content: center;
+  gap: 20px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #ffffff;
+}
+.slide.divider .small { color: #e0e7ff; }
+
+/* Bullets */
+.slide.bullets { gap: 32px; }
+
+/* Two columns */
+.slide.columns { gap: 32px; }
+.columns .cols { display: flex; gap: 48px; }
+.columns .col { flex: 1; display: flex; flex-direction: column; gap: 16px; }
+.card {
+  padding: 24px;
+  background: var(--surface-alt);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+}
+
+/* Image with caption */
+.slide.figure { gap: 24px; }
+.figure .media { display: flex; gap: 40px; align-items: flex-start; }
+.figure img { width: 640px; height: 400px; object-fit: cover; border-radius: 12px; }
+.figure figcaption { flex: 1; font-size: 22px; line-height: 32px; color: var(--muted); }
+
+/* Big number */
+.slide.number { justify-content: center; gap: 16px; }
+.number .value { font-family: var(--heading-font); font-size: 160px; line-height: 176px; color: var(--accent); }
+
+/* Closing */
+.slide.closing { justify-content: center; align-items: center; text-align: center; gap: 24px; }
+
+/* Speaker notes never render */
+aside.notes { display: none; }

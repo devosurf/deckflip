@@ -1,0 +1,24 @@
+[
+  {
+    "code": "FLATTEN_SHADOW",
+    "kind": "flattened",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(3)"
+    },
+    "reason": "box-shadow: rgb(251, 191, 36) 0px 0px 0px 6px, rgba(15, 23, 42, 0.35) 0px 12px 24px 0px on p.tile cannot be applied to editable text",
+    "hint": "box-shadow: rgb(251, 191, 36) 0px 0px 0px 6px, rgba(15, 23, 42, 0.35) 0px 12px 24px 0px was dropped to keep the text editable; put the effect on a text-free sibling behind the text"
+  },
+  {
+    "code": "RASTER_SHADOW",
+    "kind": "rasterised",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > div:nth-child(2)"
+    },
+    "reason": "box-shadow: rgb(251, 191, 36) 0px 0px 0px 6px, rgba(15, 23, 42, 0.35) 0px 12px 24px 0px on div.tile has no DrawingML equivalent",
+    "hint": "Use one outer shadow without spread"
+  }
+]

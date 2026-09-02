@@ -62,4 +62,38 @@ describe('loadDeck', () => {
     expect(doc.html).toContain('id="deck"');
     expect(doc.html).not.toContain('id="index"');
   });
+
+  it('rejects script and other non-static elements before anything is measured', async () => {
+    const file = await writeTempDeck(`<!doctype html>
+<html>
+  <head><title>Deck</title><script>document.title = 'changed'</script></head>
+  <body>
+    <section id="one"><h1>First</h1><iframe id="map" src="x.html"></iframe></section>
+    <section id="two"><button class="cta">Go</button><p>text</p></section>
+  </body>
+</html>`);
+
+    const loaded = await loadDeck(file, {});
+    expect(loaded.entries).toEqual([
+      { code: 'VALIDATE_ELEMENT', kind: 'error', severity: 'error', locator: { selector: 'script' }, reason: 'script is not static HTML', hint: 'Replace script with static HTML; scripts are never run' },
+      { code: 'VALIDATE_ELEMENT', kind: 'error', severity: 'error', slide: 1, locator: { selector: 'iframe#map' }, reason: 'iframe#map is not static HTML', hint: 'Replace iframe#map with static HTML; scripts are never run' },
+      { code: 'VALIDATE_ELEMENT', kind: 'error', severity: 'error', slide: 2, locator: { selector: 'button.cta' }, reason: 'button.cta is not static HTML', hint: 'Replace button.cta with static HTML; scripts are never run' },
+    ]);
+  });
+
+  it('refuses data-raster on a section: a rasterised Slide is a screenshot', async () => {
+    const file = await writeTempDeck(`<!doctype html>
+<html>
+  <head><title>Deck</title></head>
+  <body>
+    <section id="one"><h1>First</h1></section>
+    <section id="two" data-raster><div data-raster class="chart">chart</div></section>
+  </body>
+</html>`);
+
+    const loaded = await loadDeck(file, {});
+    expect(loaded.entries).toEqual([
+      { code: 'VALIDATE_RASTER_SLIDE', kind: 'error', severity: 'error', slide: 2, locator: { selector: 'section#two' }, reason: 'data-raster on section#two would rasterise the whole Slide', hint: 'Rasterise parts, not the Slide; use deckflip render for PNGs' },
+    ]);
+  });
 });

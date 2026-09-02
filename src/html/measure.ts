@@ -3,16 +3,29 @@ import { unlink, writeFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Browser, Page } from 'playwright-core';
-import type { Canvas, Deck, Element, PictureElement, Slide } from '../model/index.js';
+import type { Box, Canvas, Deck, Element, PictureElement, Slide } from '../model/index.js';
 import { entry as reportEntry } from '../report/codes.js';
 import type { Entry } from '../report/types.js';
-import type { BrowserElement, BrowserMeasureResult, BrowserPicture } from './browser-script.js';
+import type { BrowserElement, BrowserMeasureResult, BrowserPicture, BrowserRaster } from './browser-script.js';
 import { loadMedia } from './media.js';
-import { measureSlideDocument } from './browser-script.js';
+import { FREEZE_ATTR, measureSlideDocument } from './browser-script.js';
 import type { LoadedDeck, SlideDocument } from './load.js';
+import { captureRaster } from './raster.js';
 
 export interface MeasureOptions {
   browser: Browser;
+  /** raster density for captured subtrees (spec 05), default 192 */
+  rasterDpi?: number;
+}
+
+/** What one page's element resolution needs beyond the elements: where the Slide sits and how to capture rasters. */
+interface PageContext {
+  page: Page;
+  slide: number;
+  canvas: Canvas;
+  /** the section's offset in page coordinates */
+  origin: { x: number; y: number };
+  rasterDpi: number;
 }
 
 export interface MeasuredDeckResult {
@@ -39,10 +52,10 @@ export async function measureDeck(loaded: LoadedDeck, opts: MeasureOptions): Pro
           entries.push(errorEntry('VALIDATE_SLIDE_SIZE', `Section size ${result.sectionBox.w}x${result.sectionBox.h} does not match canvas ${loaded.canvas.width}x${loaded.canvas.height}`, SLIDE_SIZE_HINT, 'body > section', document.index));
         }
         for (const raised of result.entries) {
-          entries.push(reportEntry(raised.code, { slide: document.index, locator: { selector: raised.selector }, reason: raised.reason }));
+          entries.push(reportEntry(raised.code, { slide: document.index, locator: { selector: raised.selector }, reason: raised.reason, ...(raised.params === undefined ? {} : { params: raised.params }) }));
         }
 
-        const measuredElements = await resolveElements(page, result.shapes, document.index, loaded.canvas, entries);
+        const measuredElements = await resolveElements({ page, slide: document.index, canvas: loaded.canvas, origin: { x: result.sectionBox.x, y: result.sectionBox.y }, rasterDpi: opts.rasterDpi ?? 192 }, result.shapes, entries);
 
         for (const face of result.fontFaces) {
           const normalized = { ...face, file: fileURLToPath(face.file) };
@@ -87,9 +100,16 @@ async function measureDocumentPage(page: Page, slideDoc: SlideDocument): Promise
   try {
     await page.goto(pathToFileURL(tempPath).href, { waitUntil: 'load' });
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.addStyleTag({ content: '*{animation-play-state:paused!important;transition:none!important}' });
+    // Tagged so the page script can lift it while reading `transition` (see `validateDocument`). Animations are
+    // also rewound to their first frame so a paused animation does not leave a timing-dependent state behind.
+    const freeze = await page.addStyleTag({ content: '*{animation-play-state:paused!important;transition:none!important}' });
+    await freeze.evaluate((style, attr) => (style as HTMLElement).setAttribute(attr, ''), FREEZE_ATTR);
     await page.evaluate(async () => {
       await document.fonts.ready;
+      for (const animation of document.getAnimations()) {
+        animation.pause();
+        animation.currentTime = 0;
+      }
     });
     // esbuild-transpiled builds (tsx, vitest) wrap nested function declarations in a `__name` helper that only
     // exists in the Node bundle; the serialised page script needs an identity shim for it.
@@ -101,8 +121,9 @@ async function measureDocumentPage(page: Page, slideDoc: SlideDocument): Promise
 }
 
 
-/** Off-canvas classification and picture byte loading, recursing into groups (whose children are already inside the group's box). */
-async function resolveElements(page: Page, measured: BrowserElement[], slide: number, canvas: Canvas, entries: Entry[]): Promise<Element[]> {
+/** Off-canvas classification, picture byte loading and raster capture, recursing into groups (whose children are already inside the group's box). */
+async function resolveElements(ctx: PageContext, measured: BrowserElement[], entries: Entry[]): Promise<Element[]> {
+  const { slide, canvas } = ctx;
   const out: Element[] = [];
   for (const element of measured) {
     const offcanvas = classifyOffcanvas(element.box, canvas.width, canvas.height);
@@ -118,6 +139,10 @@ async function resolveElements(page: Page, measured: BrowserElement[], slide: nu
       });
       continue;
     }
+    if (element.kind === 'raster') {
+      out.push(await resolveRaster(ctx, element, entries));
+      continue;
+    }
     if (offcanvas === 'flattened') {
       entries.push({
         code: 'FLATTEN_OFFCANVAS',
@@ -130,14 +155,14 @@ async function resolveElements(page: Page, measured: BrowserElement[], slide: nu
       });
     }
     if (element.kind === 'picture') {
-      const picture = await resolvePicture(page, element, slide, entries);
+      const picture = await resolvePicture(ctx.page, element, slide, entries);
       if (picture) {
         out.push(picture);
       }
       continue;
     }
     if (element.kind === 'group') {
-      const children = await resolveElements(page, element.children, slide, canvas, entries);
+      const children = await resolveElements(ctx, element.children, entries);
       if (children.length > 0) {
         out.push({ ...element, children });
       }
@@ -146,6 +171,41 @@ async function resolveElements(page: Page, measured: BrowserElement[], slide: nu
     out.push(element);
   }
   return out;
+}
+
+/**
+ * One `RASTER_*` entry and one PNG picture per rasterised subtree (spec 05): the clip is the painted extent
+ * intersected with the Canvas, so a partly off-canvas raster is simply cropped rather than flattened.
+ */
+async function resolveRaster(ctx: PageContext, raster: BrowserRaster, entries: Entry[]): Promise<PictureElement> {
+  const { canvas, slide } = ctx;
+  const left = Math.max(0, raster.box.x);
+  const top = Math.max(0, raster.box.y);
+  const box: Box = { x: left, y: top, w: Math.min(canvas.width, raster.box.x + raster.box.w) - left, h: Math.min(canvas.height, raster.box.y + raster.box.h) - top };
+  const locator = { selector: raster.selector };
+  if (raster.trigger) {
+    entries.push(reportEntry(`RASTER_${raster.trigger.suffix}`, { slide, locator, reason: `${raster.trigger.decl} on ${raster.name} has no DrawingML equivalent`, params: { decl: raster.trigger.decl } }));
+  } else {
+    entries.push(reportEntry('RASTER_EXPLICIT', { slide, locator, reason: `data-raster on ${raster.name}` }));
+  }
+  const data = await captureRaster(ctx.page, {
+    selector: raster.selector,
+    clip: { x: box.x + ctx.origin.x, y: box.y + ctx.origin.y, w: box.w, h: box.h },
+    dpi: ctx.rasterDpi,
+    viewport: { width: canvas.width, height: canvas.height },
+  });
+  return {
+    kind: 'picture',
+    source: 'raster',
+    explicit: raster.trigger === undefined,
+    selector: raster.selector,
+    name: raster.name,
+    box,
+    rotation: 0,
+    crop: { l: 0, t: 0, r: 0, b: 0 },
+    geometry: { preset: 'rect' },
+    media: { data, contentType: 'image/png' },
+  };
 }
 
 /**

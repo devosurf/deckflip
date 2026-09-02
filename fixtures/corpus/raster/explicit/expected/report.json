@@ -1,0 +1,13 @@
+[
+  {
+    "code": "RASTER_EXPLICIT",
+    "kind": "rasterised",
+    "severity": "info",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > div:nth-child(2)"
+    },
+    "reason": "data-raster on div.chart",
+    "hint": "(info) Remove data-raster to get editable objects"
+  }
+]
