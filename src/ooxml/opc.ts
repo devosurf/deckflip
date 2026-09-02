@@ -94,6 +94,8 @@ function buildContentTypesXml(parts: Map<string, PartRecord>): string {
     ['xml', 'application/xml'],
     ['png', 'image/png'],
     ['jpeg', 'image/jpeg'],
+    ['gif', 'image/gif'],
+    ['svg', 'image/svg+xml'],
     ['fntdata', CT.fontData],
   ];
 

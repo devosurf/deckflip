@@ -2,6 +2,7 @@ import type { Deck } from '../model/index.js';
 import { pxToEmu } from '../ooxml/emu.js';
 import { CT, REL, OpcPackage } from '../ooxml/opc.js';
 import { parseXml, el, serialize, type XmlNode } from '../ooxml/xml.js';
+import { MediaStore } from './picture.js';
 import { emitSlide, slidePartName } from './slide.js';
 
 export interface EmitOptions {
@@ -86,8 +87,9 @@ export async function emitPptx(deck: Deck, opts: EmitOptions): Promise<Buffer> {
   pkg.addPart(MASTER_PART, CT.slideMaster, serialize(buildMasterXml(masterLayoutId)));
   pkg.addPart(LAYOUT_PART, CT.slideLayout, serialize(buildLayoutXml()));
 
+  const media = new MediaStore(pkg);
   for (const slide of deck.slides) {
-    emitSlide(pkg, slide, { deck, slidePartById });
+    emitSlide(pkg, slide, { deck, slidePartById, media });
   }
 
   pkg.addPart(THEME_PART, CT.theme, serialize(buildThemeXml()));

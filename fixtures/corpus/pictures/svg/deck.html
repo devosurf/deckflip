@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="deckflip:canvas" content="1280x720">
+<title>svg</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #ffffff; }
+  body { font-family: Arial; }
+  body > section { position: relative; box-sizing: border-box; overflow: hidden; }
+  .label { position: absolute; left: 80px; top: 40px; margin: 0; font-size: 22px; line-height: 30px; color: #111827; }
+  img, svg { position: absolute; display: block; }
+  .file { left: 80px; top: 120px; width: 240px; height: 240px; }
+  .file-small { left: 380px; top: 120px; width: 96px; height: 96px; }
+  .inline { left: 560px; top: 120px; width: 240px; height: 240px; }
+  .inline-wide { left: 860px; top: 120px; width: 340px; height: 160px; }
+  .card { position: absolute; left: 80px; top: 420px; width: 520px; height: 200px; margin: 0; padding: 24px 24px 24px 140px; box-sizing: border-box; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 16px; font-size: 22px; line-height: 30px; color: #111827; }
+  .card-icon { left: 110px; top: 460px; width: 80px; height: 80px; }
+</style>
+</head>
+<body>
+<section>
+  <p class="label">SVG file and inline SVG as vector pictures</p>
+  <img class="file" src="../_assets/badge.svg" alt="">
+  <img class="file-small" src="../_assets/badge.svg" alt="">
+  <svg class="inline" viewBox="0 0 100 100">
+    <rect x="5" y="5" width="90" height="90" rx="12" fill="#0ea5e9"/>
+    <path d="M25 55 L45 75 L78 30" stroke="#ffffff" stroke-width="10" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <svg class="inline-wide" viewBox="0 0 340 160" preserveAspectRatio="none">
+    <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#f97316"/><stop offset="1" stop-color="#db2777"/></linearGradient></defs>
+    <rect width="340" height="160" fill="url(#g)"/>
+    <circle cx="80" cy="80" r="50" fill="#ffffff" fill-opacity="0.6"/>
+    <text x="170" y="95" font-family="Arial" font-size="40" fill="#ffffff">vector</text>
+  </svg>
+  <p class="card">A text card with an icon placed beside it stays a native text box.</p>
+  <img class="card-icon" src="../_assets/badge.svg" alt="">
+</section>
+</body>
+</html>

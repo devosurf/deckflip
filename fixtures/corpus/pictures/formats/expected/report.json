@@ -1,0 +1,35 @@
+[
+  {
+    "code": "SUBSTITUTE_OPACITY",
+    "kind": "substituted",
+    "severity": "info",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > img:nth-child(7)"
+    },
+    "reason": "opacity 0.4 on img.faded applied as picture transparency",
+    "hint": "Folded into fill/line/text alpha"
+  },
+  {
+    "code": "SUBSTITUTE_IMAGE_FORMAT",
+    "kind": "substituted",
+    "severity": "info",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > img:nth-child(4)"
+    },
+    "reason": "img.webp (scene.webp) is not PNG or JPEG",
+    "hint": "Re-encoded to PNG"
+  },
+  {
+    "code": "SUBSTITUTE_IMAGE_FORMAT",
+    "kind": "substituted",
+    "severity": "info",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > img:nth-child(5)"
+    },
+    "reason": "img.gif (tiny.gif) is not PNG or JPEG",
+    "hint": "Re-encoded to PNG"
+  }
+]

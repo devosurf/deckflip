@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
-import type { Deck, Paragraph, ResolvedFont, RunStyle } from '../../src/model/index.js';
+import type { Deck, Paragraph, ResolvedFont, RunStyle, ShapeElement } from '../../src/model/index.js';
 import { emitPptx } from '../../src/emit/index.js';
 
 const sofficeAvailable = Boolean(spawnSync('soffice', ['--version'], { stdio: 'ignore' }).status === 0);
@@ -106,6 +106,14 @@ function deck(): Deck {
   };
 }
 
+function shapeAt(target: Deck, index: number): ShapeElement {
+  const element = target.slides[0]!.elements[index]!;
+  if (element.kind !== 'shape') {
+    throw new Error(`element ${index} is a ${element.kind}`);
+  }
+  return element;
+}
+
 async function zipEntries(buffer: Buffer): Promise<string[]> {
   const zip = await JSZip.loadAsync(buffer);
   return Object.keys(zip.files).filter((name) => !name.endsWith('/'));
@@ -146,7 +154,7 @@ describe('emitPptx', () => {
 
   it('emits list paragraphs with marL, negative indent and bullet properties', async () => {
     const listDeck = deck();
-    const base = listDeck.slides[0]!.elements[1]!;
+    const base = shapeAt(listDeck, 1);
     const paragraph = (overrides: Partial<Paragraph>): Paragraph => ({
       align: 'l',
       lineHeight: 28.8,
@@ -190,7 +198,7 @@ describe('emitPptx', () => {
 
   it('emits linear and radial gradient fills', async () => {
     const gradientDeck = deck();
-    const rect = gradientDeck.slides[0]!.elements[0]!;
+    const rect = shapeAt(gradientDeck, 0);
     rect.fill = {
       type: 'gradient',
       kind: 'linear',
@@ -200,7 +208,7 @@ describe('emitPptx', () => {
         { position: 1, color: { hex: '7C3AED', alpha: 0.5 } },
       ],
     };
-    const text = gradientDeck.slides[0]!.elements[1]!;
+    const text = shapeAt(gradientDeck, 1);
     text.fill = { type: 'gradient', kind: 'radial', stops: [{ position: 0, color: { hex: 'FFFFFF', alpha: 1 } }, { position: 0.3, color: { hex: '000000', alpha: 1 } }] };
 
     const zip = await JSZip.loadAsync(await emitPptx(gradientDeck, { created, appVersion: '1.2.3' }));
@@ -218,8 +226,8 @@ describe('emitPptx', () => {
 
   it('emits outer and inner shadows as an effect list after the line', async () => {
     const shadowDeck = deck();
-    shadowDeck.slides[0]!.elements[0]!.shadow = { inset: false, offsetX: 4, offsetY: 6, blur: 12, color: { hex: '000000', alpha: 0.3 } };
-    shadowDeck.slides[0]!.elements[1]!.shadow = { inset: true, offsetX: 0, offsetY: 2, blur: 4, color: { hex: '000000', alpha: 1 } };
+    shapeAt(shadowDeck, 0).shadow = { inset: false, offsetX: 4, offsetY: 6, blur: 12, color: { hex: '000000', alpha: 0.3 } };
+    shapeAt(shadowDeck, 1).shadow = { inset: true, offsetX: 0, offsetY: 2, blur: 4, color: { hex: '000000', alpha: 1 } };
 
     const zip = await JSZip.loadAsync(await emitPptx(shadowDeck, { created, appVersion: '1.2.3' }));
     const slideXml = await zip.file('ppt/slides/slide1.xml')!.async('string');
@@ -231,7 +239,7 @@ describe('emitPptx', () => {
 
   it('emits per-side borders as connector lines centred on each border edge, with unique ids', async () => {
     const borderDeck = deck();
-    const rect = borderDeck.slides[0]!.elements[0]!;
+    const rect = shapeAt(borderDeck, 0);
     rect.borders = {
       top: { width: 4, color: { hex: 'FF0000', alpha: 1 }, dash: 'solid' },
       left: { width: 2, color: { hex: '0000FF', alpha: 1 }, dash: 'dash' },
@@ -255,7 +263,7 @@ describe('emitPptx', () => {
 
   it('emits per-corner radii as a custom geometry path', async () => {
     const radiiDeck = deck();
-    radiiDeck.slides[0]!.elements[0]!.geometry = { preset: 'custom', radii: { tl: { x: 20, y: 20 }, tr: { x: 0, y: 0 }, br: { x: 40, y: 40 }, bl: { x: 10, y: 5 } } };
+    shapeAt(radiiDeck, 0).geometry = { preset: 'custom', radii: { tl: { x: 20, y: 20 }, tr: { x: 0, y: 0 }, br: { x: 40, y: 40 }, bl: { x: 10, y: 5 } } };
 
     const zip = await JSZip.loadAsync(await emitPptx(radiiDeck, { created, appVersion: '1.2.3' }));
     const slideXml = await zip.file('ppt/slides/slide1.xml')!.async('string');
@@ -268,6 +276,66 @@ describe('emitPptx', () => {
         + '<a:lnTo><a:pt x="95250" y="476250"/></a:lnTo><a:arcTo wR="95250" hR="47625" stAng="5400000" swAng="5400000"/>'
         + '<a:lnTo><a:pt x="0" y="190500"/></a:lnTo><a:arcTo wR="190500" hR="190500" stAng="10800000" swAng="5400000"/>'
         + '<a:close/></a:path></a:pathLst></a:custGeom>',
+    );
+  });
+
+  it('emits pictures with content-hashed media parts, srcRect crop, svgBlip and an outline shape', async () => {
+    const png = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c636000010000050001', 'hex');
+    const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><rect width="1" height="1"/></svg>', 'utf8');
+    const pictureDeck = deck();
+    pictureDeck.slides[0]!.elements = [
+      {
+        kind: 'picture',
+        selector: '#photo',
+        name: 'img.photo',
+        box: { x: 44, y: 304, w: 152, h: 92 },
+        rotation: 90,
+        crop: { l: 0.1875, t: 0, r: 0.1875, b: 0 },
+        geometry: { preset: 'roundRect', radius: 12 },
+        outline: { x: 40, y: 300, w: 160, h: 100 },
+        line: { width: 4, color: { hex: '000000', alpha: 1 }, dash: 'solid' },
+        opacity: 0.5,
+        media: { data: png, contentType: 'image/png' },
+      },
+      {
+        kind: 'picture',
+        selector: '#icon',
+        name: 'svg.icon',
+        box: { x: 0, y: 0, w: 80, h: 80 },
+        rotation: 0,
+        crop: { l: 0, t: 0, r: 0, b: 0 },
+        geometry: { preset: 'rect' },
+        media: { data: png, contentType: 'image/png' },
+        vector: { data: svg, contentType: 'image/svg+xml' },
+      },
+    ];
+
+    const pptx = await emitPptx(pictureDeck, { created, appVersion: '1.2.3' });
+    const zip = await JSZip.loadAsync(pptx);
+    const slideXml = await zip.file('ppt/slides/slide1.xml')!.async('string');
+    const rels = await zip.file('ppt/slides/_rels/slide1.xml.rels')!.async('string');
+    const contentTypes = await zip.file('[Content_Types].xml')!.async('string');
+
+    // the same PNG bytes are one media part; the svg is a second one
+    const media = (await zipEntries(pptx)).filter((name) => name.startsWith('ppt/media/'));
+    expect(media).toHaveLength(2);
+    expect(media[0]).toMatch(/^ppt\/media\/[0-9a-f]{16}\.png$/);
+    expect(media[1]).toMatch(/^ppt\/media\/[0-9a-f]{16}\.svg$/);
+    expect(rels).toContain(`Target="../media/${media[0]!.slice('ppt/media/'.length)}"`);
+    expect(contentTypes).toContain('<Default Extension="svg" ContentType="image/svg+xml"/>');
+
+    expect(slideXml).toContain(
+      '<p:pic><p:nvPicPr><p:cNvPr id="2" name="img.photo"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>'
+        + '<p:blipFill><a:blip r:embed="rId2"><a:alphaModFix amt="50000"/></a:blip><a:srcRect l="18750" t="0" r="18750" b="0"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>'
+        + '<p:spPr><a:xfrm rot="5400000"><a:off x="419100" y="2895600"/><a:ext cx="1447800" cy="876300"/></a:xfrm><a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val 13043"/></a:avLst></a:prstGeom></p:spPr></p:pic>',
+    );
+    // the outline follows the border box, stroke centred on the CSS border: 4 px line deflates by 2 px
+    expect(slideXml).toContain('<p:cNvPr id="3" name="img.photo border"/>');
+    expect(slideXml).toContain('<a:xfrm rot="5400000"><a:off x="400050" y="2876550"/><a:ext cx="1485900" cy="914400"/></a:xfrm>');
+    expect(slideXml).toContain('<a:noFill/><a:ln w="38100"><a:solidFill><a:srgbClr val="000000"/></a:solidFill></a:ln>');
+
+    expect(slideXml).toContain(
+      '<a:blip r:embed="rId3"><a:extLst><a:ext uri="{96DAC541-7B7A-43D3-8B79-37D633B846F1}"><asvg:svgBlip xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main" r:embed="rId4"/></a:ext></a:extLst></a:blip>',
     );
   });
 

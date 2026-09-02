@@ -17,6 +17,8 @@ A **Text block** is the lowest block-level element whose rendered children are a
 
 **Elements.** `section`, block containers (`div`, `header`, `footer`, `main`, `article`, `nav`, `figure`, `figcaption`, `aside` other than `.notes`), Text blocks (`h1`-`h6`, `p`, `blockquote`, `pre`, `li`, `dt`, `dd`, `td`, `th`), inline (`span`, `strong`, `b`, `em`, `i`, `u`, `s`, `del`, `ins`, `code`, `kbd`, `mark`, `sup`, `sub`, `small`, `a`, `br`, `abbr`, `time`), `ul`, `ol`, `img` (PNG, JPEG, GIF first frame, WebP re-encoded to PNG, SVG file as `asvg:svgBlip` with PNG fallback), `table`/`thead`/`tbody`/`tfoot`/`tr`/`td`/`th` with `colspan`/`rowspan`, `hr` (line shape), `video`/`audio` (media, #14), inline `svg` (vector picture, `substituted` info entry `SUBSTITUTE_SVG_PICTURE`: editable as a PowerPoint picture, not as shapes).
 
+Picture notes: an `img` inside a Text block is emitted as its own picture on top of the text box (PowerPoint has no inline pictures); a bordered `img` becomes a picture on its content box plus an outline shape on its border box; `image-rendering: pixelated` has no DrawingML equivalent, so PowerPoint upscales small rasters bilinearly.
+
 **CSS with a direct mapping.**
 
 | CSS | DrawingML |

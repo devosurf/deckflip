@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="deckflip:canvas" content="1280x720">
+<title>formats</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #ffffff; }
+  body { font-family: Arial; }
+  body > section { position: relative; box-sizing: border-box; overflow: hidden; }
+  .label { position: absolute; left: 80px; top: 40px; margin: 0; font-size: 22px; line-height: 30px; color: #111827; }
+  img { position: absolute; display: block; }
+  .png { left: 80px; top: 100px; width: 320px; height: 200px; }
+  .jpg { left: 480px; top: 100px; width: 320px; height: 200px; }
+  .webp { left: 880px; top: 100px; width: 320px; height: 200px; }
+  .gif { left: 80px; top: 360px; width: 160px; height: 160px; image-rendering: pixelated; }
+  .framed { left: 320px; top: 360px; width: 320px; height: 200px; border: 6px solid #0f172a; border-radius: 24px; box-sizing: border-box; }
+  .faded { left: 720px; top: 360px; width: 320px; height: 200px; opacity: 0.4; }
+  .shadowed { left: 1080px; top: 360px; width: 120px; height: 120px; box-shadow: 0 8px 16px rgba(0, 0, 0, 0.35); }
+</style>
+</head>
+<body>
+<section>
+  <p class="label">PNG, JPEG, WebP, GIF; border, radius, opacity, shadow</p>
+  <img class="png" src="../_assets/scene.png" alt="">
+  <img class="jpg" src="../_assets/scene.jpg" alt="">
+  <img class="webp" src="../_assets/scene.webp" alt="">
+  <img class="gif" src="../_assets/tiny.gif" alt="">
+  <img class="framed" src="../_assets/scene.png" alt="">
+  <img class="faded" src="../_assets/scene.png" alt="">
+  <img class="shadowed" src="../_assets/scene.png" alt="">
+</section>
+</body>
+</html>

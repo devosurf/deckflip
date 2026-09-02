@@ -95,7 +95,7 @@ function buildBorderLines(shape: ShapeElement, nextId: () => number): XmlNode[] 
   return lines;
 }
 
-function buildEffects(shape: ShapeElement): XmlNode | undefined {
+export function buildEffects(shape: { shadow?: ShapeElement['shadow'] }): XmlNode | undefined {
   const shadow = shape.shadow;
   if (!shadow) {
     return undefined;

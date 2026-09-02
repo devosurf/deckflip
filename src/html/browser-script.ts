@@ -1,4 +1,4 @@
-import type { Align, AutonumScheme, Box, Bullet, Color, CornerRadius, Fill, Insets, Line, Paragraph, Run, RunStyle, ShapeElement, TextBody } from '../model/index.js';
+import type { Align, AutonumScheme, Box, Bullet, Color, CornerRadius, Fill, Insets, Line, Paragraph, PictureElement, Run, RunStyle, ShapeElement, TextBody } from '../model/index.js';
 
 export interface BrowserFontFace {
   family: string;
@@ -14,6 +14,13 @@ export interface BrowserEntry {
   reason: string;
 }
 
+export type BrowserPictureSource = { kind: 'file'; url: string } | { kind: 'inline-svg'; svg: string };
+
+/** A picture as measured in the page; measure.ts loads the bytes and turns it into a `PictureElement`. */
+export type BrowserPicture = Omit<PictureElement, 'media' | 'vector'> & { source: BrowserPictureSource };
+
+export type BrowserElement = ShapeElement | BrowserPicture;
+
 export interface BrowserMeasureResult {
   meta: {
     id: string;
@@ -24,7 +31,7 @@ export interface BrowserMeasureResult {
     docTitle: string;
   };
   sectionBox: Box;
-  shapes: ShapeElement[];
+  shapes: BrowserElement[];
   entries: BrowserEntry[];
   fontFaces: BrowserFontFace[];
 }
@@ -57,7 +64,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
     docTitle,
   };
 
-  const shapes: ShapeElement[] = [];
+  const shapes: BrowserElement[] = [];
   const entries: BrowserEntry[] = [];
   for (const child of Array.from(section.children) as HTMLElement[]) {
     shapes.push(...walkElement(child));
@@ -71,14 +78,14 @@ export function measureSlideDocument(): BrowserMeasureResult {
   };
 
 
-  function walkElement(el: HTMLElement): ShapeElement[] {
+  function walkElement(el: HTMLElement): BrowserElement[] {
     if (isSkipped(el)) {
       return [];
     }
 
     const info = analyze(el);
     if (!info.selfPaint) {
-      const nested: ShapeElement[] = [];
+      const nested: BrowserElement[] = [];
       for (const child of Array.from(el.children) as HTMLElement[]) {
         nested.push(...walkElement(child));
       }
@@ -88,9 +95,24 @@ export function measureSlideDocument(): BrowserMeasureResult {
     // The element's own transform is disabled while it is measured: DrawingML wants the untransformed box plus
     // `rot`. Children are measured with it re-enabled, so translate-positioned parents place them correctly;
     // a rotated parent's children keep their axis-aligned bounds (a group is the way to rotate a subtree).
+    if (isPictureElement(el)) {
+      const picture = measurePictureUntransformed(el);
+      return picture ? [picture] : [];
+    }
+
     if (info.selfTextBlock) {
       const measured = withoutTransform(el, () => measureTextBlock(el));
-      return [makeShape(el, measured.box, measured.text)];
+      // PowerPoint has no inline pictures: an img inside a Text block is emitted on top of the text at its own box.
+      const inlinePictures: BrowserElement[] = [];
+      for (const img of Array.from(el.querySelectorAll('img')) as HTMLElement[]) {
+        if (!isSkipped(img)) {
+          const picture = measurePictureUntransformed(img);
+          if (picture) {
+            inlinePictures.push(picture);
+          }
+        }
+      }
+      return [makeShape(el, measured.box, measured.text), ...inlinePictures];
     }
 
     if (info.textBlockDescendants === 1 && info.paintableDescendants === 1) {
@@ -105,7 +127,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
     }
 
     const box = withoutTransform(el, () => measuredBox(el));
-    const nested: ShapeElement[] = [];
+    const nested: BrowserElement[] = [];
     for (const child of Array.from(el.children) as HTMLElement[]) {
       nested.push(...walkElement(child));
     }
@@ -131,12 +153,13 @@ export function measureSlideDocument(): BrowserMeasureResult {
     if (isSkipped(el)) {
       return { selfPaint: false, selfTextBlock: false, paintableDescendants: 0, textBlockDescendants: 0 };
     }
-    const selfTextBlock = isTextBlock(el);
-    const selfPaint = selfTextBlock || paints(el);
+    const picture = isPictureElement(el);
+    const selfTextBlock = !picture && isTextBlock(el);
+    const selfPaint = picture || selfTextBlock || paints(el);
     let paintableDescendants = 0;
     let textBlockDescendants = 0;
-    // A Text block is a leaf of the shape tree: its inline (or list-item) descendants never emit shapes.
-    if (!selfTextBlock) {
+    // Text blocks and pictures are leaves of the shape tree: their descendants never emit shapes.
+    if (!selfTextBlock && !picture) {
       for (const child of Array.from(el.children) as HTMLElement[]) {
         const childInfo = analyze(child);
         paintableDescendants += childInfo.paintableDescendants + (childInfo.selfPaint ? 1 : 0);
@@ -144,6 +167,11 @@ export function measureSlideDocument(): BrowserMeasureResult {
       }
     }
     return { selfPaint, selfTextBlock, paintableDescendants, textBlockDescendants };
+  }
+
+  /** `img`, or an inline `svg` root (whose tagName is lower-case in an HTML document). */
+  function isPictureElement(el: Element): boolean {
+    return el.tagName === 'IMG' || el.tagName.toLowerCase() === 'svg';
   }
 
   function measuredBox(el: HTMLElement): Box {
@@ -359,17 +387,38 @@ export function measureSlideDocument(): BrowserMeasureResult {
     return factor >= 1 ? color : { hex: color.hex, alpha: round(color.alpha * factor) };
   }
 
-  function makeShape(el: HTMLElement, box: Box, text?: TextBody): ShapeElement {
-    const cs = getComputedStyle(el);
-    const transform = decomposeTransform(cs.transform);
-    const shape: ShapeElement = {
-      kind: 'shape',
+  type Frame = Pick<ShapeElement, 'selector' | 'name' | 'box' | 'rotation' | 'geometry' | 'line' | 'borders' | 'shadow'> & { scale: number };
+
+  /** What shapes and pictures share: identity, transformed box, geometry, stroke and shadow. `box` is the untransformed border box. */
+  function measureFrame(el: HTMLElement, cs: CSSStyleDeclaration, box: Box, transformValue: string): Frame {
+    const transform = decomposeTransform(transformValue);
+    const frame: Frame = {
       selector: cssPath(el),
       name: elementName(el),
       box: transform ? transformedBox(cs, box, transform) : box,
       rotation: transform?.rotation ?? 0,
       geometry: classifyGeometry(box, cs),
+      scale: transform?.scale ?? 1,
     };
+    const sides = parseBorderSides(cs);
+    const line = parseLine(cs);
+    if (line) {
+      frame.line = line;
+    } else if (sides) {
+      frame.borders = sides;
+      entries.push({ code: 'SUBSTITUTE_BORDER_SIDES', selector: frame.selector, reason: `border on ${frame.name} differs per side` });
+    }
+    const shadow = parseShadow(cs.boxShadow);
+    if (shadow) {
+      frame.shadow = shadow;
+    }
+    return frame;
+  }
+
+  function makeShape(el: HTMLElement, box: Box, text?: TextBody): ShapeElement {
+    const cs = getComputedStyle(el);
+    const { scale, ...frame } = measureFrame(el, cs, box, cs.transform);
+    const shape: ShapeElement = { kind: 'shape', ...frame };
     const fill = parseFill(cs, box);
     if (fill) {
       shape.fill = fill;
@@ -377,30 +426,194 @@ export function measureSlideDocument(): BrowserMeasureResult {
         entries.push({ code: 'SUBSTITUTE_GRADIENT_RADIAL', selector: shape.selector, reason: `radial-gradient on ${shape.name} is approximated by a circular path gradient` });
       }
     }
-    const sides = parseBorderSides(cs);
-    const line = parseLine(cs);
-    if (line) {
-      shape.line = line;
-    } else if (sides) {
-      shape.borders = sides;
-      entries.push({ code: 'SUBSTITUTE_BORDER_SIDES', selector: shape.selector, reason: `border on ${shape.name} differs per side` });
-    }
-    const shadow = parseShadow(cs.boxShadow);
-    if (shadow) {
-      shape.shadow = shadow;
-    }
     if (text) {
       shape.text = text;
     }
-    if (transform) {
-      scaleShape(shape, transform.scale);
-    }
+    scaleShape(shape, scale);
     const opacity = effectiveOpacity(el);
     if (opacity < 1) {
       applyOpacity(shape, opacity);
       entries.push({ code: 'SUBSTITUTE_OPACITY', selector: shape.selector, reason: `opacity ${round(opacity)} on ${shape.name} folded into fill, line and text alpha` });
     }
     return shape;
+  }
+
+  /**
+   * An `img` or inline `svg`. The picture frame is the visible part of the painted image: the content box
+   * (`object-fit: fill|cover`), the fitted rect (`contain|scale-down|none`), further cut by a rectangular
+   * `clip-path: inset()`; `crop` is what the frame leaves out of the painted image, as `a:srcRect` fractions.
+   */
+  /** Captures the transform, then measures with it disabled (see `walkElement`). */
+  function measurePictureUntransformed(el: HTMLElement): BrowserPicture | undefined {
+    const transformValue = getComputedStyle(el).transform;
+    return withoutTransform(el, () => measurePicture(el, transformValue));
+  }
+
+  function measurePicture(el: HTMLElement, transformValue: string): BrowserPicture | undefined {
+    const cs = getComputedStyle(el);
+    const rect = el.getBoundingClientRect();
+    const borderBox = measuredBox(el);
+    const frame = measureFrame(el, cs, borderBox, transformValue);
+    const content = {
+      left: rect.left + px(cs.borderLeftWidth) + px(cs.paddingLeft),
+      top: rect.top + px(cs.borderTopWidth) + px(cs.paddingTop),
+      right: rect.right - px(cs.borderRightWidth) - px(cs.paddingRight),
+      bottom: rect.bottom - px(cs.borderBottomWidth) - px(cs.paddingBottom),
+    };
+    const contentW = Math.max(0, content.right - content.left);
+    const contentH = Math.max(0, content.bottom - content.top);
+
+    let source: BrowserPictureSource;
+    let painted = { left: content.left, top: content.top, width: contentW, height: contentH };
+    if (el.tagName === 'IMG') {
+      const img = el as HTMLImageElement;
+      const url = img.currentSrc || img.src;
+      if (!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) {
+        entries.push({ code: 'VALIDATE_MISSING_ASSET', selector: frame.selector, reason: `${frame.name} did not load: ${img.getAttribute('src') ?? ''}` });
+        return undefined;
+      }
+      if (!url.startsWith('file:')) {
+        entries.push({ code: 'VALIDATE_REMOTE_ASSET', selector: frame.selector, reason: `${frame.name} loads ${url}` });
+        return undefined;
+      }
+      source = { kind: 'file', url };
+      const natural = { width: img.naturalWidth, height: img.naturalHeight };
+      const fit = cs.objectFit;
+      let scale = 1;
+      if (fit === 'cover') {
+        scale = Math.max(contentW / natural.width, contentH / natural.height);
+      } else if (fit === 'contain') {
+        scale = Math.min(contentW / natural.width, contentH / natural.height);
+      } else if (fit === 'scale-down') {
+        scale = Math.min(1, contentW / natural.width, contentH / natural.height);
+      } else if (fit !== 'none') {
+        scale = NaN; // fill: the image is stretched to the content box
+      }
+      if (!Number.isNaN(scale)) {
+        const width = natural.width * scale;
+        const height = natural.height * scale;
+        const [posX, posY] = parseObjectPosition(cs.objectPosition, contentW - width, contentH - height);
+        painted = { left: content.left + posX, top: content.top + posY, width, height };
+      }
+    } else {
+      const svg = el.cloneNode(true) as SVGElement;
+      if (!svg.getAttribute('xmlns')) {
+        svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      }
+      svg.removeAttribute('class');
+      svg.removeAttribute('style');
+      source = { kind: 'inline-svg', svg: new XMLSerializer().serializeToString(svg) };
+      entries.push({ code: 'SUBSTITUTE_SVG_PICTURE', selector: frame.selector, reason: `inline svg ${frame.name} is emitted as a vector picture` });
+    }
+
+    // visible = content box ∩ painted image ∩ clip-path inset (which is relative to the border box)
+    let visible = {
+      left: Math.max(content.left, painted.left),
+      top: Math.max(content.top, painted.top),
+      right: Math.min(content.right, painted.left + painted.width),
+      bottom: Math.min(content.bottom, painted.top + painted.height),
+    };
+    const clip = parseClipInset(cs.clipPath, rect.width, rect.height);
+    if (clip) {
+      visible = {
+        left: Math.max(visible.left, rect.left + clip.l),
+        top: Math.max(visible.top, rect.top + clip.t),
+        right: Math.min(visible.right, rect.right - clip.r),
+        bottom: Math.min(visible.bottom, rect.bottom - clip.b),
+      };
+    }
+    if (visible.right <= visible.left || visible.bottom <= visible.top || painted.width <= 0 || painted.height <= 0) {
+      return undefined;
+    }
+    const fraction = (value: number): number => Math.round(value * 1e6) / 1e6;
+    const crop: Insets = {
+      l: fraction((visible.left - painted.left) / painted.width),
+      t: fraction((visible.top - painted.top) / painted.height),
+      r: fraction((painted.left + painted.width - visible.right) / painted.width),
+      b: fraction((painted.top + painted.height - visible.bottom) / painted.height),
+    };
+    const visibleBox: Box = {
+      x: round(visible.left - sectionRect.left),
+      y: round(visible.top - sectionRect.top),
+      w: round(visible.right - visible.left),
+      h: round(visible.bottom - visible.top),
+    };
+    // the frame was decorated for the border box; re-run the transform for the visible box, at the same origin
+    const transform = decomposeTransform(transformValue);
+    const { scale, ...decorated } = frame;
+    const picture: BrowserPicture = {
+      kind: 'picture',
+      ...decorated,
+      box: transform ? transformedBoxAround(cs, borderBox, visibleBox, transform) : visibleBox,
+      crop,
+      source,
+    };
+    if (picture.line || picture.borders) {
+      picture.outline = decorated.box;
+    }
+    scalePicture(picture, scale);
+    const opacity = effectiveOpacity(el);
+    if (opacity < 1) {
+      picture.opacity = round(opacity);
+      entries.push({ code: 'SUBSTITUTE_OPACITY', selector: picture.selector, reason: `opacity ${round(opacity)} on ${picture.name} applied as picture transparency` });
+    }
+    return picture;
+  }
+
+  function scalePicture(picture: BrowserPicture, s: number): void {
+    if (s === 1) {
+      return;
+    }
+    const g = picture.geometry;
+    if (g.preset === 'roundRect') {
+      g.radius = round(g.radius * s);
+    } else if (g.preset === 'custom') {
+      for (const corner of Object.values(g.radii)) {
+        corner.x = round(corner.x * s);
+        corner.y = round(corner.y * s);
+      }
+    }
+    if (picture.line) {
+      picture.line.width = round(picture.line.width * s);
+    }
+    for (const side of Object.values(picture.borders ?? {})) {
+      side.width = round(side.width * s);
+    }
+    if (picture.shadow) {
+      picture.shadow.offsetX = round(picture.shadow.offsetX * s);
+      picture.shadow.offsetY = round(picture.shadow.offsetY * s);
+      picture.shadow.blur = round(picture.shadow.blur * s);
+    }
+  }
+
+  /** Computed `object-position` is two lengths or percentages; percentages resolve against the free space. */
+  function parseObjectPosition(value: string, freeX: number, freeY: number): [number, number] {
+    const parts = value.trim().split(/\s+/);
+    const resolve = (token: string | undefined, free: number): number => {
+      if (!token) {
+        return free / 2;
+      }
+      return token.endsWith('%') ? (parseFloat(token) / 100) * free : px(token);
+    };
+    return [resolve(parts[0], freeX), resolve(parts[1], freeY)];
+  }
+
+  /** `clip-path: inset(t r b l)` without `round`; other clip paths are left to the raster pass. */
+  function parseClipInset(value: string, width: number, height: number): Insets | undefined {
+    const match = value.trim().match(/^inset\(([^)]*)\)$/);
+    if (!match || /\bround\b/.test(match[1]!)) {
+      return undefined;
+    }
+    const tokens = match[1]!.trim().split(/\s+/).filter(Boolean);
+    if (tokens.length === 0 || tokens.length > 4) {
+      return undefined;
+    }
+    const resolve = (token: string, size: number): number => (token.endsWith('%') ? (parseFloat(token) / 100) * size : px(token));
+    const t = resolve(tokens[0]!, height);
+    const r = resolve(tokens[1] ?? tokens[0]!, width);
+    const b = resolve(tokens[2] ?? tokens[0]!, height);
+    const l = resolve(tokens[3] ?? tokens[1] ?? tokens[0]!, width);
+    return { l, t, r, b };
   }
 
   /**
@@ -1180,13 +1393,14 @@ export function measureSlideDocument(): BrowserMeasureResult {
   }
 
   /**
-   * Applies the element's transform to its untransformed box: the box centre goes through the matrix about
-   * `transform-origin`, the size takes the uniform scale, and the rotation goes to `rotation`.
+   * Applies the element's transform to an untransformed box: the box centre goes through the matrix about
+   * `transform-origin` (resolved against `originBox`, the element's border box), the size takes the uniform
+   * scale, and the rotation goes to `rotation`.
    */
-  function transformedBox(cs: CSSStyleDeclaration, box: Box, transform: Transform2d): Box {
+  function transformedBoxAround(cs: CSSStyleDeclaration, originBox: Box, box: Box, transform: Transform2d): Box {
     const origin = cs.transformOrigin.split(/\s+/).map((part) => px(part));
-    const ox = box.x + (origin[0] ?? 0);
-    const oy = box.y + (origin[1] ?? 0);
+    const ox = originBox.x + (origin[0] ?? 0);
+    const oy = originBox.y + (origin[1] ?? 0);
     const cx = box.x + box.w / 2 - ox;
     const cy = box.y + box.h / 2 - oy;
     const centreX = ox + transform.a * cx + transform.c * cy + transform.e;
@@ -1194,6 +1408,10 @@ export function measureSlideDocument(): BrowserMeasureResult {
     const w = box.w * transform.scale;
     const h = box.h * transform.scale;
     return { x: round(centreX - w / 2), y: round(centreY - h / 2), w: round(w), h: round(h) };
+  }
+
+  function transformedBox(cs: CSSStyleDeclaration, box: Box, transform: Transform2d): Box {
+    return transformedBoxAround(cs, box, box, transform);
   }
 
   /** `transform: scale()` folds into every CSS-px quantity of the shape, text included. */
@@ -1340,12 +1558,12 @@ export function measureSlideDocument(): BrowserMeasureResult {
     if (cs.boxShadow !== 'none') {
       return true;
     }
-    return ['IMG', 'SVG', 'TABLE', 'VIDEO', 'AUDIO', 'HR'].includes(el.tagName);
+    return isPictureElement(el) || ['TABLE', 'VIDEO', 'AUDIO', 'HR'].includes(el.tagName);
   }
 
   function isTextBlock(el: HTMLElement): boolean {
     const display = getComputedStyle(el).display;
-    if (display.startsWith('inline') || display === 'contents') {
+    if (display.startsWith('inline') || display === 'contents' || isPictureElement(el)) {
       return false;
     }
     if (el.tagName === 'UL' || el.tagName === 'OL') {

@@ -11,12 +11,28 @@ const browserAvailable = await chromium.launch().then(async (browser) => {
 
 type MeasuredDeck = MeasuredDeckResult['deck'];
 
-function shapeByName(deck: MeasuredDeck, name: string) {
-  const shape = deck.slides[0]!.elements.find((element) => element.name === name);
-  if (!shape) {
-    throw new Error(`Missing shape ${name}`);
+function elementByName(deck: MeasuredDeck, name: string) {
+  const element = deck.slides[0]!.elements.find((candidate) => candidate.name === name);
+  if (!element) {
+    throw new Error(`Missing element ${name}`);
   }
-  return shape;
+  return element;
+}
+
+function shapeByName(deck: MeasuredDeck, name: string) {
+  const element = elementByName(deck, name);
+  if (element.kind !== 'shape') {
+    throw new Error(`${name} is a ${element.kind}`);
+  }
+  return element;
+}
+
+function pictureByName(deck: MeasuredDeck, name: string) {
+  const element = elementByName(deck, name);
+  if (element.kind !== 'picture') {
+    throw new Error(`${name} is a ${element.kind}`);
+  }
+  return element;
 }
 
 describe.skipIf(!browserAvailable)('measureDeck', () => {
@@ -72,16 +88,16 @@ describe.skipIf(!browserAvailable)('measureDeck', () => {
       const slide = measured.deck.slides[0]!;
       expect(slide.elements).toHaveLength(4);
 
-      const breaks = slide.elements.find((element) => element.name === 'p.breaks')!;
+      const breaks = shapeByName(measured.deck, 'p.breaks');
       expect(breaks.text?.paragraphs).toHaveLength(1);
       expect(breaks.text?.paragraphs[0]!.runs.map((run) => (run.kind === 'text' ? run.text : 'break'))).toEqual(['a', 'break', 'b']);
 
-      const pre = slide.elements.find((element) => element.name === 'pre.pre')!;
+      const pre = shapeByName(measured.deck, 'pre.pre');
       expect(pre.text?.paragraphs).toHaveLength(2);
       expect(pre.text?.paragraphs[0]!.runs[0]).toMatchObject({ kind: 'text', text: 'line 1' });
       expect(pre.text?.paragraphs[1]!.runs[0]).toMatchObject({ kind: 'text', text: '  line 2' });
 
-      const styled = slide.elements.find((element) => element.name === 'p.styled')!;
+      const styled = shapeByName(measured.deck, 'p.styled');
       const styledRuns = styled.text?.paragraphs[0]!.runs ?? [];
       expect(styledRuns.map((run) => (run.kind === 'text' ? run.text : 'break'))).toEqual(['A ', 'B ', 'C', ' D\u00A0E']);
       const styledTextRuns = styledRuns.filter((run): run is Extract<typeof run, { kind: 'text' }> => run.kind === 'text');
@@ -90,7 +106,7 @@ describe.skipIf(!browserAvailable)('measureDeck', () => {
       expect(styledTextRuns[2]!.style.italic).toBe(true);
       expect(styledTextRuns[3]!.text).toBe(' D\u00A0E');
 
-      const rtl = slide.elements.find((element) => element.name === 'p.rtl')!;
+      const rtl = shapeByName(measured.deck, 'p.rtl');
       expect(rtl.text?.rtl).toBe(true);
       expect(rtl.text?.paragraphs[0]!.align).toBe('r');
       expect(rtl.text?.paragraphs[0]!.runs.map((run) => (run.kind === 'text' ? run.text : 'break'))).toEqual(['אבג ד\u00A0ה']);
@@ -280,6 +296,77 @@ describe.skipIf(!browserAvailable)('measureDeck', () => {
       const cornered = shapeByName(measured.deck, 'div.cornered');
       expect(cornered.box).toEqual({ x: 610, y: 530, w: 200, h: 100 });
       expect(cornered.rotation).toBe(90);
+    } finally {
+      await browser.close();
+    }
+  });
+
+  it('measures img and inline svg as pictures with crop, media bytes and format substitutions', async () => {
+    const loaded = await loadDeck('test/html/fixtures/pictures.html', {});
+    const browser = await chromium.launch();
+    try {
+      const measured = await measureDeck(loaded, { browser });
+      const picture = (name: string) => pictureByName(measured.deck, name);
+
+      const plain = picture('img.plain');
+      expect(plain.box).toEqual({ x: 40, y: 40, w: 320, h: 200 });
+      expect(plain.crop).toEqual({ l: 0, t: 0, r: 0, b: 0 });
+      expect(plain.media.contentType).toBe('image/png');
+      expect(plain.media.data.length).toBeGreaterThan(0);
+      expect(plain.name).toBe('img.plain');
+
+      // 160x100 covering 200x200: painted at 320x200, 60 px cut each side = 0.1875 of the source
+      const cover = picture('img.cover');
+      expect(cover.box).toEqual({ x: 400, y: 40, w: 200, h: 200 });
+      expect(cover.crop).toEqual({ l: 0.1875, t: 0, r: 0.1875, b: 0 });
+
+      // contain at left top: the frame is the fitted 200x125 rect, nothing cropped
+      const contain = picture('img.contain');
+      expect(contain.box).toEqual({ x: 640, y: 40, w: 200, h: 125 });
+      expect(contain.crop).toEqual({ l: 0, t: 0, r: 0, b: 0 });
+
+      // inset(20 40 60 80) on a 320x200 frame: visible 200x120 at (960, 60)
+      const clipped = picture('img.clipped');
+      expect(clipped.box).toEqual({ x: 960, y: 60, w: 200, h: 120 });
+      expect(clipped.crop).toEqual({ l: 0.25, t: 0.1, r: 0.125, b: 0.3 });
+
+      const jpeg = picture('img.jpeg');
+      expect(jpeg.media.contentType).toBe('image/jpeg');
+      expect(jpeg.line).toEqual({ width: 4, color: { hex: '000000', alpha: 1 }, dash: 'solid' });
+      expect(jpeg.geometry).toEqual({ preset: 'roundRect', radius: 12 });
+      // the picture frame is the content box inside the border
+      expect(jpeg.box).toEqual({ x: 44, y: 304, w: 152, h: 92 });
+
+      const webp = picture('img.webp');
+      expect(webp.media.contentType).toBe('image/png');
+      expect(webp.opacity).toBe(0.5);
+
+      const gif = picture('img.gif');
+      expect(gif.media.contentType).toBe('image/png');
+
+      const svgfile = picture('img.svgfile');
+      expect(svgfile.media.contentType).toBe('image/png');
+      expect(svgfile.vector?.contentType).toBe('image/svg+xml');
+      expect(Buffer.from(svgfile.vector!.data).toString('utf8')).toContain('<circle');
+
+      const inline = picture('svg.inline');
+      expect(inline.box).toEqual({ x: 640, y: 300, w: 80, h: 80 });
+      expect(inline.media.contentType).toBe('image/png');
+      expect(Buffer.from(inline.vector!.data).toString('utf8')).toContain('<rect');
+
+      const rotated = picture('img.rotated');
+      expect(rotated.box).toEqual({ x: 840, y: 300, w: 160, h: 100 });
+      expect(rotated.rotation).toBe(90);
+
+      expect(measured.deck.slides[0]!.elements.find((element) => element.name === 'img.missing')).toBeUndefined();
+      const raised = measured.entries.map((entry) => `${entry.code} ${entry.locator && 'selector' in entry.locator ? entry.locator.selector : ''}`).sort();
+      expect(raised).toEqual([
+        'SUBSTITUTE_IMAGE_FORMAT section:nth-of-type(1) > img:nth-child(6)',
+        'SUBSTITUTE_IMAGE_FORMAT section:nth-of-type(1) > img:nth-child(7)',
+        'SUBSTITUTE_OPACITY section:nth-of-type(1) > img:nth-child(6)',
+        'SUBSTITUTE_SVG_PICTURE section:nth-of-type(1) > svg:nth-child(9)',
+        'VALIDATE_MISSING_ASSET section:nth-of-type(1) > img:nth-child(10)',
+      ]);
     } finally {
       await browser.close();
     }

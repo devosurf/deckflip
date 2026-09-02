@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { unlink, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Browser, Page } from 'playwright-core';
-import type { Deck, Element, Slide } from '../model/index.js';
+import type { Deck, Element, PictureElement, Slide } from '../model/index.js';
 import { entry as reportEntry } from '../report/codes.js';
 import type { Entry } from '../report/types.js';
-import type { BrowserMeasureResult } from './browser-script.js';
+import type { BrowserMeasureResult, BrowserPicture } from './browser-script.js';
+import { loadMedia } from './media.js';
 import { measureSlideDocument } from './browser-script.js';
 import type { LoadedDeck, SlideDocument } from './load.js';
 
@@ -42,16 +43,16 @@ export async function measureDeck(loaded: LoadedDeck, opts: MeasureOptions): Pro
         }
 
         const measuredElements: Element[] = [];
-        for (const shape of result.shapes) {
-          const offcanvas = classifyOffcanvas(shape.box, loaded.canvas.width, loaded.canvas.height);
+        for (const measured of result.shapes) {
+          const offcanvas = classifyOffcanvas(measured.box, loaded.canvas.width, loaded.canvas.height);
           if (offcanvas === 'dropped') {
             entries.push({
               code: 'DROPPED_OFFCANVAS',
               kind: 'dropped',
               severity: 'info',
               slide: document.index,
-              locator: { selector: shape.selector },
-              reason: `Element ${shape.name} is fully outside the canvas`,
+              locator: { selector: measured.selector },
+              reason: `Element ${measured.name} is fully outside the canvas`,
               hint: DROPPED_OFFCANVAS_HINT,
             });
             continue;
@@ -62,12 +63,19 @@ export async function measureDeck(loaded: LoadedDeck, opts: MeasureOptions): Pro
               kind: 'flattened',
               severity: 'warning',
               slide: document.index,
-              locator: { selector: shape.selector },
-              reason: `Element ${shape.name} extends beyond the canvas`,
-              hint: FLATTEN_OFFCANVAS_HINT.replace('{el}', shape.name).replace('{W}', String(loaded.canvas.width)).replace('{H}', String(loaded.canvas.height)),
+              locator: { selector: measured.selector },
+              reason: `Element ${measured.name} extends beyond the canvas`,
+              hint: FLATTEN_OFFCANVAS_HINT.replace('{el}', measured.name).replace('{W}', String(loaded.canvas.width)).replace('{H}', String(loaded.canvas.height)),
             });
           }
-          measuredElements.push(shape);
+          if (measured.kind === 'picture') {
+            const picture = await resolvePicture(page, measured, document.index, entries);
+            if (picture) {
+              measuredElements.push(picture);
+            }
+            continue;
+          }
+          measuredElements.push(measured);
         }
 
         for (const face of result.fontFaces) {
@@ -126,6 +134,51 @@ async function measureDocumentPage(page: Page, slideDoc: SlideDocument): Promise
   }
 }
 
+
+/**
+ * Loads the picture's bytes: PNG/JPEG as they are, GIF/WebP re-encoded (`SUBSTITUTE_IMAGE_FORMAT`), SVG as the
+ * vector payload with a PNG fallback captured from the page (the element alone, untransformed and opaque).
+ */
+async function resolvePicture(page: Page, measured: BrowserPicture, slide: number, entries: Entry[]): Promise<PictureElement | undefined> {
+  const { source, ...picture } = measured;
+  if (source.kind === 'inline-svg') {
+    const fallback = await captureElement(page, picture.selector);
+    return { ...picture, media: { data: fallback, contentType: 'image/png' }, vector: { data: Buffer.from(source.svg, 'utf8'), contentType: 'image/svg+xml' } };
+  }
+  const path = fileURLToPath(source.url);
+  const loaded = await loadMedia(path);
+  if (loaded.kind === 'vector') {
+    const fallback = await captureElement(page, picture.selector);
+    return { ...picture, media: { data: fallback, contentType: 'image/png' }, vector: loaded.vector };
+  }
+  if (loaded.reencoded) {
+    entries.push(reportEntry('SUBSTITUTE_IMAGE_FORMAT', { slide, locator: { selector: picture.selector }, reason: `${picture.name} (${basename(path)}) is not PNG or JPEG` }));
+  }
+  return { ...picture, media: loaded.media };
+}
+
+async function captureElement(page: Page, selector: string): Promise<Buffer> {
+  const locator = page.locator(selector).first();
+  const restore = await locator.evaluate((el) => {
+    const element = el as HTMLElement;
+    const prior = element.getAttribute('style');
+    element.style.setProperty('transform', 'none', 'important');
+    element.style.setProperty('opacity', '1', 'important');
+    element.style.setProperty('clip-path', 'none', 'important');
+    return prior;
+  });
+  try {
+    return await locator.screenshot({ type: 'png', omitBackground: true });
+  } finally {
+    await locator.evaluate((el, prior) => {
+      if (prior === null) {
+        el.removeAttribute('style');
+      } else {
+        el.setAttribute('style', prior);
+      }
+    }, restore);
+  }
+}
 function resolveSlideName(document: SlideDocument, result: BrowserMeasureResult): string {
   if (!document.inlineSection) {
     return result.meta.docTitle || result.meta.title || result.meta.heading || `Slide ${document.index}`;

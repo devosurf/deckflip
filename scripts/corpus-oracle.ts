@@ -13,7 +13,7 @@ async function listFixtures(filters: string[]): Promise<Array<{ category: string
   const fixtures: Array<{ category: string; name: string }> = [];
   const categories = (await readdir(CORPUS, { withFileTypes: true })).filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
   for (const category of categories) {
-    const names = (await readdir(join(CORPUS, category), { withFileTypes: true })).filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
+    const names = (await readdir(join(CORPUS, category), { withFileTypes: true })).filter((entry) => entry.isDirectory() && !entry.name.startsWith('_')).map((entry) => entry.name).sort();
     for (const name of names) {
       const key = `${category}/${name}`;
       if (filters.length === 0 || filters.some((filter) => filter === category || filter === key)) {

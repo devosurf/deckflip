@@ -3,7 +3,7 @@ import { extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Command, InvalidArgumentError, Option } from 'commander';
 import type { Browser } from 'playwright-core';
-import type { Canvas, Deck, ResolvedFont, ShapeElement, TextBody } from '../model/index.js';
+import type { Canvas, Deck, Element, ResolvedFont, TextBody } from '../model/index.js';
 import { convertHtmlToPptx, validateHtml } from '../convert.js';
 import { FontCatalog, resolveDeckFonts } from '../fonts/index.js';
 import { loadDeck } from '../html/load.js';
@@ -124,7 +124,7 @@ function uniqueFonts(deck: Deck): ResolvedFont[] {
   const fonts = new Map<string, ResolvedFont>();
   for (const slide of deck.slides) {
     for (const element of slide.elements) {
-      if (element.text === undefined) {
+      if (element.kind !== 'shape' || element.text === undefined) {
         continue;
       }
       for (const paragraph of element.text.paragraphs) {
@@ -140,7 +140,10 @@ function uniqueFonts(deck: Deck): ResolvedFont[] {
   return [...fonts.values()];
 }
 
-function inspectElement(element: ShapeElement) {
+function inspectElement(element: Element) {
+  if (element.kind === 'picture') {
+    return { kind: 'picture', selector: element.selector, box: element.box };
+  }
   return {
     kind: element.text === undefined ? 'shape' : 'text',
     selector: element.selector,

@@ -41,8 +41,36 @@ export interface Slide {
   notes?: TextBody;
 }
 
-/** Milestone 1 emits shapes only; later milestones add picture, table, group, media. */
-export type Element = ShapeElement;
+export type Element = ShapeElement | PictureElement;
+
+export interface Media {
+  data: Uint8Array;
+  contentType: 'image/png' | 'image/jpeg' | 'image/gif' | 'image/svg+xml';
+}
+
+/** An `img` or inline `svg`, emitted as `p:pic`. */
+export interface PictureElement {
+  kind: 'picture';
+  selector: string;
+  name: string;
+  /** the visible frame (content box, or the fitted rect for `object-fit: contain`), before rotation, CSS px */
+  box: Box;
+  /** degrees clockwise */
+  rotation: number;
+  /** fraction (0..1) of the source image outside the frame on each side -> `a:srcRect` */
+  crop: Insets;
+  geometry: Geometry;
+  /** the element's border box (transformed like `box`), present when a border is drawn around the picture */
+  outline?: Box;
+  line?: Line;
+  borders?: { top?: Line; right?: Line; bottom?: Line; left?: Line };
+  shadow?: Shadow;
+  opacity?: number;
+  /** the raster payload for `a:blip`: PNG, JPEG, or the PNG fallback of an SVG */
+  media: Media;
+  /** SVG sources: the vector payload for `asvg:svgBlip` */
+  vector?: Media;
+}
 
 export interface Box {
   x: number;
