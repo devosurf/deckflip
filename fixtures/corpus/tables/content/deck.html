@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="deckflip:canvas" content="1280x720">
+<title>content</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #ffffff; }
+  body { font-family: Arial; color: #111827; }
+  body > section { position: relative; box-sizing: border-box; overflow: hidden; }
+  table { position: absolute; left: 80px; top: 60px; width: 1120px; border-collapse: collapse; font-size: 20px; line-height: 28px; }
+  caption { text-align: left; font-size: 24px; line-height: 32px; padding: 0 0 12px; font-weight: 700; }
+  th, td { padding: 12px 16px; border: 1px solid #cbd5e1; text-align: left; vertical-align: top; }
+  th { background: #f8fafc; }
+  td p { margin: 0 0 8px; }
+  td p:last-child { margin-bottom: 0; }
+  td ul { margin: 0; padding-left: 24px; }
+  td.bottom { vertical-align: bottom; }
+  td.middle { vertical-align: middle; }
+  td.wrap { width: 380px; }
+  .tall td { height: 120px; }
+  code { font-family: "Courier New", monospace; }
+</style>
+</head>
+<body>
+<section>
+  <table>
+    <caption>Table with rich cell content</caption>
+    <tr><th>Feature</th><th>Notes</th><th>Status</th></tr>
+    <tr class="tall">
+      <td><strong>Wrapping</strong> text with <em>inline</em> styles and a <code>code</code> span</td>
+      <td class="wrap"><p>First paragraph in the cell.</p><p>Second paragraph, which is long enough to wrap onto another line inside the cell.</p></td>
+      <td class="bottom">Bottom aligned</td>
+    </tr>
+    <tr class="tall">
+      <td>Lists</td>
+      <td><ul><li>alpha</li><li>beta</li><li>gamma</li></ul></td>
+      <td class="middle">Middle aligned</td>
+    </tr>
+    <tr>
+      <td>Mixed</td>
+      <td class="wrap"><p>Intro line</p><ul><li>one item</li><li>another item that is long enough to wrap in this column</li></ul></td>
+      <td>Top</td>
+    </tr>
+  </table>
+</section>
+</body>
+</html>

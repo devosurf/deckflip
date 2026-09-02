@@ -3,6 +3,7 @@ import { CT, REL, type OpcPackage } from '../ooxml/opc.js';
 import { el, serialize, type XmlNode } from '../ooxml/xml.js';
 import { buildPicture, type MediaStore, type PictureEmissionContext } from './picture.js';
 import { buildShape } from './shape.js';
+import { buildTable } from './table.js';
 
 export interface SlideEmissionContext {
   deck: Deck;
@@ -28,7 +29,16 @@ export function emitSlide(pkg: OpcPackage, slide: Slide, ctx: SlideEmissionConte
     addRelationship,
     media: ctx.media,
   };
-  const shapes = slide.elements.flatMap((element) => (element.kind === 'picture' ? buildPicture(element, elementCtx, nextId) : buildShape(element, elementCtx, nextId)));
+  const shapes = slide.elements.flatMap((element) => {
+    switch (element.kind) {
+      case 'picture':
+        return buildPicture(element, elementCtx, nextId);
+      case 'table':
+        return [buildTable(element, elementCtx, nextId)];
+      default:
+        return buildShape(element, elementCtx, nextId);
+    }
+  });
 
   const xml = serialize(buildSlideXml(slide, shapes));
   pkg.addPart(partName, CT.slide, xml);

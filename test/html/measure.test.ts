@@ -371,4 +371,66 @@ describe.skipIf(!browserAvailable)('measureDeck', () => {
       await browser.close();
     }
   });
+
+  it('measures tables into a column grid, rows, spans, per-edge borders, fills and cell text', async () => {
+    const loaded = await loadDeck('test/html/fixtures/tables.html', {});
+    const browser = await chromium.launch();
+    try {
+      const measured = await measureDeck(loaded, { browser });
+      const table = elementByName(measured.deck, 'table.grid');
+      if (table.kind !== 'table') throw new Error(`table.grid is a ${table.kind}`);
+
+      expect(table.box.x).toBe(40);
+      expect(table.box.y).toBe(40);
+      expect(table.box.w).toBe(600);
+      expect(table.columns).toHaveLength(3);
+      expect(table.columns.reduce((sum, w) => sum + w, 0)).toBeCloseTo(600, 0);
+      expect(table.rows).toHaveLength(5);
+      expect(table.rows.reduce((sum, row) => sum + row.height, 0)).toBeCloseTo(table.box.h, 0);
+      expect(table.rows[3]!.height).toBeGreaterThanOrEqual(80);
+
+      const header = table.rows[0]!.cells[0]!;
+      expect(header.fill).toEqual({ type: 'solid', color: { hex: 'E2E8F0', alpha: 1 } });
+      expect(header.padding).toEqual({ l: 12, t: 8, r: 12, b: 8 });
+      expect(header.borders.top).toEqual({ width: 1, color: { hex: '94A3B8', alpha: 1 }, dash: 'solid' });
+      expect(header.anchor).toBe('t');
+      const headerRun = header.text.paragraphs[0]!.runs[0]!;
+      expect(headerRun.kind === 'text' && headerRun.text).toBe('Item');
+      expect(headerRun.kind === 'text' && headerRun.style.bold).toBe(true);
+
+      const price = table.rows[1]!.cells[2]!;
+      expect(price.text.paragraphs[0]!.align).toBe('r');
+      expect(price.anchor).toBe('b');
+
+      // rowspan=2 on the first body cell: the cell below it is a vertical continuation
+      const widget = table.rows[1]!.cells[0]!;
+      expect(widget.rowSpan).toBe(2);
+      expect(widget.text.paragraphs[0]!.runs.map((run) => (run.kind === 'text' ? run.text : 'break'))).toEqual(['Widget ', 'A']);
+      expect(table.rows[2]!.cells[0]!.merged).toBe('v');
+      expect(table.rows[2]!.cells).toHaveLength(3);
+
+      // colspan=2: the second cell is a horizontal continuation; p + ul give two paragraphs
+      const merged = table.rows[3]!.cells[0]!;
+      expect(merged.colSpan).toBe(2);
+      expect(table.rows[3]!.cells[1]!.merged).toBe('h');
+      expect(merged.text.paragraphs.map((p) => p.runs.map((run) => (run.kind === 'text' ? run.text : 'break')).join(''))).toEqual(['Merged cell', 'with a list']);
+      expect(merged.text.paragraphs[1]!.bullet).toEqual({ type: 'char', char: '•', color: { hex: '111827', alpha: 1 }, sizePct: 100 });
+
+      const total = table.rows[4]!.cells[0]!;
+      expect(total.borders.top).toEqual({ width: 3, color: { hex: '0F172A', alpha: 1 }, dash: 'solid' });
+      expect(total.fill).toEqual({ type: 'solid', color: { hex: 'FEF3C7', alpha: 1 } });
+
+      // caption becomes a separate text box; borderless cells have no borders
+      const caption = shapeByName(measured.deck, 'caption');
+      expect(caption.text?.paragraphs[0]!.runs[0]).toMatchObject({ kind: 'text', text: 'Figure 1' });
+      const captioned = elementByName(measured.deck, 'table.caption');
+      if (captioned.kind !== 'table') throw new Error('table.caption is not a table');
+      expect(captioned.rows[0]!.cells[0]!.borders).toEqual({});
+
+      expect(measured.entries.map((entry) => entry.code)).toEqual(['VALIDATE_TABLE_CONTENT']);
+      expect(measured.entries[0]!.locator).toEqual({ selector: 'section:nth-of-type(1) > table:nth-child(3) > tbody:nth-child(1) > tr:nth-child(1) > td:nth-child(1)' });
+    } finally {
+      await browser.close();
+    }
+  });
 });

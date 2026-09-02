@@ -3,7 +3,7 @@ import { extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Command, InvalidArgumentError, Option } from 'commander';
 import type { Browser } from 'playwright-core';
-import type { Canvas, Deck, Element, ResolvedFont, TextBody } from '../model/index.js';
+import { textBodiesOf, type Canvas, type Deck, type Element, type ResolvedFont, type TextBody } from '../model/index.js';
 import { convertHtmlToPptx, validateHtml } from '../convert.js';
 import { FontCatalog, resolveDeckFonts } from '../fonts/index.js';
 import { loadDeck } from '../html/load.js';
@@ -124,15 +124,14 @@ function uniqueFonts(deck: Deck): ResolvedFont[] {
   const fonts = new Map<string, ResolvedFont>();
   for (const slide of deck.slides) {
     for (const element of slide.elements) {
-      if (element.kind !== 'shape' || element.text === undefined) {
-        continue;
-      }
-      for (const paragraph of element.text.paragraphs) {
-        for (const run of paragraph.runs) {
-          if (run.kind !== 'text' || run.style.font === undefined) {
-            continue;
+      for (const { body } of textBodiesOf(element)) {
+        for (const paragraph of body.paragraphs) {
+          for (const run of paragraph.runs) {
+            if (run.kind !== 'text' || run.style.font === undefined) {
+              continue;
+            }
+            fonts.set(run.style.font.file, run.style.font);
           }
-          fonts.set(run.style.font.file, run.style.font);
         }
       }
     }
@@ -141,8 +140,8 @@ function uniqueFonts(deck: Deck): ResolvedFont[] {
 }
 
 function inspectElement(element: Element) {
-  if (element.kind === 'picture') {
-    return { kind: 'picture', selector: element.selector, box: element.box };
+  if (element.kind === 'picture' || element.kind === 'table') {
+    return { kind: element.kind, selector: element.selector, box: element.box };
   }
   return {
     kind: element.text === undefined ? 'shape' : 'text',

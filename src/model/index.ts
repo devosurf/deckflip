@@ -41,7 +41,39 @@ export interface Slide {
   notes?: TextBody;
 }
 
-export type Element = ShapeElement | PictureElement;
+export type Element = ShapeElement | PictureElement | TableElement;
+
+/** A `table`, emitted as `a:tbl` in a `p:graphicFrame`. */
+export interface TableElement {
+  kind: 'table';
+  selector: string;
+  name: string;
+  /** border box, CSS px */
+  box: Box;
+  /** measured column widths, CSS px -> `a:gridCol` */
+  columns: number[];
+  rows: TableRow[];
+}
+
+export interface TableRow {
+  /** measured row height, CSS px */
+  height: number;
+  /** one per grid column, continuation cells included */
+  cells: TableCell[];
+}
+
+export interface TableCell {
+  colSpan: number;
+  rowSpan: number;
+  /** continuation of a span: 'h' = hMerge, 'v' = vMerge */
+  merged?: 'h' | 'v';
+  fill?: Fill;
+  /** per edge, from the collapsed border model */
+  borders: { top?: Line; right?: Line; bottom?: Line; left?: Line };
+  padding: Insets;
+  anchor: 't' | 'ctr' | 'b';
+  text: TextBody;
+}
 
 export interface Media {
   data: Uint8Array;
@@ -240,4 +272,17 @@ export interface ResolvedFont {
   metrics: FontMetrics;
   /** OS/2 fsType; embedding permission */
   fsType: number;
+}
+
+/** Every text body an element owns, with the selector to report against: shapes have at most one, tables one per origin cell. */
+export function* textBodiesOf(element: Element): Generator<{ body: TextBody; selector: string }> {
+  if (element.kind === 'shape') {
+    if (element.text) yield { body: element.text, selector: element.selector };
+  } else if (element.kind === 'table') {
+    for (const row of element.rows) {
+      for (const cell of row.cells) {
+        if (!cell.merged) yield { body: cell.text, selector: element.selector };
+      }
+    }
+  }
 }

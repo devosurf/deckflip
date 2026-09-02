@@ -1,4 +1,4 @@
-import type { Align, AutonumScheme, Box, Bullet, Color, CornerRadius, Fill, Insets, Line, Paragraph, PictureElement, Run, RunStyle, ShapeElement, TextBody } from '../model/index.js';
+import type { Align, AutonumScheme, Box, Bullet, Color, CornerRadius, Fill, Insets, Line, Paragraph, PictureElement, Run, RunStyle, ShapeElement, TableCell, TableElement, TableRow, TextBody } from '../model/index.js';
 
 export interface BrowserFontFace {
   family: string;
@@ -19,7 +19,7 @@ export type BrowserPictureSource = { kind: 'file'; url: string } | { kind: 'inli
 /** A picture as measured in the page; measure.ts loads the bytes and turns it into a `PictureElement`. */
 export type BrowserPicture = Omit<PictureElement, 'media' | 'vector'> & { source: BrowserPictureSource };
 
-export type BrowserElement = ShapeElement | BrowserPicture;
+export type BrowserElement = ShapeElement | BrowserPicture | TableElement;
 
 export interface BrowserMeasureResult {
   meta: {
@@ -98,6 +98,10 @@ export function measureSlideDocument(): BrowserMeasureResult {
     if (isPictureElement(el)) {
       const picture = measurePictureUntransformed(el);
       return picture ? [picture] : [];
+    }
+
+    if (el.tagName === 'TABLE') {
+      return withoutTransform(el, () => measureTable(el));
     }
 
     if (info.selfTextBlock) {
@@ -614,6 +618,254 @@ export function measureSlideDocument(): BrowserMeasureResult {
     const b = resolve(tokens[2] ?? tokens[0]!, height);
     const l = resolve(tokens[3] ?? tokens[1] ?? tokens[0]!, width);
     return { l, t, r, b };
+  }
+
+  /**
+   * A `table` becomes one `TableElement` on the grid's bounding box (the `caption`, if any, is its own text
+   * box). Column and row boundaries come from measured cell and row rects; each cell carries its own padding,
+   * fill (cell, else row), per-edge borders (the collapsed model: the wider of the two adjoining edges wins)
+   * and a text body built from inline content, `p` and `ul`/`ol` children.
+   */
+  function measureTable(table: HTMLElement): BrowserElement[] {
+    const out: BrowserElement[] = [];
+    const caption = Array.from(table.children).find((child) => child.tagName === 'CAPTION') as HTMLElement | undefined;
+    if (caption && !isSkipped(caption) && isTextBlock(caption)) {
+      const measured = measureTextBlock(caption);
+      out.push(makeShape(caption, measured.box, measured.text));
+    }
+
+    const rowElements = (Array.from(table.querySelectorAll(':scope > tr, :scope > thead > tr, :scope > tbody > tr, :scope > tfoot > tr')) as HTMLElement[])
+      .filter((tr) => !isSkipped(tr))
+      .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
+    if (rowElements.length === 0) {
+      return out;
+    }
+
+    // occupancy grid: slot -> the td/th that owns it, with the origin slot marked
+    type Slot = { cell: HTMLElement; originRow: number; originCol: number };
+    const grid: Slot[][] = rowElements.map(() => []);
+    let columnCount = 0;
+    rowElements.forEach((tr, r) => {
+      let c = 0;
+      for (const cell of Array.from(tr.children) as HTMLElement[]) {
+        if ((cell.tagName !== 'TD' && cell.tagName !== 'TH') || isSkipped(cell)) {
+          continue;
+        }
+        while (grid[r]![c]) {
+          c += 1;
+        }
+        const colSpan = Math.max(1, parseInt(cell.getAttribute('colspan') ?? '1', 10) || 1);
+        const rowSpan = Math.max(1, Math.min(rowElements.length - r, parseInt(cell.getAttribute('rowspan') ?? '1', 10) || 1));
+        for (let dr = 0; dr < rowSpan; dr += 1) {
+          for (let dc = 0; dc < colSpan; dc += 1) {
+            grid[r + dr]![c + dc] = { cell, originRow: r, originCol: c };
+          }
+        }
+        c += colSpan;
+        columnCount = Math.max(columnCount, c);
+      }
+    });
+
+    const tableRect = table.getBoundingClientRect();
+    const rowRects = rowElements.map((tr) => tr.getBoundingClientRect());
+    // the grid box is the table's border box less the caption; in the collapsed model half the outer border
+    // sits outside the row rects, so row edges come from the table, not the first/last row
+    const captionRect = caption && !isSkipped(caption) ? caption.getBoundingClientRect() : undefined;
+    const captionOnTop = captionRect !== undefined && captionRect.top < rowRects[0]!.top;
+    const gridTop = captionOnTop ? captionRect.bottom : tableRect.top;
+    const gridBottom = captionRect && !captionOnTop ? captionRect.top : tableRect.bottom;
+    const columnLefts: number[] = [];
+    for (let c = 0; c < columnCount; c += 1) {
+      let left: number | undefined;
+      for (let r = 0; r < grid.length && left === undefined; r += 1) {
+        const slot = grid[r]![c];
+        if (slot && slot.originCol === c) {
+          left = slot.cell.getBoundingClientRect().left;
+        }
+      }
+      columnLefts.push(left ?? tableRect.left);
+    }
+    const columns = columnLefts.map((left, c) => round((c + 1 < columnCount ? columnLefts[c + 1]! : tableRect.right) - (c === 0 ? tableRect.left : left)));
+    const rowHeights = rowRects.map((rect, r) => round((r + 1 < rowRects.length ? rowRects[r + 1]!.top : gridBottom) - (r === 0 ? gridTop : rect.top)));
+
+    const sideOf = (cell: HTMLElement, side: 'Top' | 'Right' | 'Bottom' | 'Left'): Line | undefined => {
+      const cs = getComputedStyle(cell);
+      return parseBorderSide(cs[`border${side}Width`], cs[`border${side}Style`], cs[`border${side}Color`]);
+    };
+    const wider = (own: Line | undefined, other: Line | undefined): Line | undefined => (other && (!own || other.width > own.width) ? other : own);
+
+    const rows: TableRow[] = grid.map((slots, r) => {
+      const tr = rowElements[r]!;
+      const rowFill = parseFill(getComputedStyle(tr), rowRects[r]!.width ? measuredBox(tr) : { x: 0, y: 0, w: 0, h: 0 });
+      const cells: TableCell[] = [];
+      for (let c = 0; c < columnCount; c += 1) {
+        const slot = slots[c];
+        if (!slot) {
+          cells.push(emptyCell(tr));
+          continue;
+        }
+        const cs = getComputedStyle(slot.cell);
+        const rowSpan = grid.filter((row) => row[c]?.cell === slot.cell).length;
+        const colSpan = slots.filter((s) => s?.cell === slot.cell).length;
+        const isOrigin = slot.originRow === r && slot.originCol === c;
+        const above = r > 0 ? grid[r - 1]![c]?.cell : undefined;
+        const below = r + 1 < grid.length ? grid[r + 1]![c]?.cell : undefined;
+        const leftOf = c > 0 ? slots[c - 1]?.cell : undefined;
+        const rightOf = c + 1 < columnCount ? slots[c + 1]?.cell : undefined;
+        const borders: TableCell['borders'] = {};
+        const top = above === slot.cell ? undefined : wider(sideOf(slot.cell, 'Top'), above ? sideOf(above, 'Bottom') : undefined);
+        const bottom = below === slot.cell ? undefined : wider(sideOf(slot.cell, 'Bottom'), below ? sideOf(below, 'Top') : undefined);
+        const left = leftOf === slot.cell ? undefined : wider(sideOf(slot.cell, 'Left'), leftOf ? sideOf(leftOf, 'Right') : undefined);
+        const right = rightOf === slot.cell ? undefined : wider(sideOf(slot.cell, 'Right'), rightOf ? sideOf(rightOf, 'Left') : undefined);
+        if (top) borders.top = top;
+        if (right) borders.right = right;
+        if (bottom) borders.bottom = bottom;
+        if (left) borders.left = left;
+
+        const body = isOrigin ? measureCellBody(slot.cell, cs) : undefined;
+        const cell: TableCell = {
+          colSpan: isOrigin ? colSpan : 1,
+          rowSpan: isOrigin ? rowSpan : 1,
+          borders,
+          padding: { l: px(cs.paddingLeft), t: px(cs.paddingTop), r: px(cs.paddingRight), b: px(cs.paddingBottom) },
+          anchor: cs.verticalAlign === 'middle' ? 'ctr' : cs.verticalAlign === 'bottom' ? 'b' : 't',
+          text: body ?? emptyBody(slot.cell),
+        };
+        if (!isOrigin) {
+          cell.merged = slot.originRow === r ? 'h' : 'v';
+        }
+        const fill = parseFill(cs, measuredBox(slot.cell)) ?? rowFill;
+        if (fill) {
+          cell.fill = fill;
+        }
+        cells.push(cell);
+      }
+      return { height: rowHeights[r]!, cells };
+    });
+
+    out.push({
+      kind: 'table',
+      selector: cssPath(table),
+      name: elementName(table),
+      box: { x: round(tableRect.left - sectionRect.left), y: round(gridTop - sectionRect.top), w: round(tableRect.width), h: round(gridBottom - gridTop) },
+      columns,
+      rows,
+    });
+    return out;
+  }
+
+  function emptyBody(el: HTMLElement): TextBody {
+    const cs = getComputedStyle(el);
+    return {
+      padding: { l: 0, t: 0, r: 0, b: 0 },
+      firstParagraphGap: 0,
+      lastParagraphGap: 0,
+      wrap: true,
+      rtl: cs.direction === 'rtl',
+      trailingGuard: 0,
+      paragraphs: [{ align: 'l', lineHeight: round(px(cs.fontSize) * 1.2), spaceBefore: 0, spaceAfter: 0, indent: 0, marginLeft: 0, level: 0, runs: [{ kind: 'text', text: '', style: styleFromElement(el) }] }],
+    };
+  }
+
+  function emptyCell(tr: HTMLElement): TableCell {
+    return { colSpan: 1, rowSpan: 1, borders: {}, padding: { l: 0, t: 0, r: 0, b: 0 }, anchor: 't', text: emptyBody(tr) };
+  }
+
+  /**
+   * Cell text: the cell itself when its content is inline; otherwise its `p` and `ul`/`ol` children in order,
+   * each block's paragraphs offset to the cell's content box. Any other block child is `VALIDATE_TABLE_CONTENT`.
+   * Only the gap on the anchored side is folded into the insets, so PowerPoint never grows the row for the
+   * free space Chromium left on the other side.
+   */
+  function measureCellBody(cell: HTMLElement, cs: CSSStyleDeclaration): TextBody | undefined {
+    const rect = cell.getBoundingClientRect();
+    const contentLeft = rect.left + px(cs.borderLeftWidth) + px(cs.paddingLeft);
+    const contentTop = rect.top + px(cs.borderTopWidth) + px(cs.paddingTop);
+    const contentBottom = rect.bottom - px(cs.borderBottomWidth) - px(cs.paddingBottom);
+    const anchor = cs.verticalAlign;
+
+    if (isTextBlock(cell)) {
+      const body = measureTextBlock(cell).text;
+      if (!body) {
+        return undefined;
+      }
+      body.padding = { l: 0, t: 0, r: 0, b: 0 };
+      if (anchor === 'bottom') {
+        body.firstParagraphGap = 0;
+      } else {
+        body.lastParagraphGap = 0;
+      }
+      if (anchor === 'middle') {
+        body.firstParagraphGap = 0;
+      }
+      return body;
+    }
+
+    const paragraphs: Paragraph[] = [];
+    let firstTop: number | undefined;
+    let previousBottom: number | undefined;
+    let trailingGuard = 0;
+    let rtl = cs.direction === 'rtl';
+    let wrap = true;
+    for (const node of Array.from(cell.childNodes)) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        if ((node.textContent ?? '').trim() !== '') {
+          entries.push({ code: 'VALIDATE_TABLE_CONTENT', selector: cssPath(cell), reason: `${elementName(cell)} mixes text with block content` });
+          return undefined;
+        }
+        continue;
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE) {
+        continue;
+      }
+      const child = node as HTMLElement;
+      if (isSkipped(child)) {
+        continue;
+      }
+      const isList = child.tagName === 'UL' || child.tagName === 'OL';
+      if (!(child.tagName === 'P' || isList) || !isTextBlock(child)) {
+        entries.push({ code: 'VALIDATE_TABLE_CONTENT', selector: cssPath(cell), reason: `${elementName(cell)} contains ${elementName(child)}` });
+        return undefined;
+      }
+      const childRect = child.getBoundingClientRect();
+      const childStyle = getComputedStyle(child);
+      const body = measureTextBlock(child).text;
+      if (!body) {
+        continue;
+      }
+      const blockContentTop = childRect.top + px(childStyle.borderTopWidth) + px(childStyle.paddingTop);
+      const blockContentBottom = childRect.bottom - px(childStyle.borderBottomWidth) - px(childStyle.paddingBottom);
+      const blockTop = blockContentTop + body.firstParagraphGap;
+      const blockBottom = blockContentBottom - body.lastParagraphGap;
+      // list bodies already fold their padding into marL; a p's padding-left joins the offset
+      const offset = childRect.left + px(childStyle.borderLeftWidth) + (isList ? 0 : px(childStyle.paddingLeft)) - contentLeft;
+      body.paragraphs.forEach((paragraph, index) => {
+        paragraph.marginLeft = round(paragraph.marginLeft + offset);
+        if (index === 0) {
+          paragraph.spaceBefore = previousBottom === undefined ? 0 : round(Math.max(0, blockTop - previousBottom));
+        }
+        paragraphs.push(paragraph);
+      });
+      if (firstTop === undefined) {
+        firstTop = blockTop;
+      }
+      previousBottom = blockBottom;
+      trailingGuard = Math.max(trailingGuard, body.trailingGuard);
+      rtl = body.rtl;
+      wrap = wrap && body.wrap;
+    }
+    if (paragraphs.length === 0) {
+      return undefined;
+    }
+    return {
+      padding: { l: 0, t: 0, r: 0, b: 0 },
+      firstParagraphGap: anchor === 'bottom' || anchor === 'middle' || firstTop === undefined ? 0 : round(Math.max(0, firstTop - contentTop)),
+      lastParagraphGap: anchor === 'bottom' && previousBottom !== undefined ? round(Math.max(0, contentBottom - previousBottom)) : 0,
+      wrap,
+      rtl,
+      trailingGuard,
+      paragraphs,
+    };
   }
 
   /**

@@ -48,7 +48,8 @@ export function baselineCorrectionPx(paragraph: Paragraph): number {
   return powerpointBaseline - chromiumBaseline;
 }
 
-export function buildTextBody(text: TextBody, ctx: TextEmissionContext, bodyPrAttrs: Record<string, string | number | undefined>): XmlNode {
+/** `p:txBody` for shapes; table cells pass `a:txBody`. */
+export function buildTextBody(text: TextBody, ctx: TextEmissionContext, bodyPrAttrs: Record<string, string | number | undefined>, elementName: 'p:txBody' | 'a:txBody' = 'p:txBody'): XmlNode {
   let previousTextStyle: RunStyle | undefined;
   const paragraphs = text.paragraphs.map((paragraph) => {
     const firstStyle = firstTextRunStyle(paragraph);
@@ -100,7 +101,7 @@ export function buildTextBody(text: TextBody, ctx: TextEmissionContext, bodyPrAt
   });
 
   return el(
-    'p:txBody',
+    elementName,
     {},
     el('a:bodyPr', bodyPrAttrs),
     el('a:lstStyle'),

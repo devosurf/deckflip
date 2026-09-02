@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="deckflip:canvas" content="1280x720">
+<title>spans</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #ffffff; }
+  body { font-family: Arial; color: #111827; }
+  body > section { position: relative; box-sizing: border-box; overflow: hidden; }
+  .label { position: absolute; left: 80px; top: 40px; margin: 0; font-size: 22px; line-height: 30px; }
+  table { position: absolute; left: 80px; top: 100px; width: 1120px; border-collapse: collapse; font-size: 20px; line-height: 28px; }
+  th, td { padding: 10px 16px; border: 1px solid #94a3b8; text-align: left; vertical-align: top; }
+  thead th { background: #1e293b; color: #ffffff; }
+  td.num { text-align: right; }
+  td.mid { vertical-align: middle; text-align: center; background: #eff6ff; }
+  tfoot td { font-weight: 700; background: #f1f5f9; }
+</style>
+</head>
+<body>
+<section>
+  <p class="label">Header row, colspan, rowspan, footer</p>
+  <table>
+    <thead>
+      <tr><th>Region</th><th>Product</th><th class="num">Q1</th><th class="num">Q2</th><th class="num">Total</th></tr>
+    </thead>
+    <tbody>
+      <tr><td rowspan="3" class="mid">North</td><td>Widgets</td><td class="num">120</td><td class="num">140</td><td class="num">260</td></tr>
+      <tr><td>Gadgets</td><td class="num">80</td><td class="num">95</td><td class="num">175</td></tr>
+      <tr><td>Services</td><td class="num">40</td><td class="num">60</td><td class="num">100</td></tr>
+      <tr><td rowspan="2" class="mid">South</td><td>Widgets</td><td class="num">90</td><td class="num">110</td><td class="num">200</td></tr>
+      <tr><td colspan="3">Gadgets and Services, reported together this quarter</td><td class="num">150</td></tr>
+    </tbody>
+    <tfoot>
+      <tr><td colspan="2">All regions</td><td class="num">330</td><td class="num">405</td><td class="num">885</td></tr>
+    </tfoot>
+  </table>
+</section>
+</body>
+</html>

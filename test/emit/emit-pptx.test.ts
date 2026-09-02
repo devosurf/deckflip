@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
-import type { Deck, Paragraph, ResolvedFont, RunStyle, ShapeElement } from '../../src/model/index.js';
+import type { Deck, Line, Paragraph, ResolvedFont, RunStyle, ShapeElement, TableCell, TextBody } from '../../src/model/index.js';
 import { emitPptx } from '../../src/emit/index.js';
 
 const sofficeAvailable = Boolean(spawnSync('soffice', ['--version'], { stdio: 'ignore' }).status === 0);
@@ -337,6 +337,62 @@ describe('emitPptx', () => {
     expect(slideXml).toContain(
       '<a:blip r:embed="rId3"><a:extLst><a:ext uri="{96DAC541-7B7A-43D3-8B79-37D633B846F1}"><asvg:svgBlip xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main" r:embed="rId4"/></a:ext></a:extLst></a:blip>',
     );
+  });
+
+  it('emits tables as a graphic frame with grid columns, merged cells, per-edge borders and cell insets', async () => {
+    const body = (text: string): TextBody => ({
+      padding: { l: 0, t: 0, r: 0, b: 0 },
+      firstParagraphGap: 0,
+      lastParagraphGap: 0,
+      wrap: true,
+      rtl: false,
+      trailingGuard: 0,
+      paragraphs: [{ align: 'l', lineHeight: 24, spaceBefore: 0, spaceAfter: 0, indent: 0, marginLeft: 0, level: 0, runs: [{ kind: 'text', text, style: runStyle({ size: 20 }) }] }],
+    });
+    const line: Line = { width: 1, color: { hex: '94A3B8', alpha: 1 }, dash: 'solid' };
+    const cell = (text: string, overrides: Partial<TableCell> = {}): TableCell => ({
+      colSpan: 1,
+      rowSpan: 1,
+      borders: { top: line, right: line, bottom: line, left: line },
+      padding: { l: 12, t: 8, r: 12, b: 8 },
+      anchor: 't',
+      text: body(text),
+      ...overrides,
+    });
+    const tableDeck = deck();
+    tableDeck.slides[0]!.elements = [
+      {
+        kind: 'table',
+        selector: '#grid',
+        name: 'table.grid',
+        box: { x: 40, y: 40, w: 300, h: 100 },
+        columns: [100, 200],
+        rows: [
+          { height: 40, cells: [cell('A', { fill: { type: 'solid', color: { hex: 'E2E8F0', alpha: 1 } } }), cell('B', { anchor: 'b', borders: {} })] },
+          { height: 60, cells: [cell('Wide', { colSpan: 2, borders: { top: { width: 3, color: { hex: '0F172A', alpha: 1 }, dash: 'dash' } } }), cell('', { merged: 'h' })] },
+        ],
+      },
+    ];
+
+    const zip = await JSZip.loadAsync(await emitPptx(tableDeck, { created, appVersion: '1.2.3' }));
+    const slideXml = await zip.file('ppt/slides/slide1.xml')!.async('string');
+
+    expect(slideXml).toContain(
+      '<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="2" name="table.grid"/><p:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></p:cNvGraphicFramePr><p:nvPr/></p:nvGraphicFramePr>'
+        + '<p:xfrm><a:off x="381000" y="381000"/><a:ext cx="2857500" cy="952500"/></p:xfrm>'
+        + '<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/table"><a:tbl><a:tblPr/><a:tblGrid><a:gridCol w="952500"/><a:gridCol w="1905000"/></a:tblGrid>',
+    );
+    expect(slideXml).toContain('<a:tr h="381000"><a:tc>');
+    // cell A: text body, then tcPr with insets (marT carries the 0.41 px baseline correction for Arial 20px in a 24px line), anchor, four borders in lnL/lnR/lnT/lnB order, then fill
+    expect(slideXml).toMatch(
+      /<a:tc><a:txBody><a:bodyPr\/><a:lstStyle\/><a:p>.*?<a:t xml:space="preserve">A<\/a:t>.*?<\/a:p><\/a:txBody><a:tcPr marL="114300" marR="114300" marT="72291" marB="76200" anchor="t"><a:lnL w="9525"><a:solidFill><a:srgbClr val="94A3B8"\/><\/a:solidFill><\/a:lnL><a:lnR w="9525">.*?<\/a:lnR><a:lnT w="9525">.*?<\/a:lnT><a:lnB w="9525">.*?<\/a:lnB><a:solidFill><a:srgbClr val="E2E8F0"\/><\/a:solidFill><\/a:tcPr><\/a:tc>/,
+    );
+    // cell B: bottom anchor, explicit noFill borders so the table style draws nothing
+    expect(slideXml).toMatch(/<a:t xml:space="preserve">B<\/a:t>.*?<a:tcPr marL="114300" marR="114300" marT="76200" marB="76200" anchor="b"><a:lnL><a:noFill\/><\/a:lnL><a:lnR><a:noFill\/><\/a:lnR><a:lnT><a:noFill\/><\/a:lnT><a:lnB><a:noFill\/><\/a:lnB><\/a:tcPr>/);
+    // spanning cell and its horizontal continuation
+    expect(slideXml).toContain('<a:tr h="571500"><a:tc gridSpan="2">');
+    expect(slideXml).toContain('<a:lnT w="28575"><a:solidFill><a:srgbClr val="0F172A"/></a:solidFill><a:prstDash val="dash"/></a:lnT>');
+    expect(slideXml).toMatch(/<a:tc hMerge="1"><a:txBody><a:bodyPr\/><a:lstStyle\/><a:p><a:endParaRPr lang="en-US" sz="1500"\/><\/a:p><\/a:txBody><a:tcPr\/>/);
   });
 
   it.skipIf(!sofficeAvailable)('opens in LibreOffice and converts to PDF', async () => {

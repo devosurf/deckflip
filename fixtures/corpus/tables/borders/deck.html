@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="deckflip:canvas" content="1280x720">
+<title>borders</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #ffffff; }
+  body { font-family: Arial; color: #111827; }
+  body > section { position: relative; box-sizing: border-box; overflow: hidden; }
+  .label { position: absolute; left: 80px; top: 40px; margin: 0; font-size: 22px; line-height: 30px; }
+  table { position: absolute; border-collapse: collapse; font-size: 20px; line-height: 28px; }
+  td, th { padding: 8px 14px; text-align: left; vertical-align: top; }
+  .rules { left: 80px; top: 100px; width: 520px; }
+  .rules th { border-bottom: 3px solid #0f172a; }
+  .rules td { border-bottom: 1px solid #cbd5e1; }
+  .rules tr:last-child td { border-bottom: 2px solid #0f172a; }
+  .boxed { left: 680px; top: 100px; width: 520px; }
+  .boxed td { border: 2px dashed #7c3aed; padding: 14px; }
+  .boxed td.thick { border-left: 6px solid #f97316; }
+  .striped { left: 80px; top: 400px; width: 1120px; }
+  .striped tr:nth-child(even) { background: #f1f5f9; }
+  .striped td { border-right: 1px dotted #94a3b8; }
+  .striped td:last-child { border-right: 0; }
+  .striped td.pad { padding: 20px 40px; }
+</style>
+</head>
+<body>
+<section>
+  <p class="label">Horizontal rules, dashed boxes, per-side and dotted borders, row fills, cell padding</p>
+  <table class="rules">
+    <tr><th>Metric</th><th>Value</th></tr>
+    <tr><td>Latency</td><td>12 ms</td></tr>
+    <tr><td>Throughput</td><td>4.2k rps</td></tr>
+    <tr><td>Errors</td><td>0.01 %</td></tr>
+  </table>
+  <table class="boxed">
+    <tr><td>one</td><td class="thick">two</td><td>three</td></tr>
+    <tr><td class="thick">four</td><td>five</td><td>six</td></tr>
+  </table>
+  <table class="striped">
+    <tr><td>Row one</td><td class="pad">padded cell</td><td>end</td></tr>
+    <tr><td>Row two</td><td>plain cell</td><td>end</td></tr>
+    <tr><td>Row three</td><td class="pad">padded cell</td><td>end</td></tr>
+    <tr><td>Row four</td><td>plain cell</td><td>end</td></tr>
+  </table>
+</section>
+</body>
+</html>

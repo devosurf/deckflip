@@ -1,4 +1,4 @@
-import type { Deck, DeckFontFace, ResolvedFont } from '../model/index.js';
+import { textBodiesOf, type Deck, type DeckFontFace, type ResolvedFont } from '../model/index.js';
 import type { Entry, EntryKind, Severity } from '../report/types.js';
 import { FontCatalog, type FontFace } from './scan.js';
 
@@ -78,40 +78,41 @@ export function resolveDeckFonts(deck: Deck, catalog: FontCatalog, opts: { embed
 
   for (const slide of deck.slides) {
     for (const element of slide.elements) {
-      if (element.kind !== 'shape' || !element.text) continue;
-      for (const paragraph of element.text.paragraphs) {
-        for (const run of paragraph.runs) {
-          if (run.kind !== 'text') continue;
-          const normalizedStack = normalizeStack(run.style.fontStack);
-          const outcome = resolveStack(normalizedStack, run.style.weight, run.style.italic, catalog, stackCache, resolvedFontCache);
-          if (outcome.kind === 'error') {
-            if (emittedStacks.has(outcome.stackKey)) continue;
-            emittedStacks.add(outcome.stackKey);
-            entries.push(buildEntry(outcome, slide.index, element.selector));
-            continue;
+      for (const { body, selector } of textBodiesOf(element)) {
+        for (const paragraph of body.paragraphs) {
+          for (const run of paragraph.runs) {
+            if (run.kind !== 'text') continue;
+            const normalizedStack = normalizeStack(run.style.fontStack);
+            const outcome = resolveStack(normalizedStack, run.style.weight, run.style.italic, catalog, stackCache, resolvedFontCache);
+            if (outcome.kind === 'error') {
+              if (emittedStacks.has(outcome.stackKey)) continue;
+              emittedStacks.add(outcome.stackKey);
+              entries.push(buildEntry(outcome, slide.index, selector));
+              continue;
+            }
+  
+            const resolvedFamilyKey = normalizeName(outcome.font.family);
+            const resolvedFont: ResolvedFont = {
+              family: outcome.font.family,
+              file: outcome.font.file,
+              class: deckProvidedFamilies.has(resolvedFamilyKey) || deckProvidedFiles.has(outcome.font.file)
+                ? 'deck-provided'
+                : SAFE_FAMILIES.has(resolvedFamilyKey)
+                  ? 'safe'
+                  : 'installed',
+              metrics: { ...outcome.font.metrics },
+              fsType: outcome.font.fsType,
+            };
+            run.style.font = resolvedFont;
+  
+            if (resolvedFont.class === 'safe') continue;
+            if (embedAll) continue;
+  
+            const isEmbedded = stackContainsEmbeddedFamily(normalizedStack, resolvedFamilyKey, embeddedFamilies);
+            if (isEmbedded || warnings.has(resolvedFamilyKey)) continue;
+            warnings.add(resolvedFamilyKey);
+            entries.push(buildEntryForSafeWarning(slide.index, selector, outcome.font.family));
           }
-
-          const resolvedFamilyKey = normalizeName(outcome.font.family);
-          const resolvedFont: ResolvedFont = {
-            family: outcome.font.family,
-            file: outcome.font.file,
-            class: deckProvidedFamilies.has(resolvedFamilyKey) || deckProvidedFiles.has(outcome.font.file)
-              ? 'deck-provided'
-              : SAFE_FAMILIES.has(resolvedFamilyKey)
-                ? 'safe'
-                : 'installed',
-            metrics: { ...outcome.font.metrics },
-            fsType: outcome.font.fsType,
-          };
-          run.style.font = resolvedFont;
-
-          if (resolvedFont.class === 'safe') continue;
-          if (embedAll) continue;
-
-          const isEmbedded = stackContainsEmbeddedFamily(normalizedStack, resolvedFamilyKey, embeddedFamilies);
-          if (isEmbedded || warnings.has(resolvedFamilyKey)) continue;
-          warnings.add(resolvedFamilyKey);
-          entries.push(buildEntryForSafeWarning(slide.index, element.selector, outcome.font.family));
         }
       }
     }
