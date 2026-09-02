@@ -33,7 +33,7 @@ The spike's numbers set expectations: 0.57-0.78 % differing pixels against real 
 
 ## Corpus
 
-`fixtures/corpus/<name>/` with `deck.html` (+ assets) or `source.pptx`, and `expected/` holding `chromium/slide-NNN.png` (generated, not committed), `powerpoint/slide-NNN.png` (committed, produced on a Mac with PowerPoint by `npm run corpus:oracle`), and `report.json` (committed, the expected entries). Categories, each with 3-8 decks:
+`fixtures/corpus/<category>/<name>/` with `deck.html` (+ assets; a category may keep shared assets in `fixtures/corpus/<category>/_assets/`, which the oracle script skips) or `source.pptx`, and `expected/` holding `chromium/slide-NNN.png` (generated, not committed), `powerpoint/slide-NNN.png` (committed, produced on a Mac with PowerPoint by `npm run corpus:oracle [category[/name] ...]`), and `report.json` (committed, the expected entries). Categories, each with 3-8 decks:
 
 - `text`: wrapping at boundaries, mixed sizes in a line, lists (nested, numbered, `inside`/`outside`), alignment, `pre`, RTL, emoji.
 - `shapes`: fills, gradients, borders (uniform, per-side, dashed), radius, shadows, opacity, rotation.
