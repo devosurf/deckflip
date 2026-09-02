@@ -1,6 +1,6 @@
-# ppt-html-cli
+# deckflip
 
-Bidirectional converter between HTML slides and PowerPoint (PPTX), operated primarily by coding agents through a CLI and a skill, so agents can author decks in HTML and deliver editable, faithful PowerPoint files.
+Bidirectional converter between HTML slides and PowerPoint (PPTX), operated primarily by coding agents through a CLI (`deckflip`) and a skill, so agents can author decks in HTML and deliver editable, faithful PowerPoint files.
 
 ## Language
 
@@ -31,3 +31,11 @@ _Avoid_: Degrade, strip, simplify
 **Conversion report**:
 The record of everything a conversion flattened or rasterised, and why.
 _Avoid_: Log, warnings, diagnostics
+
+**Report entry**:
+One item in the Conversion report: a stable code, what happened (rasterised, flattened, substituted, dropped, overridden, error), where on which Slide, why, and a hint for making it native.
+_Avoid_: Warning, issue, finding
+
+**Strict mode**:
+A conversion run that treats any Report entry as a failure while still producing the output and the report.
+_Avoid_: Fail-on-warning, pedantic mode
