@@ -1,4 +1,4 @@
-import type { Align, AutonumScheme, Box, Bullet, Color, Fill, Insets, Line, Paragraph, Run, RunStyle, ShapeElement, TextBody } from '../model/index.js';
+import type { Align, AutonumScheme, Box, Bullet, Color, CornerRadius, Fill, Insets, Line, Paragraph, Run, RunStyle, ShapeElement, TextBody } from '../model/index.js';
 
 export interface BrowserFontFace {
   family: string;
@@ -85,25 +85,46 @@ export function measureSlideDocument(): BrowserMeasureResult {
       return nested;
     }
 
+    // The element's own transform is disabled while it is measured: DrawingML wants the untransformed box plus
+    // `rot`. Children are measured with it re-enabled, so translate-positioned parents place them correctly;
+    // a rotated parent's children keep their axis-aligned bounds (a group is the way to rotate a subtree).
     if (info.selfTextBlock) {
-      const measured = measureTextBlock(el);
+      const measured = withoutTransform(el, () => measureTextBlock(el));
       return [makeShape(el, measured.box, measured.text)];
     }
 
     if (info.textBlockDescendants === 1 && info.paintableDescendants === 1) {
       const textEl = findUniqueTextBlockDescendant(el);
       if (textEl) {
-        const measured = measureTextBlock(textEl);
-        const adjusted = adjustTextForContainer(el, textEl, measured.text);
-        return [makeShape(el, measuredBox(el), adjusted)];
+        const measured = withoutTransform(el, () => {
+          const inner = measureTextBlock(textEl);
+          return { box: measuredBox(el), text: adjustTextForContainer(el, textEl, inner.text) };
+        });
+        return [makeShape(el, measured.box, measured.text)];
       }
     }
 
+    const box = withoutTransform(el, () => measuredBox(el));
     const nested: ShapeElement[] = [];
     for (const child of Array.from(el.children) as HTMLElement[]) {
       nested.push(...walkElement(child));
     }
-    return [makeShape(el, measuredBox(el)), ...nested];
+    return [makeShape(el, box), ...nested];
+  }
+
+  function withoutTransform<T>(el: HTMLElement, measure: () => T): T {
+    const prior = el.style.getPropertyValue('transform');
+    const priority = el.style.getPropertyPriority('transform');
+    el.style.setProperty('transform', 'none', 'important');
+    try {
+      return measure();
+    } finally {
+      if (prior) {
+        el.style.setProperty('transform', prior, priority);
+      } else {
+        el.style.removeProperty('transform');
+      }
+    }
   }
 
   function analyze(el: HTMLElement): { selfPaint: boolean; selfTextBlock: boolean; paintableDescendants: number; textBlockDescendants: number } {
@@ -161,37 +182,281 @@ export function measureSlideDocument(): BrowserMeasureResult {
       lastParagraphGap: text.lastParagraphGap,
     };
   }
-  function parseFill(color: string): Fill | undefined {
-    const parsed = parseColor(color);
+  function parseFill(cs: CSSStyleDeclaration, box: Box): Fill | undefined {
+    const gradient = parseGradient(cs.backgroundImage, box);
+    if (gradient) {
+      return gradient;
+    }
+    const parsed = parseColor(cs.backgroundColor);
     if (!parsed || parsed.alpha <= 0) {
       return undefined;
     }
     return { type: 'solid', color: parsed };
   }
 
+  /**
+   * One `linear-gradient()` / `radial-gradient()` layer from the computed `background-image`. Chromium keeps
+   * the author's stop positions (missing ones are filled in here per CSS Images 3) and normalises colours to
+   * `rgb()`/`rgba()`. Multiple layers, `url()`, conic and repeating gradients are left to the raster pass.
+   */
+  function parseGradient(value: string, box: Box): Fill | undefined {
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === 'none') {
+      return undefined;
+    }
+    const layers = splitTopLevel(trimmed);
+    if (layers.length !== 1) {
+      return undefined;
+    }
+    const match = layers[0]!.match(/^(linear|radial)-gradient\((.*)\)$/s);
+    if (!match) {
+      return undefined;
+    }
+    const kind = match[1] as 'linear' | 'radial';
+    const args = splitTopLevel(match[2] ?? '');
+    let angle = 180;
+    if (args.length && !startsWithColor(args[0]!)) {
+      const head = args.shift()!;
+      if (kind === 'linear') {
+        const parsed = parseGradientAngle(head, box);
+        if (parsed === undefined) {
+          return undefined;
+        }
+        angle = parsed;
+      }
+    }
+    const lineLength = kind === 'linear'
+      ? Math.abs(box.w * Math.sin((angle * Math.PI) / 180)) + Math.abs(box.h * Math.cos((angle * Math.PI) / 180))
+      : Math.min(box.w, box.h) / 2;
+    const stops = parseGradientStops(args, lineLength);
+    if (!stops) {
+      return undefined;
+    }
+    return kind === 'linear' ? { type: 'gradient', kind, angle, stops } : { type: 'gradient', kind, stops };
+  }
+
+  function startsWithColor(token: string): boolean {
+    return /^(rgba?\(|transparent\b)/i.test(token.trim());
+  }
+
+  function parseGradientAngle(token: string, box: Box): number | undefined {
+    const value = token.trim();
+    const unit = value.match(/^(-?[\d.]+)(deg|grad|rad|turn)$/);
+    if (unit) {
+      const n = parseFloat(unit[1]!);
+      const degrees = unit[2] === 'deg' ? n : unit[2] === 'grad' ? n * 0.9 : unit[2] === 'rad' ? (n * 180) / Math.PI : n * 360;
+      return ((degrees % 360) + 360) % 360;
+    }
+    if (!value.startsWith('to ')) {
+      return undefined;
+    }
+    const sides = value.slice(3).split(/\s+/).sort().join(' ');
+    // corner keywords use the "magic corner" angle: the gradient line's perpendicular passes through the other corners
+    const corner = (Math.atan2(box.w, box.h) * 180) / Math.PI;
+    switch (sides) {
+      case 'top':
+        return 0;
+      case 'right':
+        return 90;
+      case 'bottom':
+        return 180;
+      case 'left':
+        return 270;
+      case 'right top':
+        return corner;
+      case 'bottom right':
+        return 180 - corner;
+      case 'bottom left':
+        return 180 + corner;
+      case 'left top':
+        return 360 - corner;
+      default:
+        return undefined;
+    }
+  }
+
+  function parseGradientStops(args: string[], lineLength: number): Array<{ position: number; color: Color }> | undefined {
+    const stops: Array<{ position: number | undefined; color: Color }> = [];
+    for (const arg of args) {
+      const tokens = arg.trim().match(/^(rgba?\([^)]*\)|transparent)\s*(.*)$/i);
+      if (!tokens) {
+        return undefined;
+      }
+      const color = parseColor(tokens[1]!);
+      if (!color) {
+        return undefined;
+      }
+      const positions = (tokens[2] ?? '').split(/\s+/).filter(Boolean);
+      if (positions.length === 0) {
+        stops.push({ position: undefined, color });
+        continue;
+      }
+      for (const position of positions) {
+        const fraction = position.endsWith('%') ? parseFloat(position) / 100 : lineLength > 0 ? px(position) / lineLength : 0;
+        stops.push({ position: Math.max(0, Math.min(1, fraction)), color });
+      }
+    }
+    if (stops.length < 2) {
+      return undefined;
+    }
+    if (stops[0]!.position === undefined) {
+      stops[0]!.position = 0;
+    }
+    if (stops[stops.length - 1]!.position === undefined) {
+      stops[stops.length - 1]!.position = 1;
+    }
+    let previous = 0;
+    for (let i = 0; i < stops.length; i += 1) {
+      const stop = stops[i]!;
+      if (stop.position === undefined) {
+        let next = i + 1;
+        while (stops[next]!.position === undefined) {
+          next += 1;
+        }
+        const span = next - (i - 1);
+        const step = (stops[next]!.position! - previous) / span;
+        for (let j = i; j < next; j += 1) {
+          stops[j]!.position = previous + step * (j - (i - 1));
+        }
+      }
+      // positions never decrease (CSS clamps a stop to the largest preceding position)
+      stop.position = Math.max(previous, stop.position!);
+      previous = stop.position;
+    }
+    return stops.map((stop) => ({ position: round(stop.position!), color: stop.color }));
+  }
+
+  /** Splits on commas outside parentheses. */
+  function splitTopLevel(value: string): string[] {
+    const parts: string[] = [];
+    let depth = 0;
+    let start = 0;
+    for (let i = 0; i < value.length; i += 1) {
+      const ch = value[i];
+      if (ch === '(') {
+        depth += 1;
+      } else if (ch === ')') {
+        depth -= 1;
+      } else if (ch === ',' && depth === 0) {
+        parts.push(value.slice(start, i).trim());
+        start = i + 1;
+      }
+    }
+    parts.push(value.slice(start).trim());
+    return parts.filter(Boolean);
+  }
+
+  /** Product of `opacity` from the element up to the section. */
+  function effectiveOpacity(el: HTMLElement): number {
+    let opacity = 1;
+    for (let current: HTMLElement | null = el; current && current !== section; current = current.parentElement) {
+      opacity *= Math.max(0, Math.min(1, px(getComputedStyle(current).opacity) || 0));
+    }
+    return opacity;
+  }
+
+  function withAlpha(color: Color, factor: number): Color {
+    return factor >= 1 ? color : { hex: color.hex, alpha: round(color.alpha * factor) };
+  }
 
   function makeShape(el: HTMLElement, box: Box, text?: TextBody): ShapeElement {
     const cs = getComputedStyle(el);
+    const transform = decomposeTransform(cs.transform);
     const shape: ShapeElement = {
       kind: 'shape',
       selector: cssPath(el),
       name: elementName(el),
-      box,
-      rotation: parseRotation(cs.transform),
+      box: transform ? transformedBox(cs, box, transform) : box,
+      rotation: transform?.rotation ?? 0,
       geometry: classifyGeometry(box, cs),
     };
-    const fill = parseFill(cs.backgroundColor);
+    const fill = parseFill(cs, box);
     if (fill) {
       shape.fill = fill;
+      if (fill.type === 'gradient' && fill.kind === 'radial') {
+        entries.push({ code: 'SUBSTITUTE_GRADIENT_RADIAL', selector: shape.selector, reason: `radial-gradient on ${shape.name} is approximated by a circular path gradient` });
+      }
     }
+    const sides = parseBorderSides(cs);
     const line = parseLine(cs);
     if (line) {
       shape.line = line;
+    } else if (sides) {
+      shape.borders = sides;
+      entries.push({ code: 'SUBSTITUTE_BORDER_SIDES', selector: shape.selector, reason: `border on ${shape.name} differs per side` });
+    }
+    const shadow = parseShadow(cs.boxShadow);
+    if (shadow) {
+      shape.shadow = shadow;
     }
     if (text) {
       shape.text = text;
     }
+    if (transform) {
+      scaleShape(shape, transform.scale);
+    }
+    const opacity = effectiveOpacity(el);
+    if (opacity < 1) {
+      applyOpacity(shape, opacity);
+      entries.push({ code: 'SUBSTITUTE_OPACITY', selector: shape.selector, reason: `opacity ${round(opacity)} on ${shape.name} folded into fill, line and text alpha` });
+    }
     return shape;
+  }
+
+  /**
+   * Computed `box-shadow`: `<color> <x> <y> <blur> <spread> [inset]` per layer. Only one layer without
+   * spread maps to `a:outerShdw`/`a:innerShdw`; anything else is left for the raster/flatten pass.
+   */
+  function parseShadow(value: string): ShapeElement['shadow'] {
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === 'none') {
+      return undefined;
+    }
+    const layers = splitTopLevel(trimmed);
+    if (layers.length !== 1) {
+      return undefined;
+    }
+    const match = layers[0]!.match(/^(rgba?\([^)]*\)|transparent)\s+(-?[\d.]+)px\s+(-?[\d.]+)px\s+(-?[\d.]+)px\s+(-?[\d.]+)px(\s+inset)?$/i);
+    if (!match) {
+      return undefined;
+    }
+    const color = parseColor(match[1]!);
+    if (!color || color.alpha <= 0 || parseFloat(match[5]!) !== 0) {
+      return undefined;
+    }
+    return { inset: Boolean(match[6]), offsetX: round(parseFloat(match[2]!)), offsetY: round(parseFloat(match[3]!)), blur: round(parseFloat(match[4]!)), color };
+  }
+
+  function applyOpacity(shape: ShapeElement, opacity: number): void {
+    if (shape.fill?.type === 'solid') {
+      shape.fill.color = withAlpha(shape.fill.color, opacity);
+    } else if (shape.fill?.type === 'gradient') {
+      for (const stop of shape.fill.stops) {
+        stop.color = withAlpha(stop.color, opacity);
+      }
+    }
+    if (shape.line) {
+      shape.line.color = withAlpha(shape.line.color, opacity);
+    }
+    for (const side of Object.values(shape.borders ?? {})) {
+      side.color = withAlpha(side.color, opacity);
+    }
+    if (shape.shadow) {
+      shape.shadow.color = withAlpha(shape.shadow.color, opacity);
+    }
+    for (const paragraph of shape.text?.paragraphs ?? []) {
+      if (paragraph.bullet && paragraph.bullet.type !== 'none') {
+        paragraph.bullet.color = withAlpha(paragraph.bullet.color, opacity);
+      }
+      for (const run of paragraph.runs) {
+        if (run.kind === 'text') {
+          run.style.color = withAlpha(run.style.color, opacity);
+          if (run.style.highlight) {
+            run.style.highlight = withAlpha(run.style.highlight, opacity);
+          }
+        }
+      }
+    }
   }
 
   function measureTextBlock(el: HTMLElement): { box: Box; text: TextBody | undefined } {
@@ -813,52 +1078,65 @@ export function measureSlideDocument(): BrowserMeasureResult {
     }
   }
 
+  type BorderSides = NonNullable<ShapeElement['borders']>;
+
+  function parseBorderSide(width: string, style: string, color: string): Line | undefined {
+    const parsedWidth = px(width);
+    const parsedColor = parseColor(color);
+    if (parsedWidth <= 0 || style === 'none' || style === 'hidden' || !parsedColor || parsedColor.alpha <= 0) {
+      return undefined;
+    }
+    return { width: parsedWidth, color: parsedColor, dash: style === 'dashed' ? 'dash' : style === 'dotted' ? 'dot' : 'solid' };
+  }
+
+  /** Visible border sides, or undefined when no side paints. */
+  function parseBorderSides(cs: CSSStyleDeclaration): BorderSides | undefined {
+    const sides: BorderSides = {};
+    const top = parseBorderSide(cs.borderTopWidth, cs.borderTopStyle, cs.borderTopColor);
+    const right = parseBorderSide(cs.borderRightWidth, cs.borderRightStyle, cs.borderRightColor);
+    const bottom = parseBorderSide(cs.borderBottomWidth, cs.borderBottomStyle, cs.borderBottomColor);
+    const left = parseBorderSide(cs.borderLeftWidth, cs.borderLeftStyle, cs.borderLeftColor);
+    if (top) sides.top = top;
+    if (right) sides.right = right;
+    if (bottom) sides.bottom = bottom;
+    if (left) sides.left = left;
+    return top || right || bottom || left ? sides : undefined;
+  }
+
+  function sameLine(a: Line | undefined, b: Line | undefined): boolean {
+    return !!a && !!b && a.width === b.width && a.dash === b.dash && colorsEqual(a.color, b.color);
+  }
+
+  /** The uniform border as one line, or undefined when sides differ or nothing paints. */
   function parseLine(cs: CSSStyleDeclaration): Line | undefined {
-    const topWidth = px(cs.borderTopWidth);
-    const rightWidth = px(cs.borderRightWidth);
-    const bottomWidth = px(cs.borderBottomWidth);
-    const leftWidth = px(cs.borderLeftWidth);
-    const topStyle = cs.borderTopStyle;
-    const rightStyle = cs.borderRightStyle;
-    const bottomStyle = cs.borderBottomStyle;
-    const leftStyle = cs.borderLeftStyle;
-    const topColor = parseColor(cs.borderTopColor);
-    const rightColor = parseColor(cs.borderRightColor);
-    const bottomColor = parseColor(cs.borderBottomColor);
-    const leftColor = parseColor(cs.borderLeftColor);
-    const visible = [
-      { width: topWidth, style: topStyle, color: topColor },
-      { width: rightWidth, style: rightStyle, color: rightColor },
-      { width: bottomWidth, style: bottomStyle, color: bottomColor },
-      { width: leftWidth, style: leftStyle, color: leftColor },
-    ].some((side) => side.width > 0 && side.style !== 'none' && !!side.color && side.color.alpha > 0);
-    if (!visible) {
+    const sides = parseBorderSides(cs);
+    if (!sides) {
       return undefined;
     }
-    const uniform = topWidth === rightWidth && topWidth === bottomWidth && topWidth === leftWidth && topStyle === rightStyle && topStyle === bottomStyle && topStyle === leftStyle && colorsEqual(topColor, rightColor) && colorsEqual(topColor, bottomColor) && colorsEqual(topColor, leftColor);
-    if (!uniform || !topColor || topColor.alpha <= 0 || topStyle === 'none') {
-      return undefined;
-    }
-    return { width: topWidth, color: topColor, dash: topStyle === 'dashed' ? 'dash' : topStyle === 'dotted' ? 'dot' : 'solid' };
+    return sameLine(sides.top, sides.right) && sameLine(sides.top, sides.bottom) && sameLine(sides.top, sides.left) ? sides.top : undefined;
   }
 
   function classifyGeometry(box: Box, cs: CSSStyleDeclaration): ShapeElement['geometry'] {
-    const radii = [cs.borderTopLeftRadius, cs.borderTopRightRadius, cs.borderBottomRightRadius, cs.borderBottomLeftRadius].map((value) => parseCornerRadius(value, box));
-    const first = radii[0];
-    if (!first) {
+    const [tl, tr, br, bl] = [cs.borderTopLeftRadius, cs.borderTopRightRadius, cs.borderBottomRightRadius, cs.borderBottomLeftRadius].map((value) => parseCornerRadius(value, box)) as [CornerRadius, CornerRadius, CornerRadius, CornerRadius];
+    // CSS Backgrounds 3 §5.5: when adjacent radii overlap, every radius is scaled by the smallest ratio
+    const ratios = [box.w / (tl.x + tr.x), box.w / (bl.x + br.x), box.h / (tl.y + bl.y), box.h / (tr.y + br.y)].filter((ratio) => Number.isFinite(ratio));
+    const scale = Math.min(1, ...ratios);
+    const radii = { tl: scaleRadius(tl, scale), tr: scaleRadius(tr, scale), br: scaleRadius(br, scale), bl: scaleRadius(bl, scale) };
+    const uniform = [radii.tr, radii.br, radii.bl].every((radius) => nearlyEqual(radius.x, radii.tl.x) && nearlyEqual(radius.y, radii.tl.y));
+    if (radii.tl.x <= 0 && radii.tl.y <= 0 && uniform) {
       return { preset: 'rect' };
     }
-    const uniform = radii.every((radius) => nearlyEqual(radius.x, first.x) && nearlyEqual(radius.y, first.y));
-    if (!uniform) {
-      return { preset: 'rect' };
-    }
-    if (box.w > 0 && box.h > 0 && nearlyEqual(box.w, box.h) && nearlyEqual(first.x, box.w / 2) && nearlyEqual(first.y, box.h / 2)) {
+    if (uniform && box.w > 0 && box.h > 0 && nearlyEqual(radii.tl.x, box.w / 2) && nearlyEqual(radii.tl.y, box.h / 2)) {
       return { preset: 'ellipse' };
     }
-    if (first.x > 0 || first.y > 0) {
-      return { preset: 'roundRect', radius: round(Math.max(first.x, first.y)) };
+    if (uniform && nearlyEqual(radii.tl.x, radii.tl.y)) {
+      return { preset: 'roundRect', radius: radii.tl.x };
     }
-    return { preset: 'rect' };
+    return { preset: 'custom', radii };
+  }
+
+  function scaleRadius(radius: CornerRadius, scale: number): CornerRadius {
+    return { x: round(radius.x * scale), y: round(radius.y * scale) };
   }
 
   function parseCornerRadius(value: string, box: Box): { x: number; y: number } {
@@ -876,26 +1154,93 @@ export function measureSlideDocument(): BrowserMeasureResult {
     return px(trimmed);
   }
 
-  function parseRotation(transform: string): number {
+  type Transform2d = { rotation: number; scale: number; a: number; b: number; c: number; d: number; e: number; f: number };
+
+  /** Rotation + uniform scale + translate from the computed 2-D matrix; anything else (skew, 3-D, non-uniform scale) is undefined. */
+  function decomposeTransform(transform: string): Transform2d | undefined {
     if (!transform || transform === 'none') {
-      return 0;
+      return undefined;
     }
     const matrix = transform.match(/^matrix\(([-0-9.eE,\s]+)\)$/);
     if (!matrix) {
-      return 0;
+      return undefined;
     }
     const parts = (matrix[1] ?? '').split(',').map((part) => parseFloat(part.trim()));
     if (parts.length !== 6 || parts.some((part) => Number.isNaN(part))) {
-      return 0;
+      return undefined;
     }
-    const a = parts[0] ?? 0;
-    const b = parts[1] ?? 0;
-    const c = parts[2] ?? 0;
-    const d = parts[3] ?? 0;
-    if (!nearlyEqual(c, -b) || !nearlyEqual(a, d) || !nearlyEqual(a * a + b * b, 1)) {
-      return 0;
+    const [a, b, c, d, e, f] = parts as [number, number, number, number, number, number];
+    const sx = Math.hypot(a, b);
+    const sy = Math.hypot(c, d);
+    if (sx <= 0 || !nearlyEqual(sx, sy) || !nearlyEqual(a * c + b * d, 0)) {
+      return undefined;
     }
-    return round((Math.atan2(b, a) * 180) / Math.PI);
+    const degrees = (Math.atan2(b, a) * 180) / Math.PI;
+    return { rotation: round(((degrees % 360) + 360) % 360) % 360, scale: round(sx), a, b, c, d, e, f };
+  }
+
+  /**
+   * Applies the element's transform to its untransformed box: the box centre goes through the matrix about
+   * `transform-origin`, the size takes the uniform scale, and the rotation goes to `rotation`.
+   */
+  function transformedBox(cs: CSSStyleDeclaration, box: Box, transform: Transform2d): Box {
+    const origin = cs.transformOrigin.split(/\s+/).map((part) => px(part));
+    const ox = box.x + (origin[0] ?? 0);
+    const oy = box.y + (origin[1] ?? 0);
+    const cx = box.x + box.w / 2 - ox;
+    const cy = box.y + box.h / 2 - oy;
+    const centreX = ox + transform.a * cx + transform.c * cy + transform.e;
+    const centreY = oy + transform.b * cx + transform.d * cy + transform.f;
+    const w = box.w * transform.scale;
+    const h = box.h * transform.scale;
+    return { x: round(centreX - w / 2), y: round(centreY - h / 2), w: round(w), h: round(h) };
+  }
+
+  /** `transform: scale()` folds into every CSS-px quantity of the shape, text included. */
+  function scaleShape(shape: ShapeElement, s: number): void {
+    if (s === 1) {
+      return;
+    }
+    const g = shape.geometry;
+    if (g.preset === 'roundRect') {
+      g.radius = round(g.radius * s);
+    } else if (g.preset === 'custom') {
+      for (const corner of Object.values(g.radii)) {
+        corner.x = round(corner.x * s);
+        corner.y = round(corner.y * s);
+      }
+    }
+    if (shape.line) {
+      shape.line.width = round(shape.line.width * s);
+    }
+    for (const side of Object.values(shape.borders ?? {})) {
+      side.width = round(side.width * s);
+    }
+    if (shape.shadow) {
+      shape.shadow.offsetX = round(shape.shadow.offsetX * s);
+      shape.shadow.offsetY = round(shape.shadow.offsetY * s);
+      shape.shadow.blur = round(shape.shadow.blur * s);
+    }
+    const text = shape.text;
+    if (!text) {
+      return;
+    }
+    text.padding = { l: round(text.padding.l * s), t: round(text.padding.t * s), r: round(text.padding.r * s), b: round(text.padding.b * s) };
+    text.firstParagraphGap = round(text.firstParagraphGap * s);
+    text.lastParagraphGap = round(text.lastParagraphGap * s);
+    for (const paragraph of text.paragraphs) {
+      paragraph.lineHeight = round(paragraph.lineHeight * s);
+      paragraph.spaceBefore = round(paragraph.spaceBefore * s);
+      paragraph.spaceAfter = round(paragraph.spaceAfter * s);
+      paragraph.indent = round(paragraph.indent * s);
+      paragraph.marginLeft = round(paragraph.marginLeft * s);
+      for (const run of paragraph.runs) {
+        if (run.kind === 'text') {
+          run.style.size = round(run.style.size * s);
+          run.style.letterSpacing = round(run.style.letterSpacing * s);
+        }
+      }
+    }
   }
 
   function parseColor(value: string): Color | undefined {
@@ -986,10 +1331,10 @@ export function measureSlideDocument(): BrowserMeasureResult {
       return true;
     }
     const cs = getComputedStyle(el);
-    if ((parseColor(cs.backgroundColor)?.alpha ?? 0) > 0) {
+    if ((parseColor(cs.backgroundColor)?.alpha ?? 0) > 0 || /-gradient\(/.test(cs.backgroundImage)) {
       return true;
     }
-    if (parseLine(cs)) {
+    if (parseBorderSides(cs)) {
       return true;
     }
     if (cs.boxShadow !== 'none') {

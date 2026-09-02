@@ -17,12 +17,14 @@ export function emitSlide(pkg: OpcPackage, slide: Slide, ctx: SlideEmissionConte
   const addRelationship: ShapeEmissionContext['addRelationship'] = (type, target, opts) => pkg.addRelationship(partName, type, target, opts);
   pkg.addRelationship(partName, REL.slideLayout, '../slideLayouts/slideLayout1.xml');
 
-  const shapes = slide.elements.map((element, index) => buildShape(element, {
+  let nextShapeId = 2;
+  const nextId = (): number => nextShapeId++;
+  const shapes = slide.elements.flatMap((element) => buildShape(element, {
     deckLang: ctx.deck.lang,
     sourceSlidePart: partName,
     slidePartById: ctx.slidePartById,
     addRelationship,
-  }, index + 2));
+  }, nextId));
 
   const xml = serialize(buildSlideXml(slide, shapes));
   pkg.addPart(partName, CT.slide, xml);

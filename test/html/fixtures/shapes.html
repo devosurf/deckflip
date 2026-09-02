@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Shapes fixture</title>
+    <style>
+      section {
+        font-family: Arial, sans-serif;
+        font-size: 24px;
+        line-height: 1.2;
+        color: #111827;
+      }
+      section > div {
+        position: absolute;
+        width: 200px;
+        height: 100px;
+        box-sizing: border-box;
+      }
+      .linear {
+        left: 40px;
+        top: 40px;
+        background: linear-gradient(135deg, #2563eb, rgba(124, 58, 237, 0.5) 100%);
+      }
+      .keyword {
+        left: 280px;
+        top: 40px;
+        background: linear-gradient(to right, #ff0000, #00ff00 30%, #0000ff);
+      }
+      .radial {
+        left: 520px;
+        top: 40px;
+        background: radial-gradient(circle, #ffffff, #000000);
+      }
+      .faded {
+        left: 760px;
+        top: 40px;
+        background: #ff0000;
+        border: 4px solid rgba(0, 0, 255, 0.5);
+        opacity: 0.5;
+        color: #00ff00;
+      }
+      .parent {
+        left: 1000px;
+        top: 40px;
+        opacity: 0.8;
+      }
+      .child {
+        width: 100px;
+        height: 50px;
+        background: #000000;
+        opacity: 0.5;
+      }
+      .shadow {
+        left: 40px;
+        top: 200px;
+        background: #ffffff;
+        box-shadow: 4px 6px 12px rgba(0, 0, 0, 0.3);
+      }
+      .inset {
+        left: 280px;
+        top: 200px;
+        background: #ffffff;
+        box-shadow: inset 0 2px 4px #000000;
+      }
+      .spread {
+        left: 520px;
+        top: 200px;
+        background: #ffffff;
+        box-shadow: 0 0 4px 2px #000000;
+      }
+      .multi {
+        left: 760px;
+        top: 200px;
+        background: #ffffff;
+        box-shadow: 0 0 4px #000000, 0 0 8px #ff0000;
+      }
+      .sides {
+        left: 40px;
+        top: 340px;
+        border-top: 4px solid #ff0000;
+        border-left: 2px dashed #0000ff;
+      }
+      .corners {
+        left: 280px;
+        top: 340px;
+        background: #00ff00;
+        border-radius: 20px 0 40px 10px;
+      }
+      .elliptic {
+        left: 520px;
+        top: 340px;
+        background: #00ff00;
+        border-radius: 30px / 15px;
+      }
+      .overflowing {
+        left: 760px;
+        top: 340px;
+        background: #00ff00;
+        border-radius: 120px 120px 0 0;
+      }
+      .rotated {
+        left: 40px;
+        top: 480px;
+        background: #ff00ff;
+        transform: rotate(30deg);
+      }
+      .moved {
+        left: 280px;
+        top: 480px;
+        background: #ff00ff;
+        transform: translate(20px, 10px) rotate(-15deg);
+      }
+      .scaled {
+        left: 520px;
+        top: 480px;
+        background: #ff00ff;
+        padding: 10px;
+        transform: scale(1.5);
+      }
+      .cornered {
+        left: 760px;
+        top: 480px;
+        background: #ff00ff;
+        transform-origin: 0 0;
+        transform: rotate(90deg);
+      }
+    </style>
+  </head>
+  <body>
+    <section id="slide-1">
+      <div class="linear"></div>
+      <div class="keyword"></div>
+      <div class="radial"></div>
+      <div class="faded">Faded</div>
+      <div class="parent"><div class="child"></div></div>
+      <div class="shadow"></div>
+      <div class="inset"></div>
+      <div class="spread"></div>
+      <div class="multi"></div>
+      <div class="sides"></div>
+      <div class="corners"></div>
+      <div class="elliptic"></div>
+      <div class="overflowing"></div>
+      <div class="rotated"></div>
+      <div class="moved"></div>
+      <div class="scaled">Scaled</div>
+      <div class="cornered"></div>
+    </section>
+  </body>
+</html>

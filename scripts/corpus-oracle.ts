@@ -6,9 +6,22 @@ import { launchChromium } from '../src/render/chromium.js';
 import { renderPptxPowerPoint } from '../src/render/powerpoint.js';
 import { convertHtmlToPptx } from '../src/convert.js';
 
-async function listFixtures(): Promise<string[]> {
-  const entries = await readdir(join('fixtures', 'corpus', 'text'), { withFileTypes: true });
-  return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
+const CORPUS = join('fixtures', 'corpus');
+
+/** `corpus:oracle [category[/fixture] ...]`; no argument regenerates every HTML fixture. */
+async function listFixtures(filters: string[]): Promise<Array<{ category: string; name: string }>> {
+  const fixtures: Array<{ category: string; name: string }> = [];
+  const categories = (await readdir(CORPUS, { withFileTypes: true })).filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
+  for (const category of categories) {
+    const names = (await readdir(join(CORPUS, category), { withFileTypes: true })).filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
+    for (const name of names) {
+      const key = `${category}/${name}`;
+      if (filters.length === 0 || filters.some((filter) => filter === category || filter === key)) {
+        fixtures.push({ category, name });
+      }
+    }
+  }
+  return fixtures;
 }
 
 async function writeSlides(targetDir: string, pages: Map<number, Buffer>): Promise<void> {
@@ -21,8 +34,8 @@ async function writeSlides(targetDir: string, pages: Map<number, Buffer>): Promi
 async function run(): Promise<void> {
   const browser = await launchChromium({ offline: true });
   try {
-    for (const name of await listFixtures()) {
-      const fixtureDir = join('fixtures', 'corpus', 'text', name);
+    for (const { category, name } of await listFixtures(process.argv.slice(2))) {
+      const fixtureDir = join(CORPUS, category, name);
       const deckPath = join(fixtureDir, 'deck.html');
       const workDir = await mkdtemp(join(tmpdir(), `deckflip-oracle-${name}-`));
       const pptxPath = join(workDir, `${name}.pptx`);
@@ -36,7 +49,7 @@ async function run(): Promise<void> {
       });
       const pages = await renderPptxPowerPoint(pptxPath, { dpi: 96 });
       await writeSlides(join(fixtureDir, 'expected', 'powerpoint'), pages);
-      console.log(`${name}: wrote ${pages.size} PowerPoint oracle slide(s)`);
+      console.log(`${category}/${name}: wrote ${pages.size} PowerPoint oracle slide(s)`);
     }
   } finally {
     await browser.close();

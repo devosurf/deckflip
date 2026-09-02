@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="deckflip:canvas" content="1280x720">
+<title>effects</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #ffffff; }
+  body { font-family: Arial; }
+  body > section { position: relative; box-sizing: border-box; overflow: hidden; }
+  .tile { position: absolute; width: 240px; height: 140px; box-sizing: border-box; background: #ffffff; }
+  .label { position: absolute; left: 80px; top: 40px; margin: 0; font-size: 22px; line-height: 30px; color: #111827; }
+  .soft { left: 80px; top: 110px; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.25); }
+  .hard { left: 380px; top: 110px; background: #fef3c7; box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.5); }
+  .inset { left: 680px; top: 110px; background: #e0f2fe; box-shadow: inset 0 4px 8px rgba(0, 0, 0, 0.35); }
+  .card { left: 980px; top: 110px; margin: 0; padding: 20px; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); font-size: 22px; line-height: 30px; color: #111827; }
+  .rotated { left: 100px; top: 380px; background: #2563eb; transform: rotate(15deg); }
+  .rotated-text { left: 400px; top: 380px; margin: 0; padding: 16px; background: #dbeafe; font-size: 22px; line-height: 30px; color: #111827; transform: rotate(-10deg); }
+  .moved { left: 680px; top: 380px; background: #16a34a; transform: translate(40px, 30px); }
+  .scaled { left: 980px; top: 380px; margin: 0; padding: 12px; background: #fde68a; font-size: 18px; line-height: 24px; color: #111827; transform: scale(1.25); }
+  .spin { position: absolute; left: 80px; top: 580px; width: 1120px; height: 60px; background: #f1f5f9; border: 2px solid #94a3b8; transform: rotate(180deg); }
+</style>
+</head>
+<body>
+<section>
+  <p class="label">Shadows and transforms</p>
+  <div class="tile soft"></div>
+  <div class="tile hard"></div>
+  <div class="tile inset"></div>
+  <p class="tile card">Card with shadow and radius</p>
+  <div class="tile rotated"></div>
+  <p class="tile rotated-text">Rotated text box</p>
+  <div class="tile moved"></div>
+  <p class="tile scaled">Scaled text box</p>
+  <div class="spin"></div>
+</section>
+</body>
+</html>

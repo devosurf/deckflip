@@ -149,4 +149,139 @@ describe.skipIf(!browserAvailable)('measureDeck', () => {
       await browser.close();
     }
   });
+
+  it('measures gradient fills and folds opacity into fill, line and run alpha', async () => {
+    const loaded = await loadDeck('test/html/fixtures/shapes.html', {});
+    const browser = await chromium.launch();
+    try {
+      const measured = await measureDeck(loaded, { browser });
+
+      const linear = shapeByName(measured.deck, 'div.linear');
+      expect(linear.fill).toEqual({
+        type: 'gradient',
+        kind: 'linear',
+        angle: 135,
+        stops: [
+          { position: 0, color: { hex: '2563EB', alpha: 1 } },
+          { position: 1, color: { hex: '7C3AED', alpha: 0.5 } },
+        ],
+      });
+
+      const keyword = shapeByName(measured.deck, 'div.keyword');
+      expect(keyword.fill).toEqual({
+        type: 'gradient',
+        kind: 'linear',
+        angle: 90,
+        stops: [
+          { position: 0, color: { hex: 'FF0000', alpha: 1 } },
+          { position: 0.3, color: { hex: '00FF00', alpha: 1 } },
+          { position: 1, color: { hex: '0000FF', alpha: 1 } },
+        ],
+      });
+
+      const radial = shapeByName(measured.deck, 'div.radial');
+      expect(radial.fill).toEqual({
+        type: 'gradient',
+        kind: 'radial',
+        stops: [
+          { position: 0, color: { hex: 'FFFFFF', alpha: 1 } },
+          { position: 1, color: { hex: '000000', alpha: 1 } },
+        ],
+      });
+      expect(measured.entries.filter((entry) => entry.code !== 'SUBSTITUTE_BORDER_SIDES')).toEqual([
+        expect.objectContaining({ code: 'SUBSTITUTE_GRADIENT_RADIAL', slide: 1, locator: { selector: 'section:nth-of-type(1) > div:nth-child(3)' } }),
+        expect.objectContaining({ code: 'SUBSTITUTE_OPACITY', slide: 1, locator: { selector: 'section:nth-of-type(1) > div:nth-child(4)' } }),
+        expect.objectContaining({ code: 'SUBSTITUTE_OPACITY', slide: 1, locator: { selector: 'section:nth-of-type(1) > div:nth-child(5) > div:nth-child(1)' } }),
+      ]);
+
+      const faded = shapeByName(measured.deck, 'div.faded');
+      expect(faded.fill).toEqual({ type: 'solid', color: { hex: 'FF0000', alpha: 0.5 } });
+      expect(faded.line).toEqual({ width: 4, color: { hex: '0000FF', alpha: 0.25 }, dash: 'solid' });
+      const run = faded.text!.paragraphs[0]!.runs[0]!;
+      expect(run.kind === 'text' && run.style.color).toEqual({ hex: '00FF00', alpha: 0.5 });
+
+      const child = shapeByName(measured.deck, 'div.child');
+      expect(child.fill).toEqual({ type: 'solid', color: { hex: '000000', alpha: 0.4 } });
+    } finally {
+      await browser.close();
+    }
+  });
+
+  it('measures a single spread-free box-shadow as an outer or inner shadow', async () => {
+    const loaded = await loadDeck('test/html/fixtures/shapes.html', {});
+    const browser = await chromium.launch();
+    try {
+      const measured = await measureDeck(loaded, { browser });
+      expect(shapeByName(measured.deck, 'div.shadow').shadow).toEqual({ inset: false, offsetX: 4, offsetY: 6, blur: 12, color: { hex: '000000', alpha: 0.3 } });
+      expect(shapeByName(measured.deck, 'div.inset').shadow).toEqual({ inset: true, offsetX: 0, offsetY: 2, blur: 4, color: { hex: '000000', alpha: 1 } });
+      expect(shapeByName(measured.deck, 'div.spread').shadow).toBeUndefined();
+      expect(shapeByName(measured.deck, 'div.multi').shadow).toBeUndefined();
+    } finally {
+      await browser.close();
+    }
+  });
+
+  it('measures per-side borders and per-corner or elliptical radii', async () => {
+    const loaded = await loadDeck('test/html/fixtures/shapes.html', {});
+    const browser = await chromium.launch();
+    try {
+      const measured = await measureDeck(loaded, { browser });
+
+      const sides = shapeByName(measured.deck, 'div.sides');
+      expect(sides.line).toBeUndefined();
+      expect(sides.borders).toEqual({
+        top: { width: 4, color: { hex: 'FF0000', alpha: 1 }, dash: 'solid' },
+        left: { width: 2, color: { hex: '0000FF', alpha: 1 }, dash: 'dash' },
+      });
+      expect(measured.entries).toContainEqual(expect.objectContaining({ code: 'SUBSTITUTE_BORDER_SIDES', locator: { selector: 'section:nth-of-type(1) > div:nth-child(10)' } }));
+
+      expect(shapeByName(measured.deck, 'div.corners').geometry).toEqual({
+        preset: 'custom',
+        radii: { tl: { x: 20, y: 20 }, tr: { x: 0, y: 0 }, br: { x: 40, y: 40 }, bl: { x: 10, y: 10 } },
+      });
+      expect(shapeByName(measured.deck, 'div.elliptic').geometry).toEqual({
+        preset: 'custom',
+        radii: { tl: { x: 30, y: 15 }, tr: { x: 30, y: 15 }, br: { x: 30, y: 15 }, bl: { x: 30, y: 15 } },
+      });
+      // 120 + 120 > 200 px wide (and > 100 tall): CSS scales every radius by 200 / 240
+      expect(shapeByName(measured.deck, 'div.overflowing').geometry).toEqual({
+        preset: 'custom',
+        radii: { tl: { x: 100, y: 100 }, tr: { x: 100, y: 100 }, br: { x: 0, y: 0 }, bl: { x: 0, y: 0 } },
+      });
+    } finally {
+      await browser.close();
+    }
+  });
+
+  it('measures transformed elements as their untransformed box plus rotation, translate and scale', async () => {
+    const loaded = await loadDeck('test/html/fixtures/shapes.html', {});
+    const browser = await chromium.launch();
+    try {
+      const measured = await measureDeck(loaded, { browser });
+
+      const rotated = shapeByName(measured.deck, 'div.rotated');
+      expect(rotated.box).toEqual({ x: 40, y: 480, w: 200, h: 100 });
+      expect(rotated.rotation).toBe(30);
+
+      const moved = shapeByName(measured.deck, 'div.moved');
+      expect(moved.box).toEqual({ x: 300, y: 490, w: 200, h: 100 });
+      expect(moved.rotation).toBe(345);
+
+      // scale(1.5) about the centre: 200x100 at (520,480) becomes 300x150 centred on (620,530)
+      const scaled = shapeByName(measured.deck, 'div.scaled');
+      expect(scaled.box).toEqual({ x: 470, y: 455, w: 300, h: 150 });
+      expect(scaled.rotation).toBe(0);
+      expect(scaled.text?.padding).toEqual({ l: 15, t: 15, r: 15, b: 15 });
+      expect(scaled.text?.paragraphs[0]!.lineHeight).toBeCloseTo(43.2, 1);
+      const run = scaled.text!.paragraphs[0]!.runs[0]!;
+      expect(run.kind === 'text' && run.style.size).toBe(36);
+
+      // rotate(90deg) about the top-left corner: the centre (860,530) maps to (760 - 50, 480 + 100) = (710, 580)
+      const cornered = shapeByName(measured.deck, 'div.cornered');
+      expect(cornered.box).toEqual({ x: 610, y: 530, w: 200, h: 100 });
+      expect(cornered.rotation).toBe(90);
+    } finally {
+      await browser.close();
+    }
+  });
 });

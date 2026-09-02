@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="deckflip:canvas" content="1280x720">
+<title>fills</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #ffffff; }
+  body { font-family: Arial; }
+  body > section { position: relative; box-sizing: border-box; overflow: hidden; }
+  .tile { position: absolute; width: 260px; height: 160px; box-sizing: border-box; }
+  .label { position: absolute; left: 80px; top: 40px; margin: 0; font-size: 22px; line-height: 30px; color: #111827; }
+  .solid { left: 80px; top: 100px; background: #2563eb; }
+  .alpha { left: 380px; top: 100px; background: rgba(220, 38, 38, 0.4); }
+  .vertical { left: 680px; top: 100px; background: linear-gradient(#f59e0b, #b45309); }
+  .diagonal { left: 980px; top: 100px; background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 60%, #ec4899 100%); }
+  .keyword { left: 80px; top: 320px; background: linear-gradient(to right, #14b8a6, #ffffff); }
+  .radial { left: 380px; top: 320px; background: radial-gradient(circle, #ffffff, #1e293b); }
+  .faded { left: 680px; top: 320px; background: #16a34a; opacity: 0.5; }
+  .faded-text { left: 980px; top: 320px; background: #111827; opacity: 0.6; color: #ffffff; font-size: 26px; line-height: 34px; padding: 24px; margin: 0; }
+  .stack { left: 80px; top: 540px; width: 1160px; height: 120px; background: linear-gradient(90deg, #ef4444, #f97316, #eab308, #22c55e, #3b82f6, #a855f7); }
+</style>
+</head>
+<body>
+<section>
+  <p class="label">Solid, translucent and gradient fills</p>
+  <div class="tile solid"></div>
+  <div class="tile alpha"></div>
+  <div class="tile vertical"></div>
+  <div class="tile diagonal"></div>
+  <div class="tile keyword"></div>
+  <div class="tile radial"></div>
+  <div class="tile faded"></div>
+  <p class="tile faded-text">Opacity folded into fill and text</p>
+  <div class="tile stack"></div>
+</section>
+</body>
+</html>

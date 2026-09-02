@@ -1,0 +1,13 @@
+[
+  {
+    "code": "SUBSTITUTE_BORDER_SIDES",
+    "kind": "substituted",
+    "severity": "info",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > div:nth-child(5)"
+    },
+    "reason": "border on div.tile differs per side",
+    "hint": "Emitted as separate lines"
+  }
+]

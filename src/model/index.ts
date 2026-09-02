@@ -58,7 +58,17 @@ export interface Color {
   alpha: number;
 }
 
-export type Fill = { type: 'solid'; color: Color };
+export interface GradientStop {
+  /** 0..1 along the gradient line */
+  position: number;
+  color: Color;
+}
+
+export type Fill =
+  | { type: 'solid'; color: Color }
+  /** `angle` in CSS degrees: 0 = to top, 90 = to right, clockwise */
+  | { type: 'gradient'; kind: 'linear'; angle: number; stops: GradientStop[] }
+  | { type: 'gradient'; kind: 'radial'; stops: GradientStop[] };
 
 export interface Line {
   /** CSS px */
@@ -77,10 +87,36 @@ export interface ShapeElement {
   box: Box;
   /** degrees clockwise */
   rotation: number;
-  geometry: { preset: 'rect' } | { preset: 'roundRect'; radius: number } | { preset: 'ellipse' };
+  geometry: Geometry;
   fill?: Fill;
+  /** uniform border; absent when sides differ (see `borders`) */
   line?: Line;
+  /** per-side borders when they differ; emitted as one line per side */
+  borders?: { top?: Line; right?: Line; bottom?: Line; left?: Line };
+  /** single `box-shadow` without spread; others are left to the raster/flatten pass */
+  shadow?: Shadow;
   text?: TextBody;
+}
+
+/** corner radii in CSS px, already scaled down when they overlap as CSS does */
+export interface CornerRadius {
+  x: number;
+  y: number;
+}
+
+export type Geometry =
+  | { preset: 'rect' }
+  | { preset: 'roundRect'; radius: number }
+  | { preset: 'ellipse' }
+  | { preset: 'custom'; radii: { tl: CornerRadius; tr: CornerRadius; br: CornerRadius; bl: CornerRadius } };
+
+export interface Shadow {
+  inset: boolean;
+  /** CSS px */
+  offsetX: number;
+  offsetY: number;
+  blur: number;
+  color: Color;
 }
 
 export interface Insets {

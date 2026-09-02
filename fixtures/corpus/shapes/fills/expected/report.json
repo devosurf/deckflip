@@ -1,0 +1,35 @@
+[
+  {
+    "code": "SUBSTITUTE_GRADIENT_RADIAL",
+    "kind": "substituted",
+    "severity": "info",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > div:nth-child(7)"
+    },
+    "reason": "radial-gradient on div.tile is approximated by a circular path gradient",
+    "hint": "Emitted as a path gradient; check render"
+  },
+  {
+    "code": "SUBSTITUTE_OPACITY",
+    "kind": "substituted",
+    "severity": "info",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > div:nth-child(8)"
+    },
+    "reason": "opacity 0.5 on div.tile folded into fill, line and text alpha",
+    "hint": "Folded into fill/line/text alpha"
+  },
+  {
+    "code": "SUBSTITUTE_OPACITY",
+    "kind": "substituted",
+    "severity": "info",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(9)"
+    },
+    "reason": "opacity 0.6 on p.tile folded into fill, line and text alpha",
+    "hint": "Folded into fill/line/text alpha"
+  }
+]

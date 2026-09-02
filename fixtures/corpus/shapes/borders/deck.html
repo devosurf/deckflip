@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="deckflip:canvas" content="1280x720">
+<title>borders</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #ffffff; }
+  body { font-family: Arial; }
+  body > section { position: relative; box-sizing: border-box; overflow: hidden; }
+  .tile { position: absolute; width: 260px; height: 160px; box-sizing: border-box; background: #f8fafc; }
+  .label { position: absolute; left: 80px; top: 40px; margin: 0; font-size: 22px; line-height: 30px; color: #111827; }
+  .solid { left: 80px; top: 100px; border: 4px solid #1d4ed8; }
+  .dashed { left: 380px; top: 100px; border: 3px dashed #b91c1c; }
+  .dotted { left: 680px; top: 100px; border: 6px dotted #15803d; }
+  .sides { left: 980px; top: 100px; border-top: 8px solid #f59e0b; border-bottom: 2px solid #0f172a; border-left: 4px dashed #7c3aed; }
+  .round { left: 80px; top: 320px; border: 2px solid #0f172a; border-radius: 24px; }
+  .corners { left: 380px; top: 320px; background: #dbeafe; border-radius: 40px 0 80px 8px; }
+  .pill { left: 680px; top: 320px; background: #fee2e2; border-radius: 80px; }
+  .oval { left: 980px; top: 320px; background: #dcfce7; border: 3px solid #166534; border-radius: 50%; }
+  .text { position: absolute; box-sizing: border-box; left: 80px; top: 540px; width: 1160px; height: 120px; margin: 0; padding: 20px 28px; border: 3px solid #0f172a; border-radius: 16px 16px 48px 48px; font-size: 24px; line-height: 32px; color: #111827; }
+</style>
+</head>
+<body>
+<section>
+  <p class="label">Uniform, dashed, dotted and per-side borders; corner radii</p>
+  <div class="tile solid"></div>
+  <div class="tile dashed"></div>
+  <div class="tile dotted"></div>
+  <div class="tile sides"></div>
+  <div class="tile round"></div>
+  <div class="tile corners"></div>
+  <div class="tile pill"></div>
+  <div class="tile oval"></div>
+  <p class="text">Text inside a bordered box with mixed corner radii keeps its insets so wrapping and the first baseline match.</p>
+</section>
+</body>
+</html>

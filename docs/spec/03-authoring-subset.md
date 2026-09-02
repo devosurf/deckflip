@@ -22,7 +22,7 @@ A **Text block** is the lowest block-level element whose rendered children are a
 | CSS | DrawingML |
 | --- | --- |
 | `background-color` | `a:solidFill` (+ `a:alpha`) |
-| `background: linear-gradient(...)` any stops/angle | `a:gradFill/a:lin` |
+| `background: linear-gradient(...)` any stops/angle | `a:gradFill/a:lin` (`scaled="0"`; a two-stop gradient gets an interpolated midpoint stop because PowerPoint for Mac renders exactly two stops in the wrong colours) |
 | `background: radial-gradient(...)` | `a:gradFill/a:path path="circle"` (approximation; `substituted` info `SUBSTITUTE_GRADIENT_RADIAL`) |
 | `background-image: url()` + `background-size cover/contain`, `background-position`, `background-repeat` | `a:blipFill` with `a:srcRect` crop or `a:tile` |
 | `border` uniform (width, style solid/dashed/dotted, colour) | `a:ln` (+ `a:prstDash`) |
