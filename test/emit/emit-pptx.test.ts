@@ -47,6 +47,7 @@ function deck(): Deck {
     spaceBefore: 0,
     spaceAfter: 0,
     indent: 0,
+    marginLeft: 0,
     level: 0,
     runs: [{ kind: 'text', text: 'Alpha', style: runStyle() }],
   };
@@ -56,6 +57,7 @@ function deck(): Deck {
     spaceBefore: 0,
     spaceAfter: 0,
     indent: 0,
+    marginLeft: 0,
     level: 0,
     runs: [{ kind: 'text', text: 'Beta', style: runStyle({ fontStack: ['Arial'], size: 12, color: { hex: '333333', alpha: 1 } }, false) }],
   };
@@ -140,6 +142,50 @@ describe('emitPptx', () => {
     // Arial 24px in a 33.6px line: Chromium baseline 25.3, PowerPoint 26.611 -> correction 1.311; tIns = (3 + 2 - 1.311) px = 35138 EMU
     expect(slideXml).toContain('tIns="35138"');
     expect(slideXml).toContain('p:cNvSpPr txBox="1"');
+  });
+
+  it('emits list paragraphs with marL, negative indent and bullet properties', async () => {
+    const listDeck = deck();
+    const base = listDeck.slides[0]!.elements[1]!;
+    const paragraph = (overrides: Partial<Paragraph>): Paragraph => ({
+      align: 'l',
+      lineHeight: 28.8,
+      spaceBefore: 6,
+      spaceAfter: 0,
+      indent: -15.07,
+      marginLeft: 40,
+      level: 0,
+      runs: [{ kind: 'text', text: 'Item', style: runStyle() }],
+      ...overrides,
+    });
+    base.text!.paragraphs = [
+      paragraph({ bullet: { type: 'char', char: '•', color: { hex: 'FF0000', alpha: 1 }, sizePct: 100 } }),
+      paragraph({ level: 1, marginLeft: 80, bullet: { type: 'char', char: '◦', color: { hex: '000000', alpha: 1 }, sizePct: 80 } }),
+      paragraph({ bullet: { type: 'autonum', scheme: 'alphaLcPeriod', startAt: 3, color: { hex: '000000', alpha: 1 }, sizePct: 100 } }),
+      paragraph({ indent: 0, marginLeft: 0, bullet: { type: 'none' } }),
+    ];
+
+    const zip = await JSZip.loadAsync(await emitPptx(listDeck, { created, appVersion: '1.2.3' }));
+    const slideXml = await zip.file('ppt/slides/slide1.xml')!.async('string');
+    const pPrs = slideXml.match(/<a:pPr[^>]*>.*?<\/a:pPr>/g)!;
+
+    expect(pPrs[0]).toContain('marL="381000"');
+    expect(pPrs[0]).toContain('indent="-143542"');
+    expect(pPrs[0]).toContain('lvl="0"');
+    // bullet children follow spacing, in schema order: buClr, buSzPct, buFontTx, buChar
+    expect(pPrs[0]).toMatch(/<a:spcBef>.*<\/a:spcBef><a:buClr><a:srgbClr val="FF0000"\/><\/a:buClr><a:buFontTx\/><a:buChar char="•"\/>/);
+    expect(pPrs[0]).not.toContain('a:buSzPct');
+
+    expect(pPrs[1]).toContain('marL="762000"');
+    expect(pPrs[1]).toContain('lvl="1"');
+    expect(pPrs[1]).toContain('<a:buSzPct val="80000"/>');
+    expect(pPrs[1]).toContain('<a:buChar char="◦"/>');
+
+    expect(pPrs[2]).toContain('<a:buAutoNum type="alphaLcPeriod" startAt="3"/>');
+
+    expect(pPrs[3]).toContain('marL="0"');
+    expect(pPrs[3]).toContain('indent="0"');
+    expect(pPrs[3]).toContain('<a:buNone/>');
   });
 
   it.skipIf(!sofficeAvailable)('opens in LibreOffice and converts to PDF', async () => {

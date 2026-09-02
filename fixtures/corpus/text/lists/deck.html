@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="deckflip:canvas" content="1280x720">
+<title>lists</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #ffffff; }
+  body { font-family: Arial; }
+  body > section { position: relative; box-sizing: border-box; overflow: hidden; }
+  ul, ol { position: absolute; margin: 0; box-sizing: border-box; color: #111827; font-size: 22px; line-height: 30px; }
+  ul ul, ol ol, ul ol { position: static; width: auto; margin: 0; }
+  li { margin: 6px 0; }
+  .box { padding: 16px 20px 16px 48px; background: #f8fafc; border: 1px solid #cbd5e1; }
+  .nested { left: 80px; top: 70px; width: 520px; height: 300px; }
+  .nested li::marker { color: #2563eb; }
+  .numbers { left: 680px; top: 70px; width: 520px; height: 300px; list-style-type: decimal; }
+  .numbers ol { list-style-type: lower-alpha; }
+  .inside { left: 80px; top: 420px; width: 520px; height: 200px; list-style-position: inside; padding-left: 20px; background: #fef3c7; }
+  .plain { left: 680px; top: 420px; width: 520px; height: 200px; list-style: none; padding-left: 20px; background: #eff6ff; }
+  .plain li { border-bottom: none; }
+</style>
+</head>
+<body>
+<section>
+  <ul class="box nested">
+    <li>Outside disc marker on the first item</li>
+    <li>Second item with a nested list that wraps onto a second line when the text is long enough
+      <ul>
+        <li>Nested circle marker</li>
+        <li>Another nested item</li>
+      </ul>
+    </li>
+    <li>Third item after the nested list</li>
+  </ul>
+  <ol class="box numbers" start="3">
+    <li>Numbered from three</li>
+    <li>Four with a nested alpha list
+      <ol>
+        <li>alpha one</li>
+        <li>alpha two</li>
+      </ol>
+    </li>
+    <li><p>Five inside a paragraph</p></li>
+  </ol>
+  <ul class="box inside">
+    <li>Inside marker sits in the first line of the item text and wraps under the bullet</li>
+    <li>Short inside item</li>
+  </ul>
+  <ul class="box plain">
+    <li>No marker at all</li>
+    <li>Second plain item</li>
+  </ul>
+</section>
+</body>
+</html>

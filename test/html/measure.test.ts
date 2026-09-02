@@ -98,4 +98,55 @@ describe.skipIf(!browserAvailable)('measureDeck', () => {
       await browser.close();
     }
   });
+
+  it('measures lists as one text body with bullet paragraphs, levels, margins and marker advance', async () => {
+    const loaded = await loadDeck('test/html/fixtures/lists.html', {});
+    const browser = await chromium.launch();
+    try {
+      const measured = await measureDeck(loaded, { browser });
+      expect(measured.entries).toEqual([]);
+      const slide = measured.deck.slides[0]!;
+      expect(slide.elements).toHaveLength(4);
+
+      const bullets = shapeByName(measured.deck, 'ul.bullets');
+      expect(bullets.box).toEqual({ x: 80, y: 40, w: 560, h: bullets.box.h });
+      expect(bullets.text?.padding.l).toBe(0);
+      const paragraphs = bullets.text!.paragraphs;
+      expect(paragraphs.map((p) => p.runs.map((run) => (run.kind === 'text' ? run.text : 'break')).join(''))).toEqual(['First', 'Second', 'Nested one', 'Nested two', 'Third']);
+      expect(paragraphs.map((p) => p.level)).toEqual([0, 0, 1, 1, 0]);
+      expect(paragraphs.map((p) => p.marginLeft)).toEqual([40, 40, 80, 80, 40]);
+      expect(paragraphs.map((p) => p.bullet)).toEqual([
+        { type: 'char', char: '•', color: { hex: 'FF0000', alpha: 1 }, sizePct: 100 },
+        { type: 'char', char: '•', color: { hex: 'FF0000', alpha: 1 }, sizePct: 100 },
+        { type: 'char', char: '◦', color: { hex: 'FF0000', alpha: 1 }, sizePct: 100 },
+        { type: 'char', char: '◦', color: { hex: 'FF0000', alpha: 1 }, sizePct: 100 },
+        { type: 'char', char: '•', color: { hex: 'FF0000', alpha: 1 }, sizePct: 100 },
+      ]);
+      // Arial 24px: "• " advances 0.35em + 0.278em = 15.07px
+      expect(paragraphs[0]!.indent).toBeCloseTo(-15.07, 0);
+      for (const paragraph of paragraphs) {
+        expect(paragraph.lineHeight).toBeCloseTo(28.8, 1);
+      }
+      expect(paragraphs.map((p) => p.spaceBefore)).toEqual([0, 6, 6, 6, 6]);
+      expect(bullets.text?.firstParagraphGap).toBe(6);
+      expect(bullets.text?.lastParagraphGap).toBe(6);
+
+      const numbers = shapeByName(measured.deck, 'ol.numbers');
+      expect(numbers.text?.paragraphs.map((p) => p.runs.map((run) => (run.kind === 'text' ? run.text : 'break')).join(''))).toEqual(['Alpha', 'Beta']);
+      expect(numbers.text?.paragraphs[0]!.bullet).toEqual({ type: 'autonum', scheme: 'alphaLcPeriod', startAt: 3, color: { hex: '111827', alpha: 1 }, sizePct: 100 });
+      expect(numbers.text?.paragraphs[0]!.indent).toBeLessThan(0);
+
+      const inside = shapeByName(measured.deck, 'ul.inside');
+      // Chromium's inside symbol marker box spans 32 px at Arial 24 px: marL anchors at the text start (40 + 32)
+      expect(inside.text?.paragraphs[0]!.marginLeft).toBe(72);
+      expect(inside.text?.paragraphs[0]!.indent).toBe(-32);
+
+      const plain = shapeByName(measured.deck, 'ul.plain');
+      expect(plain.text?.paragraphs[0]!.bullet).toEqual({ type: 'none' });
+      expect(plain.text?.paragraphs[0]!.marginLeft).toBe(0);
+      expect(plain.text?.paragraphs[0]!.indent).toBe(0);
+    } finally {
+      await browser.close();
+    }
+  });
 });

@@ -117,6 +117,7 @@ describe.skipIf(!hasLocalFonts)('fonts', () => {
             spaceBefore: 0,
             spaceAfter: 0,
             indent: 0,
+            marginLeft: 0,
             level: 0,
             runs: [
               {

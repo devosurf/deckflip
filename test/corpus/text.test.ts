@@ -9,7 +9,7 @@ import { launchChromium, renderHtml } from '../../src/render/chromium.js';
 import { loadDeck } from '../../src/html/load.js';
 import { convertHtmlToPptx } from '../../src/convert.js';
 
-const FIXTURES = ['spike', 'wrapping', 'mixed-sizes', 'alignment', 'rtl', 'emoji'] as const;
+const FIXTURES = ['spike', 'wrapping', 'mixed-sizes', 'alignment', 'rtl', 'emoji', 'lists'] as const;
 
 function normaliseEntries(entries: readonly unknown[]): string[] {
   return [...entries].map((entry) => JSON.stringify(entry)).sort();

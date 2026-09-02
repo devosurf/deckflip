@@ -1,5 +1,5 @@
 import path from 'node:path';
-import type { Color, Paragraph, RunStyle, TextBody } from '../model/index.js';
+import type { Bullet, Color, Paragraph, RunStyle, TextBody } from '../model/index.js';
 import { pxToEmu, pxToHundredthsPt } from '../ooxml/emu.js';
 import { el, type XmlNode } from '../ooxml/xml.js';
 import { REL } from '../ooxml/opc.js';
@@ -56,6 +56,7 @@ export function buildTextBody(text: TextBody, ctx: TextEmissionContext, bodyPrAt
       el(
         'a:pPr',
         {
+          marL: pxToEmu(paragraph.marginLeft),
           algn: paragraph.align,
           lvl: paragraph.level,
           indent: pxToEmu(paragraph.indent),
@@ -63,6 +64,7 @@ export function buildTextBody(text: TextBody, ctx: TextEmissionContext, bodyPrAt
         el('a:lnSpc', {}, el('a:spcPts', { val: pxToHundredthsPt(paragraph.lineHeight) })),
         paragraph.spaceBefore > 0 ? el('a:spcBef', {}, el('a:spcPts', { val: pxToHundredthsPt(paragraph.spaceBefore) })) : undefined,
         paragraph.spaceAfter > 0 ? el('a:spcAft', {}, el('a:spcPts', { val: pxToHundredthsPt(paragraph.spaceAfter) })) : undefined,
+        ...buildBulletNodes(paragraph.bullet),
       ),
     ];
 
@@ -104,6 +106,23 @@ export function buildTextBody(text: TextBody, ctx: TextEmissionContext, bodyPrAt
     el('a:lstStyle'),
     ...paragraphs,
   );
+}
+
+/** CT_TextParagraphProperties order after spacing: buClr, buSzPct, buFontTx, then buNone | buAutoNum | buChar. */
+function buildBulletNodes(bullet: Bullet | undefined): XmlNode[] {
+  if (!bullet) {
+    return [];
+  }
+  if (bullet.type === 'none') {
+    return [el('a:buNone')];
+  }
+  const nodes: XmlNode[] = [el('a:buClr', {}, colorNode(bullet.color))];
+  if (bullet.sizePct !== 100) {
+    nodes.push(el('a:buSzPct', { val: Math.round(bullet.sizePct * 1000) }));
+  }
+  nodes.push(el('a:buFontTx'));
+  nodes.push(bullet.type === 'char' ? el('a:buChar', { char: bullet.char }) : el('a:buAutoNum', { type: bullet.scheme, startAt: bullet.startAt === 1 ? undefined : bullet.startAt }));
+  return nodes;
 }
 
 export function buildRunProperties(style: RunStyle | undefined, ctx: TextEmissionContext): XmlNode {

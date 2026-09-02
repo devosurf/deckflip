@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Browser, Page } from 'playwright-core';
 import type { Deck, Element, Slide } from '../model/index.js';
+import { entry as reportEntry } from '../report/codes.js';
 import type { Entry } from '../report/types.js';
 import type { BrowserMeasureResult } from './browser-script.js';
 import { measureSlideDocument } from './browser-script.js';
@@ -35,6 +36,9 @@ export async function measureDeck(loaded: LoadedDeck, opts: MeasureOptions): Pro
         const result = await measureDocumentPage(page, document);
         if (result.sectionBox.w !== loaded.canvas.width || result.sectionBox.h !== loaded.canvas.height) {
           entries.push(errorEntry('VALIDATE_SLIDE_SIZE', `Section size ${result.sectionBox.w}x${result.sectionBox.h} does not match canvas ${loaded.canvas.width}x${loaded.canvas.height}`, SLIDE_SIZE_HINT, 'body > section', document.index));
+        }
+        for (const raised of result.entries) {
+          entries.push(reportEntry(raised.code, { slide: document.index, locator: { selector: raised.selector }, reason: raised.reason }));
         }
 
         const measuredElements: Element[] = [];

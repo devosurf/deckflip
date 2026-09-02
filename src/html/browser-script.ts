@@ -1,10 +1,17 @@
-import type { Align, Box, Color, Fill, Insets, Line, Paragraph, Run, RunStyle, ShapeElement, TextBody } from '../model/index.js';
+import type { Align, AutonumScheme, Box, Bullet, Color, Fill, Insets, Line, Paragraph, Run, RunStyle, ShapeElement, TextBody } from '../model/index.js';
 
 export interface BrowserFontFace {
   family: string;
   file: string;
   weight?: number;
   italic?: boolean;
+}
+
+/** A report entry raised inside the page; measure.ts attaches slide, kind, severity and hint. */
+export interface BrowserEntry {
+  code: string;
+  selector: string;
+  reason: string;
 }
 
 export interface BrowserMeasureResult {
@@ -18,6 +25,7 @@ export interface BrowserMeasureResult {
   };
   sectionBox: Box;
   shapes: ShapeElement[];
+  entries: BrowserEntry[];
   fontFaces: BrowserFontFace[];
 }
 
@@ -32,6 +40,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
       meta: { id: '', title: docTitle, layout: 'Blank', section: undefined, heading: undefined, docTitle },
       sectionBox: { x: 0, y: 0, w: 0, h: 0 },
       shapes: [],
+      entries: [],
       fontFaces: collectFontFaces(document.baseURI),
     };
   }
@@ -49,6 +58,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
   };
 
   const shapes: ShapeElement[] = [];
+  const entries: BrowserEntry[] = [];
   for (const child of Array.from(section.children) as HTMLElement[]) {
     shapes.push(...walkElement(child));
   }
@@ -56,6 +66,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
     meta,
     sectionBox,
     shapes,
+    entries,
     fontFaces: collectFontFaces(document.baseURI),
   };
 
@@ -103,10 +114,13 @@ export function measureSlideDocument(): BrowserMeasureResult {
     const selfPaint = selfTextBlock || paints(el);
     let paintableDescendants = 0;
     let textBlockDescendants = 0;
-    for (const child of Array.from(el.children) as HTMLElement[]) {
-      const childInfo = analyze(child);
-      paintableDescendants += childInfo.paintableDescendants + (childInfo.selfPaint ? 1 : 0);
-      textBlockDescendants += childInfo.textBlockDescendants + (childInfo.selfTextBlock ? 1 : 0);
+    // A Text block is a leaf of the shape tree: its inline (or list-item) descendants never emit shapes.
+    if (!selfTextBlock) {
+      for (const child of Array.from(el.children) as HTMLElement[]) {
+        const childInfo = analyze(child);
+        paintableDescendants += childInfo.paintableDescendants + (childInfo.selfPaint ? 1 : 0);
+        textBlockDescendants += childInfo.textBlockDescendants + (childInfo.selfTextBlock ? 1 : 0);
+      }
     }
     return { selfPaint, selfTextBlock, paintableDescendants, textBlockDescendants };
   }
@@ -181,6 +195,9 @@ export function measureSlideDocument(): BrowserMeasureResult {
   }
 
   function measureTextBlock(el: HTMLElement): { box: Box; text: TextBody | undefined } {
+    if (el.tagName === 'UL' || el.tagName === 'OL') {
+      return measureListBlock(el);
+    }
     const cs = getComputedStyle(el);
     const box = measuredBox(el);
     const padding: Insets = { l: px(cs.paddingLeft), t: px(cs.paddingTop), r: px(cs.paddingRight), b: px(cs.paddingBottom) };
@@ -205,7 +222,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
       wrap,
       rtl,
       trailingGuard: resolveTrailingGuard(lineGroups, availWidth, align),
-      paragraphs: paragraphs.length ? paragraphs : [{ align, lineHeight: 0, spaceBefore: 0, spaceAfter: 0, indent, level: 0, runs: runs.length ? runs : [{ kind: 'text', text: '', style: styleFromElement(el) }] }],
+      paragraphs: paragraphs.length ? paragraphs : [{ align, lineHeight: 0, spaceBefore: 0, spaceAfter: 0, indent, marginLeft: 0, level: 0, runs: runs.length ? runs : [{ kind: 'text', text: '', style: styleFromElement(el) }] }],
     };
 
     const lineHeight = round(lineBox ? lineBox.height : px(cs.fontSize));
@@ -217,11 +234,285 @@ export function measureSlideDocument(): BrowserMeasureResult {
   }
 
   /**
+   * A `ul`/`ol` is one text body: each `li` (any depth) is a paragraph at `level` = nesting depth. The list's
+   * left padding and nested indentation go into `marginLeft` (`marL`), never into `lIns`, so `marL + indent`
+   * stays >= 0 (PowerPoint clamps a bullet position left of the inset). `indent` is `-(marker advance)`, the
+   * measured width of the marker string in the marker's font, so the bullet lands where CSS paints it.
+   */
+  function measureListBlock(list: HTMLElement): { box: Box; text: TextBody | undefined } {
+    const cs = getComputedStyle(list);
+    const box = measuredBox(list);
+    const rect = list.getBoundingClientRect();
+    const padding: Insets = { l: 0, t: px(cs.paddingTop), r: px(cs.paddingRight), b: px(cs.paddingBottom) };
+    const rtl = cs.direction === 'rtl';
+    const whiteSpace = cs.whiteSpace;
+    const wrap = whiteSpace !== 'nowrap' && whiteSpace !== 'pre';
+    const bodyLeft = rect.left + px(cs.borderLeftWidth);
+    const contentTop = rect.top + px(cs.borderTopWidth) + padding.t;
+    const contentBottom = rect.bottom - px(cs.borderBottomWidth) - padding.b;
+
+    const paragraphs: Paragraph[] = [];
+    let firstTop: number | undefined;
+    let previousBottom: number | undefined;
+    let trailingGuard = 0;
+
+    function visitList(current: HTMLElement, level: number): void {
+      if (level > 8) {
+        entries.push({ code: 'VALIDATE_LIST_CONTENT', selector: cssPath(current), reason: `List nesting deeper than 9 levels in ${elementName(list)}` });
+        return;
+      }
+      const ordered = current.tagName === 'OL';
+      const start = ordered ? parseInt(current.getAttribute('start') ?? '1', 10) || 1 : 1;
+      const reversed = ordered && current.hasAttribute('reversed');
+      const items = (Array.from(current.children) as HTMLElement[]).filter((child) => child.tagName === 'LI' && !isSkipped(child));
+      items.forEach((li, position) => {
+        const parts = classifyListItem(li);
+        if (!parts) {
+          entries.push({ code: 'VALIDATE_LIST_CONTENT', selector: cssPath(li), reason: `${elementName(li)} contains block content other than one p and one nested list` });
+          return;
+        }
+        const host = parts.host;
+        const liStyle = getComputedStyle(li);
+        const hostStyle = getComputedStyle(host);
+        const align = resolveAlign(hostStyle.textAlign, rtl);
+        const runs = mergeRuns(collectRuns(host, hostStyle.whiteSpace, true));
+        const firstRun = runs.find((run): run is Extract<Run, { kind: 'text' }> => run.kind === 'text');
+        const runStyle = firstRun ? firstRun.style : styleFromElement(host);
+        const lineBox = measureLineBox(host, host === li ? parts.nested : null);
+        const lineHeight = round(lineBox ? lineBox.height : px(hostStyle.fontSize));
+        const contentLeft = li.getBoundingClientRect().left + px(liStyle.borderLeftWidth) + px(liStyle.paddingLeft);
+        let marginLeft = round(contentLeft - bodyLeft);
+        const marker = resolveMarker(li, liStyle, current, reversed ? items.length - position : start + position);
+        const bullet = marker.bullet;
+        if (marker.substituted && position === 0) {
+          entries.push({ code: 'SUBSTITUTE_LIST_STYLE', selector: cssPath(current), reason: `list-style-type ${liStyle.listStyleType}${reversed ? ' (reversed)' : ''} on ${elementName(current)} has no PowerPoint numbering scheme` });
+        }
+        let indent = 0;
+        if (bullet.type !== 'none') {
+          bullet.sizePct = Math.round((marker.fontSize / runStyle.size) * 100);
+          const textStart = liStyle.listStylePosition === 'inside' ? firstTextLeft(host) : undefined;
+          if (textStart !== undefined) {
+            // An inside marker is part of the first line, which a hanging indent cannot express: anchor marL at the
+            // text start so bullet and first line match Chromium; wrapped lines shift right by the marker width.
+            indent = -round(textStart - contentLeft);
+            marginLeft = round(textStart - bodyLeft);
+          } else {
+            indent = -marker.advance;
+          }
+        }
+
+        const spaceBefore = lineBox && previousBottom !== undefined ? round(Math.max(0, lineBox.firstTop - previousBottom)) : 0;
+        if (lineBox && firstTop === undefined) {
+          firstTop = lineBox.firstTop;
+        }
+        if (lineBox) {
+          previousBottom = lineBox.lastBottom;
+        }
+        const availWidth = li.getBoundingClientRect().width - px(liStyle.borderLeftWidth) - px(liStyle.borderRightWidth) - px(liStyle.paddingLeft) - px(liStyle.paddingRight);
+        trailingGuard = Math.max(trailingGuard, resolveTrailingGuard(measureLineGroups(host, true), availWidth, align));
+
+        paragraphs.push({
+          align,
+          lineHeight,
+          spaceBefore,
+          spaceAfter: 0,
+          indent,
+          marginLeft,
+          level,
+          bullet,
+          runs: runs.length ? runs : [{ kind: 'text', text: '', style: runStyle }],
+        });
+        if (parts.nested) {
+          visitList(parts.nested, level + 1);
+        }
+      });
+    }
+    visitList(list, 0);
+
+    const text: TextBody = {
+      padding,
+      firstParagraphGap: firstTop === undefined ? 0 : round(Math.max(0, firstTop - contentTop)),
+      lastParagraphGap: previousBottom === undefined ? 0 : round(Math.max(0, contentBottom - previousBottom)),
+      wrap,
+      rtl,
+      trailingGuard,
+      paragraphs: paragraphs.length ? paragraphs : [{ align: resolveAlign(cs.textAlign, rtl), lineHeight: round(px(cs.fontSize)), spaceBefore: 0, spaceAfter: 0, indent: 0, marginLeft: 0, level: 0, runs: [{ kind: 'text', text: '', style: styleFromElement(list) }] }],
+    };
+    return { box, text };
+  }
+
+  /** `li` content: inline content directly, or in one `p`, plus at most one nested list; anything else is invalid. */
+  function classifyListItem(li: HTMLElement): { host: HTMLElement; nested: HTMLElement | null } | undefined {
+    let paragraph: HTMLElement | null = null;
+    let nested: HTMLElement | null = null;
+    for (const child of Array.from(li.children) as HTMLElement[]) {
+      if (isSkipped(child)) {
+        continue;
+      }
+      if (child.tagName === 'UL' || child.tagName === 'OL') {
+        if (nested) {
+          return undefined;
+        }
+        nested = child;
+        continue;
+      }
+      if (isInlineRendered(child)) {
+        continue;
+      }
+      if (child.tagName === 'P' && !paragraph) {
+        paragraph = child;
+        continue;
+      }
+      return undefined;
+    }
+    if (paragraph) {
+      // A `p` host must be the only inline content: stray text next to it would be a second anonymous block.
+      const strayText = Array.from(li.childNodes).some((node) => node.nodeType === Node.TEXT_NODE && (node.textContent ?? '').trim() !== '');
+      if (strayText) {
+        return undefined;
+      }
+    }
+    return { host: paragraph ?? li, nested };
+  }
+
+  function resolveMarker(li: HTMLElement, liStyle: CSSStyleDeclaration, list: HTMLElement, ordinal: number): { bullet: Bullet; advance: number; fontSize: number; substituted: boolean } {
+    const markerStyle = getComputedStyle(li, '::marker');
+    const fontSize = px(markerStyle.fontSize) || px(liStyle.fontSize);
+    const color = parseColor(markerStyle.color) ?? parseColor(liStyle.color) ?? { hex: '000000', alpha: 1 };
+    const type = liStyle.listStyleType;
+    const reversed = list.hasAttribute('reversed');
+    if (type === 'none') {
+      return { bullet: { type: 'none' }, advance: 0, fontSize, substituted: false };
+    }
+    const char = type === 'disc' ? '•' : type === 'circle' ? '◦' : type === 'square' ? '▪' : undefined;
+    if (char) {
+      return { bullet: { type: 'char', char, color, sizePct: 100 }, advance: measureMarkerAdvance(`${char} `, markerStyle, liStyle), fontSize, substituted: false };
+    }
+    const scheme = autonumScheme(type);
+    const substituted = scheme === undefined || reversed;
+    const effectiveScheme: AutonumScheme = scheme ?? 'arabicPeriod';
+    const start = list.tagName === 'OL' && !reversed ? parseInt(list.getAttribute('start') ?? '1', 10) || 1 : 1;
+    const label = `${autonumLabel(effectiveScheme, ordinal)}. `;
+    return {
+      bullet: { type: 'autonum', scheme: effectiveScheme, startAt: start, color, sizePct: 100 },
+      advance: measureMarkerAdvance(label, markerStyle, liStyle),
+      fontSize,
+      substituted,
+    };
+  }
+
+  function autonumScheme(type: string): AutonumScheme | undefined {
+    switch (type) {
+      case 'decimal':
+        return 'arabicPeriod';
+      case 'lower-alpha':
+      case 'lower-latin':
+        return 'alphaLcPeriod';
+      case 'upper-alpha':
+      case 'upper-latin':
+        return 'alphaUcPeriod';
+      case 'lower-roman':
+        return 'romanLcPeriod';
+      case 'upper-roman':
+        return 'romanUcPeriod';
+      default:
+        return undefined;
+    }
+  }
+
+  function autonumLabel(scheme: AutonumScheme, n: number): string {
+    const value = Math.max(1, n);
+    switch (scheme) {
+      case 'alphaLcPeriod':
+        return alphaLabel(value);
+      case 'alphaUcPeriod':
+        return alphaLabel(value).toUpperCase();
+      case 'romanLcPeriod':
+        return romanLabel(value).toLowerCase();
+      case 'romanUcPeriod':
+        return romanLabel(value);
+      default:
+        return String(value);
+    }
+  }
+
+  function alphaLabel(n: number): string {
+    let out = '';
+    let value = n;
+    while (value > 0) {
+      value -= 1;
+      out = String.fromCharCode(97 + (value % 26)) + out;
+      value = Math.floor(value / 26);
+    }
+    return out;
+  }
+
+  function romanLabel(n: number): string {
+    const table: Array<[number, string]> = [[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
+    let out = '';
+    let value = n;
+    for (const [weight, glyph] of table) {
+      while (value >= weight) {
+        out += glyph;
+        value -= weight;
+      }
+    }
+    return out;
+  }
+
+  /** Width of the marker string in the marker's font, measured off-flow so nothing reflows. */
+  function measureMarkerAdvance(label: string, markerStyle: CSSStyleDeclaration, liStyle: CSSStyleDeclaration): number {
+    const span = document.createElement('span');
+    span.style.cssText = 'position:absolute;left:0;top:0;visibility:hidden;white-space:pre;';
+    span.style.fontFamily = markerStyle.fontFamily || liStyle.fontFamily;
+    span.style.fontSize = markerStyle.fontSize || liStyle.fontSize;
+    span.style.fontWeight = markerStyle.fontWeight || liStyle.fontWeight;
+    span.style.fontStyle = markerStyle.fontStyle || liStyle.fontStyle;
+    span.style.letterSpacing = liStyle.letterSpacing;
+    span.textContent = label;
+    section!.appendChild(span);
+    const width = span.getBoundingClientRect().width;
+    span.remove();
+    return round(width);
+  }
+
+  function firstTextLeft(root: HTMLElement): number | undefined {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, nestedListFilter(root));
+    let node = walker.nextNode();
+    while (node) {
+      const range = document.createRange();
+      range.selectNodeContents(node as Text);
+      for (const rect of Array.from(range.getClientRects()) as DOMRect[]) {
+        if (rect.width > 0) {
+          return rect.left;
+        }
+      }
+      node = walker.nextNode();
+    }
+    return undefined;
+  }
+
+  /** TreeWalker filter that leaves nested lists to their own paragraphs. */
+  function nestedListFilter(root: HTMLElement): NodeFilter {
+    return {
+      acceptNode(node: Node): number {
+        for (let current: Node | null = node; current && current !== root; current = current.parentNode) {
+          if (current.nodeType === Node.ELEMENT_NODE && ((current as Element).tagName === 'UL' || (current as Element).tagName === 'OL')) {
+            return NodeFilter.FILTER_REJECT;
+          }
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    };
+  }
+
+  /**
    * Line-box geometry of the first and last line, measured with zero-size inline-block probes:
    * `vertical-align: top|bottom` pins a probe to the line box edges, which text-node rects
    * (content area only) cannot give. Probes are zero-width so they never change wrapping.
+   * `endBefore` places the last-line probe in front of that child (a nested list) instead of at the end.
    */
-  function measureLineBox(el: HTMLElement): { firstTop: number; height: number; lastBottom: number } | undefined {
+  function measureLineBox(el: HTMLElement, endBefore: Node | null = null): { firstTop: number; height: number; lastBottom: number } | undefined {
     if (!el.firstChild) {
       return undefined;
     }
@@ -236,7 +527,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
     const endBottom = probe('bottom');
     el.insertBefore(startBottom, el.firstChild);
     el.insertBefore(startTop, el.firstChild);
-    el.appendChild(endBottom);
+    el.insertBefore(endBottom, endBefore);
     const firstTop = startTop.getBoundingClientRect().top;
     const firstBottom = startBottom.getBoundingClientRect().bottom;
     const lastBottom = endBottom.getBoundingClientRect().bottom;
@@ -249,15 +540,15 @@ export function measureSlideDocument(): BrowserMeasureResult {
   function buildParagraphs(el: HTMLElement, runs: Run[], align: Align, indent: number): Paragraph[] {
     if (el.tagName === 'PRE') {
       const raw = (el.textContent || '').replace(/\r\n?/g, '\n');
-      return raw.split('\n').map((line) => ({ align, lineHeight: 0, spaceBefore: 0, spaceAfter: 0, indent, level: 0, runs: [{ kind: 'text', text: removeSoftHyphens(line), style: styleFromElement(el) }] }));
+      return raw.split('\n').map((line) => ({ align, lineHeight: 0, spaceBefore: 0, spaceAfter: 0, indent, marginLeft: 0, level: 0, runs: [{ kind: 'text', text: removeSoftHyphens(line), style: styleFromElement(el) }] }));
     }
-    return [{ align, lineHeight: 0, spaceBefore: 0, spaceAfter: 0, indent, level: 0, runs }];
+    return [{ align, lineHeight: 0, spaceBefore: 0, spaceAfter: 0, indent, marginLeft: 0, level: 0, runs }];
   }
 
   /** Ink extents per line: text-node rects merged when they overlap vertically (mixed sizes share a line). */
-  function measureLineGroups(root: HTMLElement): LineGroup[] {
+  function measureLineGroups(root: HTMLElement, skipNestedLists = false): LineGroup[] {
     const rects: DOMRect[] = [];
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, skipNestedLists ? nestedListFilter(root) : null);
     let node = walker.nextNode();
     while (node) {
       const range = document.createRange();
@@ -371,10 +662,10 @@ export function measureSlideDocument(): BrowserMeasureResult {
     return trimmed;
   }
 
-  function collectRuns(root: HTMLElement, whiteSpace: string): Run[] {
+  function collectRuns(root: HTMLElement, whiteSpace: string, skipNestedLists = false): Run[] {
     const preserve = whiteSpace === 'pre' || whiteSpace === 'pre-wrap';
     const runs: Run[] = [];
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, skipNestedLists ? nestedListFilter(root) : null);
     let node = walker.firstChild();
     while (node) {
       if (node.nodeType === Node.TEXT_NODE) {
@@ -711,6 +1002,9 @@ export function measureSlideDocument(): BrowserMeasureResult {
     const display = getComputedStyle(el).display;
     if (display.startsWith('inline') || display === 'contents') {
       return false;
+    }
+    if (el.tagName === 'UL' || el.tagName === 'OL') {
+      return Array.from(el.children).some((child) => child.tagName === 'LI' && !isSkipped(child as HTMLElement));
     }
     let sawContent = false;
     for (const child of Array.from(el.childNodes)) {

@@ -115,12 +115,23 @@ export interface Paragraph {
   spaceBefore: number;
   /** measured gap to the next paragraph in the same body, CSS px -> `a:spcAft` */
   spaceAfter: number;
-  /** `text-indent`, CSS px */
+  /** `a:pPr/@indent`, CSS px: `text-indent` for plain paragraphs; `-(marker advance)` for list items */
   indent: number;
+  /** `a:pPr/@marL`, CSS px: list padding + nested indentation measured from the body's padding edge; 0 otherwise */
+  marginLeft: number;
   /** list nesting depth 0-8; 0 for non-list paragraphs */
   level: number;
+  /** present on list items only */
+  bullet?: Bullet;
   runs: Run[];
 }
+
+export type AutonumScheme = 'arabicPeriod' | 'alphaLcPeriod' | 'alphaUcPeriod' | 'romanLcPeriod' | 'romanUcPeriod';
+
+export type Bullet =
+  | { type: 'char'; char: string; color: Color; sizePct: number }
+  | { type: 'autonum'; scheme: AutonumScheme; startAt: number; color: Color; sizePct: number }
+  | { type: 'none' };
 
 export type Run = { kind: 'text'; text: string; style: RunStyle } | { kind: 'break' };
 

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Lists fixture</title>
+    <style>
+      section {
+        font-family: Arial, sans-serif;
+        color: #111827;
+        font-size: 24px;
+        line-height: 1.2;
+      }
+      ul,
+      ol {
+        position: absolute;
+        left: 80px;
+        width: 560px;
+        margin: 0;
+        box-sizing: border-box;
+      }
+      ul ul {
+        position: static;
+        width: auto;
+      }
+      li {
+        margin: 6px 0;
+      }
+      .bullets {
+        top: 40px;
+      }
+      .bullets li::marker {
+        color: #ff0000;
+      }
+      .numbers {
+        top: 260px;
+        list-style-type: lower-alpha;
+      }
+      .numbers p {
+        margin: 0;
+      }
+      .inside {
+        top: 400px;
+        list-style-position: inside;
+      }
+      .plain {
+        top: 500px;
+        list-style: none;
+        padding-left: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <section id="slide-1">
+      <ul class="bullets">
+        <li>First</li>
+        <li>
+          Second
+          <ul>
+            <li>Nested one</li>
+            <li>Nested two</li>
+          </ul>
+        </li>
+        <li>Third</li>
+      </ul>
+      <ol class="numbers" start="3">
+        <li><p>Alpha</p></li>
+        <li>Beta</li>
+      </ol>
+      <ul class="inside">
+        <li>Inside marker</li>
+      </ul>
+      <ul class="plain">
+        <li>No marker</li>
+      </ul>
+    </section>
+  </body>
+</html>
