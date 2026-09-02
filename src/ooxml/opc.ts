@@ -1,6 +1,6 @@
 import JSZip from 'jszip';
 import path from 'node:path';
-import { el, serialize } from './xml.js';
+import { el, parseXml, serialize, type XmlNode } from './xml.js';
 
 export interface PartOptions {
   contentType: string;
@@ -85,6 +85,72 @@ export class OpcPackage {
     }
 
     return zip.generateAsync({ type: 'nodebuffer', compression, platform: 'UNIX' });
+  }
+}
+
+export interface Relationship {
+  id: string;
+  type: string;
+  target: string;
+  external: boolean;
+}
+
+/** Read side of an OPC package: parts by absolute name, relationships per source part, targets resolved. */
+export class OpcReader {
+  private constructor(private readonly zip: JSZip) {}
+
+  static async load(bytes: Uint8Array): Promise<OpcReader> {
+    return new OpcReader(await JSZip.loadAsync(bytes));
+  }
+
+  /** Absolute part names (`/ppt/...`), excluding `[Content_Types].xml` and relationship parts. */
+  partNames(): string[] {
+    return Object.keys(this.zip.files)
+      .filter((name) => !this.zip.files[name]!.dir && name !== '[Content_Types].xml' && !name.endsWith('.rels'))
+      .map(normalizePartName);
+  }
+
+  hasPart(name: string): boolean {
+    return this.zip.file(zipPath(name)) !== null;
+  }
+
+  async bytes(name: string): Promise<Uint8Array> {
+    const file = this.zip.file(zipPath(name));
+    if (!file) {
+      throw new Error(`Missing package part ${name}`);
+    }
+    return file.async('uint8array');
+  }
+
+  async xml(name: string): Promise<XmlNode> {
+    const file = this.zip.file(zipPath(name));
+    if (!file) {
+      throw new Error(`Missing package part ${name}`);
+    }
+    return parseXml(await file.async('string'));
+  }
+
+  /** The relationships of a part (`/` for the package), with internal targets resolved to absolute part names. */
+  async relationships(source: string): Promise<Relationship[]> {
+    const file = this.zip.file(source === '/' ? '_rels/.rels' : relsPath(source));
+    if (!file) {
+      return [];
+    }
+    const base = source === '/' ? '/' : path.posix.dirname(normalizePartName(source));
+    const root = parseXml(await file.async('string'));
+    return root.children.flatMap((child) => {
+      if (typeof child === 'string' || child.name !== 'Relationship') {
+        return [];
+      }
+      const external = child.attrs.TargetMode === 'External';
+      const target = child.attrs.Target ?? '';
+      return [{ id: child.attrs.Id ?? '', type: child.attrs.Type ?? '', target: external ? target : path.posix.resolve(base, target), external }];
+    });
+  }
+
+  /** The single relationship of `type` from `source`, resolved; undefined when absent. */
+  async related(source: string, type: string): Promise<Relationship | undefined> {
+    return (await this.relationships(source)).find((rel) => rel.type === type);
   }
 }
 
