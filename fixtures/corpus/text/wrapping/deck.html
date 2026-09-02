@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="deckflip:canvas" content="1280x720">
+<title>wrapping</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #ffffff; }
+  body { font-family: Arial; }
+  body > section { position: relative; box-sizing: border-box; overflow: hidden; }
+  p { position: absolute; margin: 0; box-sizing: border-box; color: #111827; }
+  .box { padding: 16px 20px; background: #f8fafc; border: 1px solid #d1d5db; }
+  .s18 { font: 18px/24px Georgia; }
+  .s24 { font: 24px/30px "Times New Roman"; }
+  .s32 { font: 32px/38px Verdana; }
+  .nowrap { white-space: nowrap; }
+  .small { font-size: 16px; line-height: 22px; }
+</style>
+</head>
+<body>
+<section>
+  <p class="box s18" style="left: 80px; top: 70px; width: 460px; height: 170px;">Wrapping at eighteen pixels should leave the final line landing within a couple of pixels of the right edge without overflow or an early break.</p>
+  <p class="box s24" style="left: 80px; top: 280px; width: 540px; height: 190px;">A twenty-four pixel paragraph stresses line fitting with a wider measure and a longer final line, so the renderer must keep the same wrap points in both engines.</p>
+  <p class="box s32 nowrap" style="left: 80px; top: 520px; width: 1120px; height: 96px;">This thirty-two pixel line refuses to wrap and therefore must stay on a single line even when the box is just wide enough to make the text feel tense.</p>
+</section>
+</body>
+</html>

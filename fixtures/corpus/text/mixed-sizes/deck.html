@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="deckflip:canvas" content="1280x720">
+<title>mixed-sizes</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #ffffff; }
+  body { font-family: Georgia; }
+  body > section { position: relative; box-sizing: border-box; overflow: hidden; }
+  p { position: absolute; margin: 0; box-sizing: border-box; color: #1f2937; }
+  .line { left: 80px; width: 1120px; }
+  .a { top: 80px; font-size: 24px; line-height: 30px; }
+  .b { top: 200px; font-size: 22px; line-height: 30px; }
+  .c { top: 340px; font-size: 18px; line-height: 26px; letter-spacing: 1px; }
+  .s16 { font-size: 16px; }
+  .s24 { font-size: 24px; }
+  .s40 { font-size: 40px; line-height: 1; }
+  .caps { font-variant: small-caps; }
+  .bold { font-weight: 700; }
+  .italic { font-style: italic; }
+  .underline { text-decoration: underline; }
+  .strike { text-decoration: line-through; }
+  sup { font-size: 70%; vertical-align: super; }
+  sub { font-size: 70%; vertical-align: sub; }
+</style>
+</head>
+<body>
+<section>
+  <p class="line a">Mixed size runs: <span class="s16">sixteen</span> <span class="s24">twenty-four</span> <span class="s40">forty</span> pixels on one line.</p>
+  <p class="line b">Styled runs: <span class="bold">bold</span>, <span class="italic">italic</span>, <span class="underline">underline</span>, <span class="strike">strike</span>, <span class="caps">small caps</span>, and letter spacing.</p>
+  <p class="line c">Formulae: H<sub>2</sub>O plus x<sup>2</sup> and <span style="letter-spacing: 2px;">spaced letters</span> keep the same baseline rhythm.</p>
+</section>
+</body>
+</html>

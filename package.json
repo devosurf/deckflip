@@ -1,0 +1,45 @@
+{
+  "name": "deckflip",
+  "version": "0.1.0",
+  "description": "Bidirectional converter between HTML slides and PowerPoint (PPTX), built for coding agents",
+  "type": "module",
+  "license": "MIT",
+  "repository": "github:devosurf/deckflip",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "deckflip": "./bin/deckflip.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "skills"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx src/cli/main.ts",
+    "test": "vitest run",
+    "test:corpus": "vitest run test/corpus",
+    "typecheck": "tsc --noEmit",
+    "corpus:oracle": "tsx scripts/corpus-oracle.ts"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^0.1.80",
+    "commander": "^14.0.0",
+    "fontkit": "^2.0.4",
+    "jszip": "^3.10.1",
+    "pdfjs-dist": "^5.4.0",
+    "playwright-core": "1.62.1",
+    "saxes": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/fontkit": "^2.0.8",
+    "@types/node": "^24.0.0",
+    "odiff-bin": "^4.5.0",
+    "tsup": "^8.5.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}

@@ -1,2 +1,6 @@
 .worktrees/
 node_modules/
+dist/
+fixtures/**/expected/chromium/
+*.report.json
+.deckflip-*.html

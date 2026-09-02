@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ar">
+<head>
+<meta charset="utf-8">
+<meta name="deckflip:canvas" content="1280x720">
+<title>rtl</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #ffffff; }
+  body { font-family: Arial; }
+  body > section { position: relative; box-sizing: border-box; overflow: hidden; }
+  p { position: absolute; margin: 0; box-sizing: border-box; }
+  .box { left: 80px; width: 1120px; padding: 16px 20px; background: #f8fafc; border: 1px solid #cbd5e1; text-align: right; direction: rtl; }
+  .arabic { top: 90px; height: 140px; font-size: 30px; line-height: 42px; }
+  .hebrew { top: 280px; height: 140px; font-size: 28px; line-height: 40px; }
+</style>
+</head>
+<body>
+<section>
+  <p class="box arabic">مرحبا بالعالم، هذا نص عربي مضبوط من اليمين إلى اليسار حتى يختبر المحاذاة واللف في Chromium وPowerPoint.</p>
+  <p class="box hebrew">שלום עולם, זה טקסט עברי שמיושר לימין ובודק כיוון RTL עם גודל גופן קצת שונה.</p>
+</section>
+</body>
+</html>

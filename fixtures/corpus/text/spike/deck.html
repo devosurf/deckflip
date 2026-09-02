@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="deckflip:canvas" content="1280x720">
+<title>spike</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #ffffff; }
+  body { font-family: Arial; }
+  body > section { position: relative; box-sizing: border-box; overflow: hidden; }
+  h1, p, div { position: absolute; margin: 0; box-sizing: border-box; }
+  .title   { left: 80px; top: 60px; width: 1120px; height: 80px; font-size: 48px; font-weight: 700; line-height: 1.2; color: #1f2937; }
+  .body    { left: 80px; top: 170px; width: 560px; height: 300px; font-size: 24px; line-height: 1.4; color: #111827; padding: 16px; background: #f3f4f6; }
+  .card    { left: 700px; top: 170px; width: 500px; height: 200px; background: #2563eb; color: #ffffff; font-size: 28px; line-height: 36px; padding: 24px 32px; text-align: center; }
+  .circle  { left: 700px; top: 400px; width: 160px; height: 160px; border-radius: 50%; background: #f59e0b; }
+  .caption { left: 880px; top: 440px; width: 320px; height: 80px; font-size: 18px; line-height: 1.5; color: #374151; padding: 8px 0; text-align: right; }
+  .footer  { left: 80px; top: 640px; width: 1120px; height: 40px; font-size: 16px; line-height: 40px; color: #6b7280; }
+</style>
+</head>
+<body>
+<section>
+  <h1 class="title">Measured HTML to PPTX spike</h1>
+  <p class="body">The quick brown fox jumps over the lazy dog to test wrap sensitivity. This paragraph should wrap to the same number of lines in PowerPoint as in Chromium, with the same words on each line.</p>
+  <div class="card">A filled card with centred text that wraps onto two lines</div>
+  <div class="circle"></div>
+  <p class="caption">Right-aligned caption beside a circle, two lines long</p>
+  <p class="footer">Footer: 1 CSS px = 0.75 pt = 9525 EMU, Canvas 1280x720</p>
+</section>
+</body>
+</html>

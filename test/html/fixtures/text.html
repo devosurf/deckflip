@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Text fixture</title>
+    <style>
+      section {
+        font-family: Arial, sans-serif;
+        color: #111827;
+      }
+      .breaks,
+      .pre,
+      .styled,
+      .rtl {
+        position: absolute;
+        left: 80px;
+        width: 560px;
+        box-sizing: border-box;
+      }
+      .breaks {
+        top: 60px;
+        font-size: 24px;
+        line-height: 1.2;
+      }
+      .pre {
+        top: 140px;
+        font-size: 22px;
+        line-height: 1.2;
+        white-space: pre;
+      }
+      .styled {
+        top: 240px;
+        font-size: 24px;
+        line-height: 1.2;
+      }
+      .rtl {
+        top: 340px;
+        font-size: 24px;
+        line-height: 1.2;
+        direction: rtl;
+        text-align: start;
+      }
+    </style>
+  </head>
+  <body>
+    <section id="slide-1">
+      <p class="breaks">a<br />b</p>
+      <pre class="pre">line 1
+  line 2</pre>
+      <p class="styled">A <strong>B <em>C</em></strong> D&nbsp;E</p>
+      <p class="rtl">אבג ד&nbsp;ה</p>
+    </section>
+  </body>
+</html>
