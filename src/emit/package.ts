@@ -2,7 +2,7 @@ import type { Deck } from '../model/index.js';
 import { pxToEmu } from '../ooxml/emu.js';
 import { CT, REL, OpcPackage } from '../ooxml/opc.js';
 import { parseXml, el, serialize, type XmlNode } from '../ooxml/xml.js';
-import { MediaStore } from './picture.js';
+import { MediaStore } from './media.js';
 import { emitSlide, slidePartName } from './slide.js';
 
 export interface EmitOptions {

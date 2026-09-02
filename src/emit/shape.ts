@@ -1,9 +1,10 @@
-import type { CornerRadius, Geometry, GradientStop, Insets, Line, ShapeElement, TextBody } from '../model/index.js';
+import type { CornerRadius, Geometry, GradientStop, ImageFill, Insets, Line, ShapeElement, TextBody } from '../model/index.js';
 import { pxToEmu } from '../ooxml/emu.js';
 import { el, type XmlNode } from '../ooxml/xml.js';
+import { relateMedia, type MediaEmissionContext } from './media.js';
 import { baselineCorrectionPx, buildTextBody, colorNode, solidFillNode, type TextEmissionContext } from './text.js';
 
-export interface ShapeEmissionContext extends TextEmissionContext {}
+export interface ShapeEmissionContext extends TextEmissionContext, MediaEmissionContext {}
 
 /** The shape plus one connector line per side when borders differ; ids come from `nextId` in emission order. */
 export function buildShape(shape: ShapeElement, ctx: ShapeEmissionContext, nextId: () => number): XmlNode[] {
@@ -11,7 +12,7 @@ export function buildShape(shape: ShapeElement, ctx: ShapeEmissionContext, nextI
   const frame = shapeFrame(shape, guard);
   const xfrm = buildTransform(shape, frame);
   const geometry = buildGeometry(shape, frame);
-  const fill = buildFill(shape);
+  const fill = buildFill(shape, ctx);
   const line = buildLine(shape.line);
   const effects = buildEffects(shape);
   const text = shape.text ? buildText(shape.text, shape, ctx, guard) : undefined;
@@ -214,13 +215,16 @@ function buildRoundedPath(radii: Extract<Geometry, { preset: 'custom' }>['radii'
   return el('a:custGeom', {}, el('a:avLst'), el('a:gdLst'), el('a:ahLst'), el('a:cxnLst'), el('a:rect', { l: 0, t: 0, r: 'r', b: 'b' }), el('a:pathLst', {}, path));
 }
 
-function buildFill(shape: ShapeElement): XmlNode {
+function buildFill(shape: ShapeElement, ctx: ShapeEmissionContext): XmlNode {
   const fill = shape.fill;
   if (!fill) {
     return el('a:noFill');
   }
   if (fill.type === 'solid') {
     return solidFillNode(fill.color);
+  }
+  if (fill.type === 'image') {
+    return buildImageFill(fill, ctx);
   }
   const stops = el('a:gsLst', {}, withMidpoint(fill.stops).map((stop) => el('a:gs', { pos: Math.round(stop.position * 100000) }, colorNode(stop.color))));
   if (fill.kind === 'radial') {
@@ -229,6 +233,27 @@ function buildFill(shape: ShapeElement): XmlNode {
   // CSS: 0deg = to top, clockwise. DrawingML: 0 = to right, clockwise, in 60000ths of a degree.
   const ang = (((fill.angle - 90) % 360) + 360) % 360;
   return el('a:gradFill', { rotWithShape: '1' }, stops, el('a:lin', { ang: Math.round(ang * 60000), scaled: '0' }));
+}
+
+/**
+ * `a:blipFill` on a shape: a stretched image with its crop (negative values leave a margin), or tiles from the
+ * given offset. `a:tile` scales against the image's natural size, which PowerPoint reads at 96 DPI when the
+ * file carries no density, matching CSS px; a JPEG tagged 72 DPI tiles 4/3 larger than Chromium painted it.
+ */
+function buildImageFill(fill: ImageFill, ctx: ShapeEmissionContext): XmlNode {
+  const embed = relateMedia(fill.media, ctx);
+  const blip = el('a:blip', { 'r:embed': embed }, fill.opacity === undefined ? undefined : el('a:alphaModFix', { amt: Math.round(fill.opacity * 100000) }));
+  if ('tile' in fill) {
+    const { x, y, scaleX, scaleY } = fill.tile;
+    return el('a:blipFill', {}, blip, el('a:tile', { tx: pxToEmu(x), ty: pxToEmu(y), sx: pct(scaleX), sy: pct(scaleY), flip: 'none', algn: 'tl' }));
+  }
+  const { l, t, r, b } = fill.crop;
+  const srcRect = l || t || r || b ? el('a:srcRect', { l: pct(l), t: pct(t), r: pct(r), b: pct(b) }) : undefined;
+  return el('a:blipFill', {}, blip, srcRect, el('a:stretch', {}, el('a:fillRect')));
+}
+
+function pct(fraction: number): number {
+  return Math.round(fraction * 100000);
 }
 
 /**

@@ -3,12 +3,13 @@ import { unlink, writeFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Browser, Page } from 'playwright-core';
-import type { Box, Canvas, Deck, Element, PictureElement, Slide } from '../model/index.js';
+import { textBodiesOf } from '../model/index.js';
+import type { Box, Canvas, Deck, Element, ImageFill, PictureElement, Slide, TextBody } from '../model/index.js';
 import { entry as reportEntry } from '../report/codes.js';
 import type { Entry } from '../report/types.js';
-import type { BrowserElement, BrowserMeasureResult, BrowserPicture, BrowserRaster } from './browser-script.js';
-import { loadMedia } from './media.js';
-import { FREEZE_ATTR, measureSlideDocument } from './browser-script.js';
+import type { BrowserElement, BrowserImageFill, BrowserMeasureResult, BrowserPicture, BrowserRaster } from './browser-script.js';
+import { loadMedia, reencodeToPng } from './media.js';
+import { FREEZE_ATTR, measureSlideDocument, preloadBackgroundImages } from './browser-script.js';
 import type { LoadedDeck, SlideDocument } from './load.js';
 import { captureRaster } from './raster.js';
 
@@ -82,6 +83,8 @@ export async function measureDeck(loaded: LoadedDeck, opts: MeasureOptions): Pro
     await context.close();
   }
 
+  entries.push(...linkTargetEntries(slides));
+
   return {
     deck: {
       title: loaded.title,
@@ -92,6 +95,37 @@ export async function measureDeck(loaded: LoadedDeck, opts: MeasureOptions): Pro
     },
     entries,
   };
+}
+
+/** `VALIDATE_LINK_TARGET` once per text body and unknown `#<slide id>` jump (spec 02: internal hyperlinks target a section id). */
+function linkTargetEntries(slides: Slide[]): Entry[] {
+  const ids = new Set(slides.map((slide) => slide.id));
+  const list = slides.map((slide) => `#${slide.id}`).join(', ');
+  const entries: Entry[] = [];
+  const check = (body: TextBody, selector: string, slide: number, owner: string) => {
+    const seen = new Set<string>();
+    for (const paragraph of body.paragraphs) {
+      for (const run of paragraph.runs) {
+        const link = run.kind === 'text' ? run.style.link : undefined;
+        if (!link?.startsWith('#') || ids.has(link.slice(1)) || seen.has(link)) {
+          continue;
+        }
+        seen.add(link);
+        entries.push(reportEntry('VALIDATE_LINK_TARGET', { slide, locator: { selector }, reason: `href="${link}" on ${owner} points at no Slide`, params: { href: link, slides: list } }));
+      }
+    }
+  };
+  for (const slide of slides) {
+    for (const element of slide.elements) {
+      for (const { body, selector, name } of textBodiesOf(element)) {
+        check(body, selector, slide.index, name);
+      }
+    }
+    if (slide.notes) {
+      check(slide.notes, 'aside.notes', slide.index, 'aside.notes');
+    }
+  }
+  return entries;
 }
 
 async function measureDocumentPage(page: Page, slideDoc: SlideDocument): Promise<BrowserMeasureResult> {
@@ -114,6 +148,7 @@ async function measureDocumentPage(page: Page, slideDoc: SlideDocument): Promise
     // esbuild-transpiled builds (tsx, vitest) wrap nested function declarations in a `__name` helper that only
     // exists in the Node bundle; the serialised page script needs an identity shim for it.
     await page.evaluate('globalThis.__name = globalThis.__name || ((fn) => fn)');
+    await page.evaluate(preloadBackgroundImages);
     return await page.evaluate(measureSlideDocument);
   } finally {
     await unlink(tempPath).catch(() => {});
@@ -168,9 +203,26 @@ async function resolveElements(ctx: PageContext, measured: BrowserElement[], ent
       }
       continue;
     }
+    if (element.kind === 'shape') {
+      const { fill, ...shape } = element;
+      out.push(fill === undefined ? shape : { ...shape, fill: fill.type === 'image' ? await resolveImageFill(fill, element, slide, entries) : fill });
+      continue;
+    }
     out.push(element);
   }
   return out;
+}
+
+/** Loads an image fill's bytes: PNG/JPEG as they are; GIF, WebP and SVG re-encoded to PNG (`SUBSTITUTE_IMAGE_FORMAT`), since `a:blipFill` on a shape takes no vector. */
+async function resolveImageFill(fill: BrowserImageFill, shape: { selector: string; name: string }, slide: number, entries: Entry[]): Promise<ImageFill> {
+  const { url, ...rest } = fill;
+  const path = fileURLToPath(url);
+  const loaded = await loadMedia(path);
+  const media = loaded.kind === 'vector' ? { data: await reencodeToPng(loaded.vector.data), contentType: 'image/png' as const } : loaded.media;
+  if (loaded.kind === 'vector' || loaded.reencoded) {
+    entries.push(reportEntry('SUBSTITUTE_IMAGE_FORMAT', { slide, locator: { selector: shape.selector }, reason: `background-image on ${shape.name} (${basename(path)}) is not PNG or JPEG` }));
+  }
+  return { ...rest, media };
 }
 
 /**

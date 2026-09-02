@@ -35,7 +35,7 @@ Exit codes: `0` ok · `1` no output (Chromium or renderer failure) · `2` valida
 
 1. Text is only ever native. Put text in `h1`-`h6`, `p`, `li`, `td`/`th`, `blockquote`, `pre`; style runs with `span`, `strong`, `em`, `u`, `s`, `code`, `mark`, `sup`, `sub`, `a`.
 2. Effects go on text-free elements. A `filter`, `clip-path`, `mix-blend-mode`, `mask`, `backdrop-filter` or skew on a text-bearing element is flattened (dropped); on a text-free sibling behind the text it becomes a picture.
-3. Backgrounds: solid colours and a single `linear-gradient` are native; `radial-gradient` is an approximation (info entry); conic, repeating and layered gradients rasterise.
+3. Backgrounds: solid colours, a single `linear-gradient` and a single `background-image: url()` (cover/contain/position/repeat) are native; `radial-gradient` is an approximation (info entry); conic, repeating and layered backgrounds rasterise.
 4. Shadows: one outer `box-shadow` without spread is native (`inset` too). Spread or multiple shadows rasterise.
 5. Borders: uniform `solid`/`dashed`/`dotted` are native, per-side differences become separate lines (info). `double`, `groove`, `ridge`, `inset`, `outset` and `border-image` rasterise.
 6. Transforms: `rotate`, `scale`, `translate` are native. Skew, matrix, 3D and perspective rasterise.

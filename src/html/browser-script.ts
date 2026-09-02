@@ -1,4 +1,4 @@
-import type { Align, AutonumScheme, Box, Bullet, Color, CornerRadius, Fill, GroupElement, Insets, Line, Paragraph, PictureElement, Run, RunStyle, ShapeElement, TableCell, TableElement, TableRow, TextBody } from '../model/index.js';
+import type { Align, AutonumScheme, Box, Bullet, Color, CornerRadius, Fill, GroupElement, ImageFill, ImagePlacement, Insets, Line, Paragraph, PictureElement, Run, RunStyle, ShapeElement, TableCell, TableElement, TableRow, TextBody } from '../model/index.js';
 
 export interface BrowserFontFace {
   family: string;
@@ -21,6 +21,12 @@ export type BrowserPictureSource = { kind: 'file'; url: string } | { kind: 'inli
 /** A picture as measured in the page; measure.ts loads the bytes and turns it into a `PictureElement`. */
 export type BrowserPicture = Omit<PictureElement, 'media' | 'vector' | 'source' | 'explicit'> & { source: BrowserPictureSource };
 
+/** `background-image: url()` as measured in the page; measure.ts loads the bytes and turns it into an `ImageFill`. */
+export type BrowserImageFill = { type: 'image'; url: string; opacity?: number } & ImagePlacement;
+
+/** A shape as measured in the page: an image fill still names its file. */
+export type BrowserShape = Omit<ShapeElement, 'fill'> & { fill?: Exclude<Fill, ImageFill> | BrowserImageFill };
+
 export type BrowserGroup = Omit<GroupElement, 'children'> & { children: BrowserElement[] };
 
 /** The raster trigger family suffix (`RASTER_<X>` / `FLATTEN_<X>`) plus the offending declaration. */
@@ -42,7 +48,7 @@ export interface BrowserRaster {
   trigger?: RasterTrigger;
 }
 
-export type BrowserElement = ShapeElement | BrowserPicture | TableElement | BrowserGroup | BrowserRaster;
+export type BrowserElement = BrowserShape | BrowserPicture | TableElement | BrowserGroup | BrowserRaster;
 
 export interface BrowserMeasureResult {
   meta: {
@@ -61,6 +67,32 @@ export interface BrowserMeasureResult {
 
 /** Marks the stylesheet measure.ts injects to freeze animations; `validateDocument` lifts it while reading `transition`. */
 export const FREEZE_ATTR = 'data-deckflip-freeze';
+
+/** Natural sizes of every `background-image: url()` in the document, keyed by resolved URL; `null` when it did not load. */
+export type BackgroundImageSizes = Record<string, { width: number; height: number } | null>;
+
+/**
+ * Decodes every `background-image: url()` the document paints and stores the natural sizes on `window`, where
+ * `measureSlideDocument` (synchronous) reads them. `load` has already fetched them, so this only waits for decode.
+ */
+export async function preloadBackgroundImages(): Promise<void> {
+  const sizes: BackgroundImageSizes = {};
+  const pending: Promise<void>[] = [];
+  for (const el of Array.from(document.querySelectorAll('body > section, body > section *'))) {
+    for (const match of getComputedStyle(el).backgroundImage.matchAll(/url\("([^"]*)"\)/g)) {
+      const url = match[1]!;
+      if (url in sizes) continue;
+      sizes[url] = null;
+      const image = new Image();
+      image.src = url;
+      pending.push(image.decode().then(() => {
+        sizes[url] = { width: image.naturalWidth, height: image.naturalHeight };
+      }, () => {}));
+    }
+  }
+  await Promise.all(pending);
+  (window as unknown as { __deckflipBackgroundImages: BackgroundImageSizes }).__deckflipBackgroundImages = sizes;
+}
 
 export function measureSlideDocument(): BrowserMeasureResult {
   type LineGroup = { top: number; left: number; right: number; bottom: number; height: number };
@@ -354,14 +386,14 @@ export function measureSlideDocument(): BrowserMeasureResult {
     return undefined;
   }
 
-  /** conic, repeating, layered, or gradient-plus-image backgrounds: the offending layer list, else undefined. */
+  /** conic, repeating, or layered backgrounds: the offending layer list, else undefined. */
   function unsupportedGradient(backgroundImage: string): string | undefined {
     const value = backgroundImage.trim();
     if (!value || value === 'none') {
       return undefined;
     }
     const layers = splitTopLevel(value);
-    if (layers.length > 1 && layers.some((layer) => /-gradient\(/.test(layer))) {
+    if (layers.length > 1) {
       return value;
     }
     return /^(conic|repeating-[a-z]+)-gradient\(/.test(layers[0]!.trim()) ? value : undefined;
@@ -641,7 +673,11 @@ export function measureSlideDocument(): BrowserMeasureResult {
       lastParagraphGap: text.lastParagraphGap,
     };
   }
-  function parseFill(cs: CSSStyleDeclaration, box: Box): Fill | undefined {
+  function parseFill(el: HTMLElement, cs: CSSStyleDeclaration, box: Box): BrowserShape['fill'] {
+    const image = parseImageFill(el, cs, box);
+    if (image) {
+      return image;
+    }
     const gradient = parseGradient(cs.backgroundImage, box);
     if (gradient) {
       return gradient;
@@ -654,11 +690,77 @@ export function measureSlideDocument(): BrowserMeasureResult {
   }
 
   /**
+   * A single `url()` layer (spec 03): the image rect follows `background-size`, `background-position` and
+   * `background-origin` on the padding box, clipped by the border box `box`. A rect covering the box, or one the
+   * author does not repeat, stretches with a crop (negative for margins); anything else tiles from its offset.
+   * Remote and unloadable images are `VALIDATE_*` entries, as for `img` (spec 02).
+   */
+  function parseImageFill(el: HTMLElement, cs: CSSStyleDeclaration, box: Box): BrowserImageFill | undefined {
+    const match = cs.backgroundImage.trim().match(/^url\("([^"]*)"\)$/);
+    if (!match) {
+      return undefined;
+    }
+    const url = match[1]!;
+    const sizes = (window as unknown as { __deckflipBackgroundImages?: BackgroundImageSizes }).__deckflipBackgroundImages ?? {};
+    const natural = sizes[url];
+    if (!url.startsWith('file:')) {
+      entries.push({ code: 'VALIDATE_REMOTE_ASSET', selector: cssPath(el), reason: `${elementName(el)} loads ${url}` });
+      return undefined;
+    }
+    if (!natural || natural.width === 0 || natural.height === 0) {
+      entries.push({ code: 'VALIDATE_MISSING_ASSET', selector: cssPath(el), reason: `background-image on ${elementName(el)} did not load: ${url}` });
+      return undefined;
+    }
+    return { type: 'image', url, ...placeBackground(cs, box, natural) };
+  }
+
+  function placeBackground(cs: CSSStyleDeclaration, box: Box, natural: { width: number; height: number }): ImagePlacement {
+    const border = { l: px(cs.borderLeftWidth), t: px(cs.borderTopWidth), r: px(cs.borderRightWidth), b: px(cs.borderBottomWidth) };
+    const area = cs.backgroundOrigin === 'border-box'
+      ? { x: 0, y: 0, w: box.w, h: box.h }
+      : { x: border.l, y: border.t, w: box.w - border.l - border.r, h: box.h - border.t - border.b };
+    const [w, h] = backgroundSize(cs.backgroundSize, area, natural);
+    const x = area.x + backgroundOffset(cs.backgroundPositionX, area.w - w);
+    const y = area.y + backgroundOffset(cs.backgroundPositionY, area.h - h);
+    const covers = x <= 0 && y <= 0 && x + w >= box.w && y + h >= box.h;
+    if (covers || cs.backgroundRepeat === 'no-repeat') {
+      const fraction = (value: number) => Math.round(value * 100000) / 100000 || 0;
+      return { crop: { l: fraction(-x / w), t: fraction(-y / h), r: fraction((x + w - box.w) / w), b: fraction((y + h - box.h) / h) } };
+    }
+    return { tile: { x: round(x) || 0, y: round(y) || 0, scaleX: round(w / natural.width), scaleY: round(h / natural.height) } };
+  }
+
+  /** Painted size for a computed `background-size`: `cover`, `contain`, `auto`, or one/two lengths with `auto` keeping the aspect. */
+  function backgroundSize(value: string, area: { w: number; h: number }, natural: { width: number; height: number }): [number, number] {
+    if (value === 'cover' || value === 'contain') {
+      const scale = (value === 'cover' ? Math.max : Math.min)(area.w / natural.width, area.h / natural.height);
+      return [natural.width * scale, natural.height * scale];
+    }
+    const [first = 'auto', second = 'auto'] = value.split(/\s+/);
+    const length = (token: string, reference: number) => (token.endsWith('%') ? (px(token) / 100) * reference : px(token));
+    const w = first === 'auto' ? undefined : length(first, area.w);
+    const h = second === 'auto' ? undefined : length(second, area.h);
+    if (w === undefined && h === undefined) return [natural.width, natural.height];
+    if (w === undefined) return [(h! / natural.height) * natural.width, h!];
+    if (h === undefined) return [w, (w / natural.width) * natural.height];
+    return [w, h];
+  }
+
+  /** Offset of the image edge for a computed `background-position-x/y`: `N%` of the free space, `Npx`, or `calc(100% - Npx)`. */
+  function backgroundOffset(value: string, free: number): number {
+    const calc = value.match(/^calc\(\s*(-?[\d.]+)%\s*([+-])\s*(-?[\d.]+)px\s*\)$/);
+    if (calc) {
+      return (px(calc[1]!) / 100) * free + (calc[2] === '-' ? -px(calc[3]!) : px(calc[3]!));
+    }
+    return value.endsWith('%') ? (px(value) / 100) * free : px(value);
+  }
+
+  /**
    * One `linear-gradient()` / `radial-gradient()` layer from the computed `background-image`. Chromium keeps
    * the author's stop positions (missing ones are filled in here per CSS Images 3) and normalises colours to
    * `rgb()`/`rgba()`. Multiple layers, `url()`, conic and repeating gradients are left to the raster pass.
    */
-  function parseGradient(value: string, box: Box): Fill | undefined {
+  function parseGradient(value: string, box: Box): Extract<Fill, { type: 'gradient' }> | undefined {
     const trimmed = value.trim();
     if (!trimmed || trimmed === 'none') {
       return undefined;
@@ -846,11 +948,11 @@ export function measureSlideDocument(): BrowserMeasureResult {
     return frame;
   }
 
-  function makeShape(el: HTMLElement, box: Box, text?: TextBody): ShapeElement {
+  function makeShape(el: HTMLElement, box: Box, text?: TextBody): BrowserShape {
     const cs = getComputedStyle(el);
     const { scale, ...frame } = measureFrame(el, cs, box, cs.transform);
-    const shape: ShapeElement = { kind: 'shape', ...frame };
-    const fill = parseFill(cs, box);
+    const shape: BrowserShape = { kind: 'shape', ...frame };
+    const fill = parseFill(el, cs, box);
     if (fill) {
       shape.fill = fill;
       if (fill.type === 'gradient' && fill.kind === 'radial') {
@@ -1123,7 +1225,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
 
     const rows: TableRow[] = grid.map((slots, r) => {
       const tr = rowElements[r]!;
-      const rowFill = parseFill(getComputedStyle(tr), rowRects[r]!.width ? measuredBox(tr) : { x: 0, y: 0, w: 0, h: 0 });
+      const rowFill = cellFill(tr, getComputedStyle(tr), rowRects[r]!.width ? measuredBox(tr) : { x: 0, y: 0, w: 0, h: 0 });
       const cells: TableCell[] = [];
       for (let c = 0; c < columnCount; c += 1) {
         const slot = slots[c];
@@ -1161,7 +1263,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
         if (!isOrigin) {
           cell.merged = slot.originRow === r ? 'h' : 'v';
         }
-        const fill = parseFill(cs, measuredBox(slot.cell)) ?? rowFill;
+        const fill = cellFill(slot.cell, cs, measuredBox(slot.cell)) ?? rowFill;
         if (fill) {
           cell.fill = fill;
         }
@@ -1319,13 +1421,21 @@ export function measureSlideDocument(): BrowserMeasureResult {
     return { inset: Boolean(match[6]), offsetX: round(parseFloat(match[2]!)), offsetY: round(parseFloat(match[3]!)), blur: round(parseFloat(match[4]!)), color };
   }
 
-  function applyOpacity(shape: ShapeElement, opacity: number): void {
+  /** Table cells take colour and gradient fills only: `a:tcPr` carries no picture fill in this emitter. */
+  function cellFill(el: HTMLElement, cs: CSSStyleDeclaration, box: Box): TableCell['fill'] {
+    const fill = parseFill(el, cs, box);
+    return fill?.type === 'image' ? undefined : fill;
+  }
+
+  function applyOpacity(shape: BrowserShape, opacity: number): void {
     if (shape.fill?.type === 'solid') {
       shape.fill.color = withAlpha(shape.fill.color, opacity);
     } else if (shape.fill?.type === 'gradient') {
       for (const stop of shape.fill.stops) {
         stop.color = withAlpha(stop.color, opacity);
       }
+    } else if (shape.fill?.type === 'image') {
+      shape.fill.opacity = round(opacity);
     }
     if (shape.line) {
       shape.line.color = withAlpha(shape.line.color, opacity);
@@ -2132,9 +2242,13 @@ export function measureSlideDocument(): BrowserMeasureResult {
   }
 
   /** `transform: scale()` folds into every CSS-px quantity of the shape, text included. */
-  function scaleShape(shape: ShapeElement, s: number): void {
+  function scaleShape(shape: BrowserShape, s: number): void {
     if (s === 1) {
       return;
+    }
+    if (shape.fill?.type === 'image' && 'tile' in shape.fill) {
+      const tile = shape.fill.tile;
+      shape.fill.tile = { x: round(tile.x * s), y: round(tile.y * s), scaleX: round(tile.scaleX * s), scaleY: round(tile.scaleY * s) };
     }
     const g = shape.geometry;
     if (g.preset === 'roundRect') {
@@ -2268,7 +2382,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
   /** Visible fill, border or shadow, or an element that is a picture/table/media by nature: paints without needing text. */
   function paintsBox(el: HTMLElement): boolean {
     const cs = getComputedStyle(el);
-    if ((parseColor(cs.backgroundColor)?.alpha ?? 0) > 0 || /-gradient\(/.test(cs.backgroundImage)) {
+    if ((parseColor(cs.backgroundColor)?.alpha ?? 0) > 0 || cs.backgroundImage !== 'none') {
       return true;
     }
     if (parseBorderSides(cs)) {

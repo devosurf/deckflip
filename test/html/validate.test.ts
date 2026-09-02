@@ -78,4 +78,16 @@ describe.skipIf(!browserAvailable)('measured validation', () => {
     ]);
     expect(measured.entries[1]!.hint).toBe('Use absolute or flow layout inside the section');
   });
+
+  it('rejects a slide jump whose target is not a Slide id, and accepts one that is', async () => {
+    const measured = await measure(deck(
+      '',
+      `<section id="intro"><p id="jump"><a href="#closing">go</a> and <a href="#nowhere">lost</a></p></section>
+       <section id="closing"><p><a href="https://example.com/">out</a></p></section>`,
+    ));
+    expect(stripHints(measured.entries)).toEqual([
+      { code: 'VALIDATE_LINK_TARGET', kind: 'error', severity: 'error', slide: 1, locator: { selector: '#jump' }, reason: 'href="#nowhere" on p#jump points at no Slide' },
+    ]);
+    expect(measured.entries[0]!.hint).toBe('Point #nowhere at a section id; Slides: #intro, #closing');
+  });
 });

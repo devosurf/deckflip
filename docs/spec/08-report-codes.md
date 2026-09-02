@@ -24,6 +24,7 @@ Two rules hold across families:
 | `VALIDATE_LIST_CONTENT` | `li` with block content other than one `p` and one nested list, or nesting deeper than 9 | Keep list items to inline text plus one nested list |
 | `VALIDATE_TABLE_CONTENT` | table cell with block content other than `p`/`ul`/`ol` | Keep cell content to text, paragraphs and lists |
 | `VALIDATE_RASTER_SLIDE` | `data-raster` on a `section` | Rasterise parts, not the Slide; use `deckflip render` for PNGs |
+| `VALIDATE_LINK_TARGET` | `a[href^="#"]` whose target is not a Slide id | Point `{href}` at a section id; Slides: `{slides}` |
 
 ## FONT_* (errors, then warnings; kind `substituted` for warnings)
 

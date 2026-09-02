@@ -147,7 +147,17 @@ export type Fill =
   | { type: 'solid'; color: Color }
   /** `angle` in CSS degrees: 0 = to top, 90 = to right, clockwise */
   | { type: 'gradient'; kind: 'linear'; angle: number; stops: GradientStop[] }
-  | { type: 'gradient'; kind: 'radial'; stops: GradientStop[] };
+  | { type: 'gradient'; kind: 'radial'; stops: GradientStop[] }
+  | ImageFill;
+
+/** `background-image: url()` as `a:blipFill`: stretched over the box with a crop, or tiled from the top-left corner. */
+export type ImageFill = { type: 'image'; media: Media; opacity?: number } & ImagePlacement;
+
+export type ImagePlacement =
+  /** fraction (0..1, negative for a margin) of the image outside the box on each side -> `a:srcRect` + `a:stretch` */
+  | { crop: Insets }
+  /** `a:tile`: first tile's offset in CSS px and the scale relative to the image's natural size */
+  | { tile: { x: number; y: number; scaleX: number; scaleY: number } };
 
 export interface Line {
   /** CSS px */
@@ -293,14 +303,14 @@ export interface ResolvedFont {
   fsType: number;
 }
 
-/** Every text body an element owns, with the selector to report against: shapes have at most one, tables one per origin cell, groups recurse. */
-export function* textBodiesOf(element: Element): Generator<{ body: TextBody; selector: string }> {
+/** Every text body an element owns, with the owner's selector and name to report against: shapes have at most one, tables one per origin cell, groups recurse. */
+export function* textBodiesOf(element: Element): Generator<{ body: TextBody; selector: string; name: string }> {
   if (element.kind === 'shape') {
-    if (element.text) yield { body: element.text, selector: element.selector };
+    if (element.text) yield { body: element.text, selector: element.selector, name: element.name };
   } else if (element.kind === 'table') {
     for (const row of element.rows) {
       for (const cell of row.cells) {
-        if (!cell.merged) yield { body: cell.text, selector: element.selector };
+        if (!cell.merged) yield { body: cell.text, selector: element.selector, name: element.name };
       }
     }
   } else if (element.kind === 'group') {

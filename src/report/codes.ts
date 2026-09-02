@@ -76,6 +76,11 @@ export const CODES = {
     severity: 'error',
     hint: 'Rasterise parts, not the Slide; use deckflip render for PNGs',
   },
+  VALIDATE_LINK_TARGET: {
+    kind: 'error',
+    severity: 'error',
+    hint: 'Point {href} at a section id; Slides: {slides}',
+  },
   FONT_UNRESOLVED: {
     kind: 'error',
     severity: 'error',
@@ -390,7 +395,7 @@ export const CODES = {
 
 export type Code = keyof typeof CODES;
 
-const TOKEN_KEYS = ['decl', 'el', 'family', 'generic', 'W', 'H', 'file', 'dir'] as const;
+const TOKEN_KEYS = ['decl', 'el', 'family', 'generic', 'W', 'H', 'file', 'dir', 'href', 'slides'] as const;
 
 function substitute(text: string, params?: Record<string, string>): string {
   let out = text;

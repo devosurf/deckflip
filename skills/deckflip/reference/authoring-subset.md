@@ -18,6 +18,7 @@ Elements: `section`; block containers (`div`, `header`, `footer`, `main`, `artic
 | `background-color` | solid fill with alpha |
 | `linear-gradient(...)`, any angle and stops | linear gradient fill |
 | `radial-gradient(...)` | path gradient, approximate (`SUBSTITUTE_GRADIENT_RADIAL` info) |
+| `background-image: url()` with `background-size`, `background-position`, `background-repeat` | picture fill: stretched with a crop (`cover`, `contain`, `no-repeat`) or tiled; a `background-color` beneath it is not emitted, so a `contain` margin is transparent |
 | uniform `border` (`solid`, `dashed`, `dotted`) | outline |
 | per-side borders | one line per side (`SUBSTITUTE_BORDER_SIDES` info) |
 | `border-radius` uniform / per-corner / elliptical | rounded rectangle / custom geometry |

@@ -504,4 +504,39 @@ describe.skipIf(!browserAvailable)('measureDeck', () => {
       await browser.close();
     }
   });
+
+  it('measures background-image url() as a picture fill: stretched with a crop, or tiled', async () => {
+    const loaded = await loadDeck('test/html/fixtures/backgrounds.html', {});
+    const browser = await chromium.launch();
+    try {
+      const measured = await measureDeck(loaded, { browser });
+      const png = { data: expect.any(Uint8Array), contentType: 'image/png' };
+
+      // 160x100 covering the 1280x720 Canvas: scaled x8 to 1280x800, 40 px cut top and bottom = 0.05 of the source
+      const slide = shapeByName(measured.deck, 'section#slide-1');
+      expect(slide.fill).toEqual({ type: 'image', media: png, crop: { l: 0, t: 0.05, r: 0, b: 0.05 } });
+
+      // covering 200x200: 320x200 centred, 60 px cut each side
+      expect(shapeByName(measured.deck, 'div.cover').fill).toEqual({ type: 'image', media: png, crop: { l: 0.1875, t: 0, r: 0.1875, b: 0 } });
+
+      // contain at left top: 200x125 leaves 75 px of the 200 px box empty below = -0.6 of the painted height
+      expect(shapeByName(measured.deck, 'div.contain').fill).toEqual({ type: 'image', media: png, crop: { l: 0, t: 0, r: 0, b: -0.6 } });
+
+      // default repeat at natural size: tiled from the top-left corner
+      expect(shapeByName(measured.deck, 'div.tile').fill).toEqual({ type: 'image', media: png, tile: { x: 0, y: 0, scaleX: 1, scaleY: 1 } });
+
+      // 80x50 tiles offset by 20,10: half the natural size
+      expect(shapeByName(measured.deck, 'div.sized').fill).toEqual({ type: 'image', media: png, tile: { x: 20, y: 10, scaleX: 0.5, scaleY: 0.5 } });
+
+      expect(elementByName(measured.deck, 'div.layered')).toMatchObject({ kind: 'picture', source: 'raster' });
+      const raised = measured.entries.map((entry) => `${entry.code} ${entry.locator && 'selector' in entry.locator ? entry.locator.selector : ''}`).sort();
+      expect(raised).toEqual([
+        'RASTER_GRADIENT section:nth-of-type(1) > div:nth-child(5)',
+        'VALIDATE_MISSING_ASSET section:nth-of-type(1) > div:nth-child(7)',
+        'VALIDATE_REMOTE_ASSET section:nth-of-type(1) > div:nth-child(6)',
+      ]);
+    } finally {
+      await browser.close();
+    }
+  });
 });

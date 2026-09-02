@@ -190,6 +190,7 @@ function buildHyperlink(link: string, ctx: TextEmissionContext): XmlNode | undef
     const slideId = link.slice(1);
     const targetPart = ctx.slidePartById.get(slideId);
     if (!targetPart) {
+      // Unreachable after measure: an unknown target is VALIDATE_LINK_TARGET and stops conversion before emit.
       throw new Error(`Unknown slide link target ${link}`);
     }
     // A slide jump is an internal relationship of type `slide`; PowerPoint repairs a `hyperlink` relationship pointing at a part.

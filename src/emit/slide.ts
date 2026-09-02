@@ -2,8 +2,9 @@ import type { Deck, Element, GroupElement, Slide } from '../model/index.js';
 import { pxToEmu } from '../ooxml/emu.js';
 import { CT, REL, type OpcPackage } from '../ooxml/opc.js';
 import { el, serialize, type XmlNode } from '../ooxml/xml.js';
-import { buildPicture, type MediaStore, type PictureEmissionContext } from './picture.js';
-import { buildShape } from './shape.js';
+import type { MediaStore } from './media.js';
+import { buildPicture } from './picture.js';
+import { buildShape, type ShapeEmissionContext } from './shape.js';
 import { buildTable } from './table.js';
 
 export interface SlideEmissionContext {
@@ -18,12 +19,12 @@ export function slidePartName(index: number): string {
 
 export function emitSlide(pkg: OpcPackage, slide: Slide, ctx: SlideEmissionContext): string {
   const partName = slidePartName(slide.index);
-  const addRelationship: PictureEmissionContext['addRelationship'] = (type, target, opts) => pkg.addRelationship(partName, type, target, opts);
+  const addRelationship: ShapeEmissionContext['addRelationship'] = (type, target, opts) => pkg.addRelationship(partName, type, target, opts);
   pkg.addRelationship(partName, REL.slideLayout, '../slideLayouts/slideLayout1.xml');
 
   let nextShapeId = 2;
   const nextId = (): number => nextShapeId++;
-  const elementCtx: PictureEmissionContext = {
+  const elementCtx: ShapeEmissionContext = {
     deckLang: ctx.deck.lang,
     sourceSlidePart: partName,
     slidePartById: ctx.slidePartById,
@@ -37,7 +38,7 @@ export function emitSlide(pkg: OpcPackage, slide: Slide, ctx: SlideEmissionConte
   return partName;
 }
 
-export function buildElement(element: Element, ctx: PictureEmissionContext, nextId: () => number): XmlNode[] {
+export function buildElement(element: Element, ctx: ShapeEmissionContext, nextId: () => number): XmlNode[] {
   switch (element.kind) {
     case 'picture':
       return buildPicture(element, ctx, nextId);
@@ -51,7 +52,7 @@ export function buildElement(element: Element, ctx: PictureEmissionContext, next
 }
 
 /** `p:grpSp`: `off/ext` place the group, `chOff/chExt` name the child coordinate space, so children keep slide coordinates. */
-function buildGroup(group: GroupElement, ctx: PictureEmissionContext, nextId: () => number): XmlNode {
+function buildGroup(group: GroupElement, ctx: ShapeEmissionContext, nextId: () => number): XmlNode {
   const id = nextId();
   const children = group.children.flatMap((child) => buildElement(child, ctx, nextId));
   return el(

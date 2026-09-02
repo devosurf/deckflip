@@ -224,6 +224,25 @@ describe('emitPptx', () => {
     );
   });
 
+  it('emits image fills as a:blipFill: stretched with a srcRect, or tiled, with one shared media part', async () => {
+    const png = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c636000010000050001', 'hex');
+    const imageDeck = deck();
+    // a contain-style placement: the image ends 60 % above the bottom edge, so the bottom crop is negative
+    shapeAt(imageDeck, 0).fill = { type: 'image', media: { data: png, contentType: 'image/png' }, opacity: 0.5, crop: { l: 0.1875, t: 0, r: 0.1875, b: -0.6 } };
+    // tiles at half the natural size, the first one offset by 20x10 px
+    shapeAt(imageDeck, 1).fill = { type: 'image', media: { data: png, contentType: 'image/png' }, tile: { x: 20, y: 10, scaleX: 0.5, scaleY: 0.5 } };
+
+    const pptx = await emitPptx(imageDeck, { created, appVersion: '1.2.3' });
+    const zip = await JSZip.loadAsync(pptx);
+    const slideXml = await zip.file('ppt/slides/slide1.xml')!.async('string');
+    const rels = await zip.file('ppt/slides/_rels/slide1.xml.rels')!.async('string');
+
+    expect((await zipEntries(pptx)).filter((name) => name.startsWith('ppt/media/'))).toHaveLength(1);
+    expect(rels).toContain('Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"');
+    expect(slideXml).toContain('<a:blipFill><a:blip r:embed="rId2"><a:alphaModFix amt="50000"/></a:blip><a:srcRect l="18750" t="0" r="18750" b="-60000"/><a:stretch><a:fillRect/></a:stretch></a:blipFill>');
+    expect(slideXml).toContain('<a:blipFill><a:blip r:embed="rId3"/><a:tile tx="190500" ty="95250" sx="50000" sy="50000" flip="none" algn="tl"/></a:blipFill>');
+  });
+
   it('emits outer and inner shadows as an effect list after the line', async () => {
     const shadowDeck = deck();
     shapeAt(shadowDeck, 0).shadow = { inset: false, offsetX: 4, offsetY: 6, blur: 12, color: { hex: '000000', alpha: 0.3 } };

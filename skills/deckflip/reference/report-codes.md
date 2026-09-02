@@ -17,6 +17,7 @@ Every entry carries `code`, `kind`, `severity`, `slide`, `locator`, `reason` and
 | `VALIDATE_LIST_CONTENT` | `li` with block content beyond one `p` and one nested list, or nesting deeper than 9 | Keep list items to inline text plus one nested list |
 | `VALIDATE_TABLE_CONTENT` | table cell with block content other than `p`/`ul`/`ol` | Keep cells to text, paragraphs and lists |
 | `VALIDATE_RASTER_SLIDE` | `data-raster` on a `section` | Rasterise parts, not the Slide; use `deckflip render` for PNGs |
+| `VALIDATE_LINK_TARGET` | `a[href^="#"]` whose target is not a Slide id | Point `{href}` at a section id; the hint lists the Slides |
 
 ## FONT_*
 

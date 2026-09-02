@@ -1,52 +1,21 @@
-import { createHash } from 'node:crypto';
-import path from 'node:path';
-import type { Media, PictureElement, ShapeElement } from '../model/index.js';
+import type { PictureElement, ShapeElement } from '../model/index.js';
 import { pxToEmu } from '../ooxml/emu.js';
-import { REL, type OpcPackage } from '../ooxml/opc.js';
 import { el, type XmlNode } from '../ooxml/xml.js';
+import { relateMedia } from './media.js';
 import { buildEffects, buildShape, type ShapeEmissionContext } from './shape.js';
 
 const SVG_BLIP_EXT_URI = '{96DAC541-7B7A-43D3-8B79-37D633B846F1}';
 const SVG_NS = 'http://schemas.microsoft.com/office/drawing/2016/SVG/main';
 
-const EXTENSION: Record<Media['contentType'], string> = {
-  'image/png': 'png',
-  'image/jpeg': 'jpeg',
-  'image/gif': 'gif',
-  'image/svg+xml': 'svg',
-};
-
-/** Media parts are content-hash named and shared across slides (spec 11: determinism). */
-export class MediaStore {
-  private readonly parts = new Set<string>();
-
-  constructor(private readonly pkg: OpcPackage) {}
-
-  /** Adds the bytes once and returns the part name; rasters are `raster-<hash>` so a reader can tell captures from assets (spec 05). */
-  add(media: Media, prefix = ''): string {
-    const hash = createHash('sha1').update(media.data).digest('hex').slice(0, 16);
-    const partName = `/ppt/media/${prefix}${hash}.${EXTENSION[media.contentType]}`;
-    if (!this.parts.has(partName)) {
-      this.pkg.addPart(partName, media.contentType, media.data);
-      this.parts.add(partName);
-    }
-    return partName;
-  }
-}
-
-export interface PictureEmissionContext extends ShapeEmissionContext {
-  media: MediaStore;
-}
-
 /** `p:pic` for the visible frame, plus an outline shape on the border box when the element has a border. */
-export function buildPicture(picture: PictureElement, ctx: PictureEmissionContext, nextId: () => number): XmlNode[] {
-  const embed = relate(picture.media, ctx, picture.source === 'raster' ? 'raster-' : '');
+export function buildPicture(picture: PictureElement, ctx: ShapeEmissionContext, nextId: () => number): XmlNode[] {
+  const embed = relateMedia(picture.media, ctx, picture.source === 'raster' ? 'raster-' : '');
   const blipChildren: XmlNode[] = [];
   if (picture.opacity !== undefined) {
     blipChildren.push(el('a:alphaModFix', { amt: Math.round(picture.opacity * 100000) }));
   }
   if (picture.vector) {
-    const vectorId = relate(picture.vector, ctx);
+    const vectorId = relateMedia(picture.vector, ctx);
     blipChildren.push(el('a:extLst', {}, el('a:ext', { uri: SVG_BLIP_EXT_URI }, el('asvg:svgBlip', { 'xmlns:asvg': SVG_NS, 'r:embed': vectorId }))));
   }
   const crop = picture.crop;
@@ -100,12 +69,6 @@ function buildPictureGeometry(picture: PictureElement): XmlNode {
     return el('a:prstGeom', { prst: 'roundRect' }, el('a:avLst', {}, el('a:gd', { name: 'adj', fmla: `val ${adj}` })));
   }
   return el('a:prstGeom', { prst: 'rect' }, el('a:avLst'));
-}
-
-function relate(media: Media, ctx: PictureEmissionContext, prefix = ''): string {
-  const partName = ctx.media.add(media, prefix);
-  const target = path.posix.relative(path.posix.dirname(ctx.sourceSlidePart), partName);
-  return ctx.addRelationship(REL.image, target);
 }
 
 function pct(fraction: number): number {

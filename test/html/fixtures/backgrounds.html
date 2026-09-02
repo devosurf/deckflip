@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Backgrounds fixture</title>
+    <style>
+      section {
+        font-family: Arial, sans-serif;
+        font-size: 24px;
+        color: #111827;
+        background: url(assets/quad.png) center / cover no-repeat;
+      }
+      section > div {
+        position: absolute;
+        width: 200px;
+        height: 200px;
+        top: 40px;
+      }
+      .cover {
+        left: 40px;
+        background: url(assets/quad.png) center / cover no-repeat;
+      }
+      .contain {
+        left: 280px;
+        background: url(assets/quad.png) left top / contain no-repeat;
+      }
+      .tile {
+        left: 520px;
+        background: url(assets/quad.png);
+      }
+      .sized {
+        left: 760px;
+        background: url(assets/quad.png) 20px 10px / 80px 50px repeat;
+      }
+      .layered {
+        left: 1000px;
+        background: url(assets/quad.png), linear-gradient(#fff, #000);
+      }
+      .remote {
+        left: 40px;
+        top: 300px;
+        background: url(https://deckflip.invalid/quad.png);
+      }
+      .missing {
+        left: 280px;
+        top: 300px;
+        background: url(assets/nope.png);
+      }
+    </style>
+  </head>
+  <body>
+    <section id="slide-1">
+      <div class="cover"></div>
+      <div class="contain"></div>
+      <div class="tile"></div>
+      <div class="sized"></div>
+      <div class="layered"></div>
+      <div class="remote"></div>
+      <div class="missing"></div>
+    </section>
+  </body>
+</html>
