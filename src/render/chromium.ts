@@ -23,6 +23,9 @@ interface LoadedDeck {
 
 const PLAYWRIGHT_CLI = resolve('node_modules', 'playwright-core', 'cli.js');
 const INSTALL_COMMAND = 'node node_modules/playwright-core/cli.js install chromium';
+// GPU rasterisation can vary edge channels by one level across processes under load. Media names are
+// content-hashed, so Deck conversion uses software rendering to keep captured PNG bytes deterministic.
+const CHROMIUM_ARGS = ['--disable-gpu'];
 
 function installManagedChromium(): Promise<void> {
   return new Promise((resolvePromise, rejectPromise) => {
@@ -42,12 +45,12 @@ function installManagedChromium(): Promise<void> {
 export async function launchChromium(opts: { browserPath?: string; offline: boolean }): Promise<Browser> {
   const browserPath = opts.browserPath ?? process.env.DECKFLIP_BROWSER;
   if (browserPath) {
-    return chromium.launch({ executablePath: browserPath, headless: true });
+    return chromium.launch({ executablePath: browserPath, headless: true, args: CHROMIUM_ARGS });
   }
 
   const managedPath = chromium.executablePath();
   if (existsSync(managedPath)) {
-    return chromium.launch({ executablePath: managedPath, headless: true });
+    return chromium.launch({ executablePath: managedPath, headless: true, args: CHROMIUM_ARGS });
   }
 
   if (opts.offline || process.env.DECKFLIP_OFFLINE === '1' || process.env.CI === 'true') {
@@ -55,7 +58,7 @@ export async function launchChromium(opts: { browserPath?: string; offline: bool
   }
 
   await installManagedChromium();
-  return chromium.launch({ executablePath: chromium.executablePath(), headless: true });
+  return chromium.launch({ executablePath: chromium.executablePath(), headless: true, args: CHROMIUM_ARGS });
 }
 
 export function chromiumVersion(browser: Browser): string {

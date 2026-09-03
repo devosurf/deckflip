@@ -12,8 +12,9 @@ import { loadMedia, reencodeToPng } from './media.js';
 import { FREEZE_ATTR, measureSlideDocument, preloadBackgroundImages } from './browser-script.js';
 import type { LoadedDeck, SlideDocument } from './load.js';
 import { readNotes } from './notes.js';
-import { captureRaster } from './raster.js';
+import { captureRaster, captureStablePng } from './raster.js';
 import type { HtmlNode } from '../roundtrip/fingerprint.js';
+
 
 export interface MeasureOptions {
   browser: Browser;
@@ -300,8 +301,9 @@ async function resolvePicture(page: Page, measured: BrowserPicture, slide: numbe
   return { ...picture, media: loaded.media };
 }
 
-async function captureElement(page: Page, selector: string): Promise<Buffer> {
+async function captureElement(page: Page, selector: string): Promise<Uint8Array> {
   const locator = page.locator(selector).first();
+  const cdp = await page.context().newCDPSession(page);
   const restore = await locator.evaluate((el) => {
     const element = el as HTMLElement;
     const prior = element.getAttribute('style');
@@ -311,8 +313,21 @@ async function captureElement(page: Page, selector: string): Promise<Buffer> {
     return prior;
   });
   try {
-    return await locator.screenshot({ type: 'png', omitBackground: true });
+    const box = await locator.boundingBox();
+    if (box === null) {
+      throw new Error(`Missing bounding box for ${selector}`);
+    }
+    await cdp.send('Emulation.setDefaultBackgroundColorOverride', { color: { r: 0, g: 0, b: 0, a: 0 } });
+    return await captureStablePng(page, async () => {
+      const { data } = await cdp.send('Page.captureScreenshot', {
+        format: 'png',
+        clip: { x: box.x, y: box.y, width: box.width, height: box.height, scale: 1 },
+        captureBeyondViewport: true,
+      });
+      return data;
+    });
   } finally {
+    await cdp.send('Emulation.setDefaultBackgroundColorOverride', {});
     await locator.evaluate((el, prior) => {
       if (prior === null) {
         el.removeAttribute('style');
@@ -320,6 +335,7 @@ async function captureElement(page: Page, selector: string): Promise<Buffer> {
         el.setAttribute('style', prior);
       }
     }, restore);
+    await cdp.detach();
   }
 }
 function resolveSlideName(document: SlideDocument, result: BrowserMeasureResult): string {
