@@ -1329,6 +1329,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
     out.push({
       kind: 'table',
       ...shapeIdOf(table),
+      ...placeholderOf(table),
       selector: cssPath(table),
       name: elementName(table),
       box: { x: round(tableRect.left - sectionRect.left), y: round(gridTop - sectionRect.top), w: round(tableRect.width), h: round(gridBottom - gridTop) },

@@ -254,8 +254,10 @@ function groupHtml(group: GroupElement, origin: { x: number; y: number }, ctx: E
  * grid's (CSS `height` on a table is the grid, not the wrapper).
  */
 function tableHtml(table: TableElement, origin: { x: number; y: number }, ctx: ElementContext, caption?: ShapeElement): string {
-  const { tag, attrs: named } = nameParts(table.name);
-  const attrs = `${named}${identityAttr(table)}`;
+  // a table is a `table` element whatever PowerPoint named the frame ("Table 3"), because that is what the
+  // measurer reads the grid, the columns and the cells back from
+  const named = nameParts(table.name);
+  const attrs = `${named.tag === 'table' ? named.attrs : ''}${identityAttr(table)}`;
   const box = local(table.box, origin);
   const top = caption ? local(caption.box, origin).y : box.y;
   const outer = outerBorders(table);
@@ -268,7 +270,7 @@ function tableHtml(table: TableElement, origin: { x: number; y: number }, ctx: E
     .map((row, r) => `<tr style="height: ${pxv(row.height - (r === 0 ? outer.top / 2 : 0) - (r === lastRow ? outer.bottom / 2 : 0))}">${row.cells.map((cell, c) => (cell.merged ? '' : cellHtml(cell, edgeOwnership(table, r, c), ctx))).join('')}</tr>`)
     .join('');
   const captionHtml = caption ? textBodyHtml(caption.text!, { tag: 'caption', attrs: '', css: [`height: ${pxv(caption.box.h)}`, 'box-sizing: border-box', 'margin: 0', 'caption-side: top', ...shapeDecorationCss(caption, ctx), ...textBlockCss(caption.text!)] }, ctx.sheet) : '';
-  return `<${tag}${attrs} style="${css.join('; ')}">${captionHtml}<colgroup>${cols}</colgroup><tbody>${rows}</tbody></${tag}>`;
+  return `<table${attrs} style="${css.join('; ')}">${captionHtml}<colgroup>${cols}</colgroup><tbody>${rows}</tbody></table>`;
 }
 
 /** The widest edge on each outer side of the grid: what the collapsed model draws half outside the rows. */

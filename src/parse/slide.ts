@@ -6,7 +6,7 @@
 
 import type { Element, GroupElement, Insets, Line, OpaqueClass, OpaqueElement, PictureElement, ShapeElement, Slide } from '../model/index.js';
 import type { XmlNode } from '../ooxml/xml.js';
-import { identityOf, readFill, readGeometry, readLine, readShadow, readSrcRect, readTransform, shapeIdentity, shapeName, type ColorScheme, type DrawingContext } from './drawing.js';
+import { identityOf, readFill, readGeometry, readLine, readPlaceholder, readShadow, readSrcRect, readTransform, shapeIdentity, shapeName, type ColorScheme, type DrawingContext } from './drawing.js';
 import type { InheritedStyles } from './inherit.js';
 import { readTable } from './table.js';
 import { readTextBody, type TextContext } from './text.js';
@@ -107,19 +107,6 @@ function descendant(node: XmlNode, matches: (node: XmlNode) => boolean): XmlNode
 /** WordArt and 3D (spec 06 "text with 3D or a:scene3d"): a warp, a 3D scene or bevel anywhere on the shape. */
 function hasTextEffects(sp: XmlNode): boolean {
   return descendant(sp, (node) => node.name === 'a:scene3d' || node.name === 'a:sp3d' || (node.name === 'a:prstTxWarp' && node.attrs.prst !== 'textNoShape')) !== undefined;
-}
-
-/**
- * `p:ph` as `data-placeholder` spells it (spec 06 "Placeholders"): `<type>[:<idx>]`. A placeholder without a
- * type is a body one, which is what PowerPoint means by the bare `idx` it writes on layout body boxes.
- */
-function readPlaceholder(nv: XmlNode | undefined): string | undefined {
-  const ph = child(child(nv, 'p:nvPr'), 'p:ph');
-  if (!ph) {
-    return undefined;
-  }
-  const type = ph.attrs.type ?? 'body';
-  return ph.attrs.idx === undefined ? type : `${type}:${ph.attrs.idx}`;
 }
 
 const BORDER_SIDES = ['top', 'right', 'bottom', 'left'] as const;

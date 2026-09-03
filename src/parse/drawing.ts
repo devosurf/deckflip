@@ -62,6 +62,20 @@ export function shapeName(nvPr: XmlNode | undefined): string {
   return child(nvPr, 'p:cNvPr')?.attrs.name ?? '';
 }
 
+/**
+ * `p:ph` as `data-placeholder` spells it (spec 06 "Placeholders"): `<type>[:<idx>]`, read off the `p:nvSpPr`,
+ * `p:nvPicPr` or `p:nvGraphicFramePr` of whatever fills the placeholder. A placeholder without a type is a
+ * body one, which is what PowerPoint means by the bare `idx` it writes on layout body boxes.
+ */
+export function readPlaceholder(nv: XmlNode | undefined): string | undefined {
+  const ph = child(child(nv, 'p:nvPr'), 'p:ph');
+  if (!ph) {
+    return undefined;
+  }
+  const type = ph.attrs.type ?? 'body';
+  return ph.attrs.idx === undefined ? type : `${type}:${ph.attrs.idx}`;
+}
+
 /** `a:srgbClr` (with `a:alpha`) or `a:schemeClr` through the theme; `a:lumMod`/`a:lumOff` tints are applied on scheme colours. */
 export function readColor(container: XmlNode | undefined, colors: ColorScheme): Color | undefined {
   const srgb = child(container, 'a:srgbClr');

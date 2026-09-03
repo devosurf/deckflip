@@ -13,6 +13,7 @@ import type { ElementSplice, SlidePlan, SplicePlan } from '../roundtrip/plan.js'
 import type { SourceIndex, SourceShape, SourceSlide } from '../roundtrip/source.js';
 import { MediaStore } from './media.js';
 import { emitNotesMaster, emitNotesSlide, NOTES_MASTER_PART } from './notes.js';
+import { deckSections, listedSlideIds, sectionExtNode, sectionNode, SECTION_EXT_URI, type DeckSection } from './sections.js';
 import { emitSlide, type SlideSplice } from './slide.js';
 
 export interface PreservedSource {
@@ -60,7 +61,7 @@ export async function emitPreservedPptx(deck: Deck, preserved: PreservedSource, 
   const sourceNotesMaster = source.presentation.rels.find((rel) => rel.type === REL.notesMaster && !rel.external)?.target;
   const ownNotesMaster = sourceNotesMaster === undefined && deck.slides.some((slide) => slide.notes);
   const identities = assignSlideIdentities(plan, source, reader);
-  await emitPresentation(pkg, source, plan, identities, copy, ownNotesMaster);
+  await emitPresentation(pkg, deck, source, plan, identities, copy, ownNotesMaster);
   if (ownNotesMaster) {
     emitNotesMaster(pkg, deck.canvas, source.presentation.rels.find((rel) => rel.type === REL.theme && !rel.external)?.target);
   }
@@ -117,13 +118,13 @@ function assignSlideIdentities(plan: SplicePlan, source: SourceIndex, reader: Op
 }
 
 /** The source presentation part with `p:sldIdLst` (and a `p14:sectionLst`) following the Deck's slides; every other relationship kept under its id. */
-async function emitPresentation(pkg: OpcPackage, source: SourceIndex, plan: SplicePlan, identities: Map<SlidePlan, SlideIdentity>, copy: (part: string) => Promise<void>, ownNotesMaster: boolean): Promise<void> {
+async function emitPresentation(pkg: OpcPackage, deck: Deck, source: SourceIndex, plan: SplicePlan, identities: Map<SlidePlan, SlideIdentity>, copy: (part: string) => Promise<void>, ownNotesMaster: boolean): Promise<void> {
   const part = source.presentation.partName;
   const ordered = plan.slides.map((slide) => identities.get(slide)!);
   const tree = parseXml(source.presentation.xml);
   const list = find(tree, 'p:sldIdLst');
   if (list) list.children = ordered.map((identity) => el('p:sldId', { id: identity.id, 'r:id': identity.rId }));
-  rewriteSections(tree, plan, ordered);
+  rewriteSections(tree, deckSections(deck.slides, ordered.map((identity) => identity.id)));
   const dir = path.posix.dirname(part);
   const notesMasterRel = ownNotesMaster ? { id: freeRelId(source, ordered), target: path.posix.relative(dir, NOTES_MASTER_PART) } : undefined;
   if (notesMasterRel) {
@@ -157,25 +158,45 @@ function freeRelId(source: SourceIndex, ordered: SlideIdentity[]): string {
   return `rId${Math.max(0, ...taken) + 1}`;
 }
 
-/** Removed slides leave their sections; a new slide joins the section of the slide before it. */
-function rewriteSections(tree: XmlNode, plan: SplicePlan, ordered: SlideIdentity[]): void {
-  const sections = findAll(tree, 'p14:section');
-  if (sections.length === 0) return;
-  const lists = sections.map((section) => find(section, 'p14:sldIdLst') ?? section);
-  const survivors = new Set(ordered.filter((_, index) => plan.slides[index]!.source).map((identity) => String(identity.id)));
-  for (const list of lists) {
-    list.children = list.children.filter((child) => typeof child === 'string' || child.name !== 'p14:sldId' || survivors.has(child.attrs.id ?? ''));
-  }
-  const sectionOf = (id: string): XmlNode | undefined => lists.find((list) => list.children.some((child) => typeof child !== 'string' && child.attrs.id === id));
-  let current = lists[0]!;
-  for (const [index, identity] of ordered.entries()) {
-    if (plan.slides[index]!.source) {
-      current = sectionOf(String(identity.id)) ?? current;
-      continue;
+/**
+ * `p14:sectionLst` regenerated from the Deck (spec 06 "Sections"): the sections its Slides spell out, in Deck
+ * order, each holding its Slides' `p:sldId`s. A Deck section keeps the GUID of the source section of the same
+ * name, or failing that of the one its first Slide sat in, so a rename and a moved boundary both leave the
+ * sections PowerPoint knows in place. A Deck that spells out no section loses the source's list: the HTML is
+ * what says which sections exist.
+ */
+function rewriteSections(tree: XmlNode, sections: DeckSection[]): void {
+  const extLst = tree.children.find((child): child is XmlNode => typeof child !== 'string' && child.name === 'p:extLst');
+  const ext = extLst?.children.find((child): child is XmlNode => typeof child !== 'string' && child.name === 'p:ext' && child.attrs.uri === SECTION_EXT_URI);
+  if (sections.length === 0) {
+    if (extLst && ext) {
+      extLst.children = extLst.children.filter((child) => child !== ext);
+      if (!extLst.children.some((child) => typeof child !== 'string')) tree.children = tree.children.filter((child) => child !== extLst);
     }
-    const previous = current.children.findIndex((child) => typeof child !== 'string' && child.attrs.id === String(ordered[index - 1]?.id));
-    current.children.splice(previous === -1 ? current.children.length : previous + 1, 0, el('p14:sldId', { id: identity.id }));
+    return;
   }
+  const sectionLst = ext?.children.find((child): child is XmlNode => typeof child !== 'string' && child.name === 'p14:sectionLst');
+  if (!sectionLst) {
+    // CT_Presentation puts extensions last, so a deck that never had sections gains the list at the end
+    if (extLst) extLst.children.push(sectionExtNode(sections));
+    else tree.children.push(el('p:extLst', {}, sectionExtNode(sections)));
+    return;
+  }
+  const remaining = sectionLst.children.filter((child): child is XmlNode => typeof child !== 'string' && child.name === 'p14:section');
+  const claim = (match: (node: XmlNode) => boolean): XmlNode | undefined => {
+    const at = remaining.findIndex(match);
+    return at === -1 ? undefined : remaining.splice(at, 1)[0];
+  };
+  sectionLst.children = sections.map((section, index) => {
+    const kept = claim((node) => node.attrs.name === section.name) ?? claim((node) => listedSlideIds(node).includes(section.slideIds[0]!));
+    if (!kept) return sectionNode(section, index);
+    kept.attrs.name = section.name;
+    const listed = listedSlideIds(kept);
+    if (listed.length !== section.slideIds.length || listed.some((id, at) => id !== section.slideIds[at])) {
+      kept.children = [el('p14:sldIdLst', {}, section.slideIds.map((id) => el('p14:sldId', { id })))];
+    }
+    return kept;
+  });
 }
 
 function find(node: XmlNode, name: string): XmlNode | undefined {

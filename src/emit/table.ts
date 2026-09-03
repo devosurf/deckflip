@@ -1,6 +1,7 @@
 import type { Line, TableCell, TableElement } from '../model/index.js';
 import { pxToEmu } from '../ooxml/emu.js';
 import { el, type XmlNode } from '../ooxml/xml.js';
+import { buildPlaceholder } from './shape.js';
 import { baselineCorrectionPx, buildEndParaRPr, buildTextBody, firstTextRunStyle, solidFillNode, type TextEmissionContext } from './text.js';
 
 const TABLE_URI = 'http://schemas.openxmlformats.org/drawingml/2006/table';
@@ -10,7 +11,7 @@ export function buildTable(table: TableElement, ctx: TextEmissionContext, nextId
   return el(
     'p:graphicFrame',
     {},
-    el('p:nvGraphicFramePr', {}, el('p:cNvPr', { id: nextId(), name: table.name }), el('p:cNvGraphicFramePr', {}, el('a:graphicFrameLocks', { noGrp: '1' })), el('p:nvPr')),
+    el('p:nvGraphicFramePr', {}, el('p:cNvPr', { id: nextId(), name: table.name }), el('p:cNvGraphicFramePr', {}, el('a:graphicFrameLocks', { noGrp: '1' })), el('p:nvPr', {}, buildPlaceholder(table.placeholder))),
     el('p:xfrm', {}, el('a:off', { x: pxToEmu(table.box.x), y: pxToEmu(table.box.y) }), el('a:ext', { cx: pxToEmu(table.box.w), cy: pxToEmu(table.box.h) })),
     el(
       'a:graphic',

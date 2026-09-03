@@ -5,6 +5,7 @@ import { parseXml, el, serialize, type XmlNode } from '../ooxml/xml.js';
 import { MediaStore } from './media.js';
 import { emitNotesMaster, emitNotesSlide, notesSlidePartName, NOTES_MASTER_PART } from './notes.js';
 import { emitPreservedPptx, type PreservedSource } from './preserved.js';
+import { deckSections, sectionExtNode } from './sections.js';
 import { emitSlide, slidePartName } from './slide.js';
 
 export interface EmitOptions {
@@ -113,14 +114,18 @@ export async function emitPptx(deck: Deck, opts: EmitOptions): Promise<Buffer> {
 }
 
 function buildPresentationXml(deck: Deck, masterId: string, notesMasterId: string | undefined, slideIds: string[]): XmlNode {
+  const sldIds = slideIds.map((_, index) => 256 + index);
+  const sections = deckSections(deck.slides, sldIds);
   return el(
     'p:presentation',
     pptNs(),
     el('p:sldMasterIdLst', {}, el('p:sldMasterId', { id: 2147483648, 'r:id': masterId })),
     notesMasterId ? el('p:notesMasterIdLst', {}, el('p:notesMasterId', { 'r:id': notesMasterId })) : undefined,
-    el('p:sldIdLst', {}, ...slideIds.map((rId, index) => el('p:sldId', { id: 256 + index, 'r:id': rId }))),
+    el('p:sldIdLst', {}, ...slideIds.map((rId, index) => el('p:sldId', { id: sldIds[index], 'r:id': rId }))),
     el('p:sldSz', { cx: pxToEmu(deck.canvas.width), cy: pxToEmu(deck.canvas.height) }),
     el('p:notesSz', { cx: 6858000, cy: 9144000 }),
+    // CT_Presentation puts extensions last
+    sections.length === 0 ? undefined : el('p:extLst', {}, sectionExtNode(sections)),
   );
 }
 

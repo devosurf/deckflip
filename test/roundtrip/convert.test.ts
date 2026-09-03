@@ -208,6 +208,91 @@ describe.skipIf(!browserAvailable)('PPTX -> HTML -> PPTX round trip', () => {
     expect(await parts(await readFile(output))).toEqual(await parts(pptx));
   });
 
+  async function sectionedFixture(): Promise<{ dir: string; pptx: Buffer; html: string }> {
+    const section = (name: string, ids: number[]): string =>
+      `<p14:section name="${name}" id="{6DC5${ids[0]}-0000-0000-0000-000000000000}"><p14:sldIdLst>${ids.map((id) => `<p14:sldId id="${id}"/>`).join('')}</p14:sldIdLst></p14:section>`;
+    const pptx = await buildPptx({
+      slides: [
+        { name: 'One', shapes: text(2, 'Title', 914400, 'First') },
+        { name: 'Two', shapes: text(2, 'Title', 914400, 'Second') },
+        { name: 'Three', shapes: text(2, 'Title', 914400, 'Third') },
+      ],
+      presentationTail: `<p:extLst><p:ext uri="{521415D9-36F7-43E2-AB2F-B90AF26B5E84}"><p14:sectionLst xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main">${section('Intro', [256, 257])}${section('Body', [258])}</p14:sectionLst></p:ext></p:extLst>`,
+    });
+    const dir = await mkdtemp(join(tmpdir(), 'deckflip-sections-'));
+    await writeFile(join(dir, 'deck.pptx'), pptx);
+    const { outputPath } = await convertPptxToHtml(join(dir, 'deck.pptx'));
+    return { dir, pptx, html: outputPath };
+  }
+
+  async function presentationOf(output: string): Promise<string> {
+    return Buffer.from((await parts(await readFile(output))).get('ppt/presentation.xml')!, 'base64').toString('utf8');
+  }
+
+  it('regenerates the section list from the HTML: a renamed section, a moved boundary, and the ids the sections keep', async () => {
+    const { dir, html } = await sectionedFixture();
+    const source = await readFile(html, 'utf8');
+    expect(source).toContain('data-section="Intro"');
+    // rename the first section and move the second one's boundary from Slide 3 up to Slide 2
+    await writeFile(html, source.replace('data-section="Intro"', 'data-section="Opening"').replace(/(<section id="[^"]*" data-title="Three"[^>]*) data-section="Body"/, '$1').replace(/(<section id="[^"]*" data-title="Two")/, '$1 data-section="Body"'));
+
+    const output = join(dir, 'back.pptx');
+    const result = await convertHtmlToPptx(html, { ...options, browser, output });
+    expect(result.exitCode).toBe(0);
+
+    const presentation = await presentationOf(output);
+    expect(presentation).toContain('<p14:section name="Opening" id="{6DC5256-0000-0000-0000-000000000000}"><p14:sldIdLst><p14:sldId id="256"/></p14:sldIdLst></p14:section>');
+    // the section that kept its name keeps the id PowerPoint knows it by
+    expect(presentation).toContain('<p14:section name="Body" id="{6DC5258-0000-0000-0000-000000000000}"><p14:sldIdLst><p14:sldId id="257"/><p14:sldId id="258"/></p14:sldIdLst></p14:section>');
+  });
+
+  it('regenerates nothing for a deck whose sections the author removed, and a list for one that never had any', async () => {
+    const { dir, html } = await sectionedFixture();
+    await writeFile(html, (await readFile(html, 'utf8')).replace(/ data-section="[^"]*"/g, ''));
+    const removed = join(dir, 'removed.pptx');
+    expect((await convertHtmlToPptx(html, { ...options, browser, output: removed })).exitCode).toBe(0);
+    expect(await presentationOf(removed)).not.toContain('p14:sectionLst');
+
+    const plain = await fixture();
+    await writeFile(plain.html, (await readFile(plain.html, 'utf8')).replace(/(<section id="[^"]*" data-title="Two")/, '$1 data-section="Later"'));
+    const added = join(plain.dir, 'added.pptx');
+    expect((await convertHtmlToPptx(plain.html, { ...options, browser, output: added })).exitCode).toBe(0);
+    const presentation = await presentationOf(added);
+    // the deck had no sections, so Slide 1 falls in the section PowerPoint would have named itself
+    expect(presentation).toContain('<p14:section name="Default Section"');
+    expect(presentation).toMatch(/<p14:section name="Later" id="\{[0-9A-F-]+\}"><p14:sldIdLst><p14:sldId id="257"\/><\/p14:sldIdLst><\/p14:section>/);
+  });
+
+  it('reproduces the section list byte for byte when the HTML is untouched', async () => {
+    const { dir, pptx, html } = await sectionedFixture();
+    const output = join(dir, 'back.pptx');
+    expect((await convertHtmlToPptx(html, { ...options, browser, output })).exitCode).toBe(0);
+    expect(await parts(await readFile(output))).toEqual(await parts(pptx));
+  });
+
+  it('keeps the placeholder of an edited table, which lives on its graphic frame', async () => {
+    const frame = '<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="4" name="Table 3"/><p:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></p:cNvGraphicFramePr><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvGraphicFramePr><p:xfrm><a:off x="914400" y="914400"/><a:ext cx="3657600" cy="914400"/></p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/table"><a:tbl><a:tblPr/><a:tblGrid><a:gridCol w="1828800"/><a:gridCol w="1828800"/></a:tblGrid><a:tr h="457200"><a:tc><a:txBody><a:bodyPr/><a:p><a:r><a:rPr lang="en-US" sz="1400"/><a:t>Region</a:t></a:r></a:p></a:txBody><a:tcPr/></a:tc><a:tc><a:txBody><a:bodyPr/><a:p><a:r><a:rPr lang="en-US" sz="1400"/><a:t>Share</a:t></a:r></a:p></a:txBody><a:tcPr/></a:tc></a:tr></a:tbl></a:graphicData></a:graphic></p:graphicFrame>';
+    const layoutFrame = '<p:sp><p:nvSpPr><p:cNvPr id="2" name="Content Placeholder 1"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="914400" y="914400"/><a:ext cx="3657600" cy="914400"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr/></a:p></p:txBody></p:sp>';
+    const pptx = await buildPptx({
+      slides: [{ name: 'Table', shapes: frame }],
+      layouts: { 'slideLayout1.xml': { name: 'Content', shapes: layoutFrame } },
+    });
+    const dir = await mkdtemp(join(tmpdir(), 'deckflip-table-ph-'));
+    await writeFile(join(dir, 'deck.pptx'), pptx);
+    const { outputPath: html } = await convertPptxToHtml(join(dir, 'deck.pptx'));
+    const source = await readFile(html, 'utf8');
+    expect(source).toContain('data-placeholder="body:1"');
+    await writeFile(html, source.replace('Share', 'Percentage'));
+
+    const output = join(dir, 'back.pptx');
+    const result = await convertHtmlToPptx(html, { ...options, browser, output });
+    expect(result.exitCode).toBe(0);
+
+    const slide1 = Buffer.from((await parts(await readFile(output))).get('ppt/slides/slide1.xml')!, 'base64').toString('utf8');
+    expect(slide1).toContain('>Percentage</a:t>');
+    expect(slide1).toContain('<p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvGraphicFramePr>');
+  });
+
   it('warns once and re-emits everything on the built-in master when the Asset directory is gone', async () => {
     const { dir, html } = await fixture();
     await rm(join(dir, 'deck.assets'), { recursive: true });

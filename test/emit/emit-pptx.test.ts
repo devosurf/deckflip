@@ -192,6 +192,37 @@ describe('emitPptx', () => {
     );
   });
 
+  it('regenerates p14:sectionLst from the sections the Slides carry', async () => {
+    const sectioned = deck();
+    const first = sectioned.slides[0]!;
+    // `data-section` opens a section, which then holds every Slide up to the next one (spec 06 "Sections")
+    sectioned.slides = [
+      { ...first, section: 'Intro' },
+      { ...first, index: 2, id: 'slide-2', name: 'Slide 2' },
+      { ...first, index: 3, id: 'slide-3', name: 'Slide 3', section: 'Body' },
+    ];
+
+    const zip = await JSZip.loadAsync(await emitPptx(sectioned, { created, appVersion: '1.2.3' }));
+    const presentation = await zip.file('ppt/presentation.xml')!.async('string');
+    const list = /<p14:sectionLst xmlns:p14="http:\/\/schemas\.microsoft\.com\/office\/powerpoint\/2010\/main">(.*)<\/p14:sectionLst>/.exec(presentation)?.[1];
+    expect(list?.replace(/ id="\{[0-9A-F-]+\}"/g, '')).toBe(
+      '<p14:section name="Intro"><p14:sldIdLst><p14:sldId id="256"/><p14:sldId id="257"/></p14:sldIdLst></p14:section>'
+        + '<p14:section name="Body"><p14:sldIdLst><p14:sldId id="258"/></p14:sldIdLst></p14:section>',
+    );
+    // every section needs a GUID, and the same Deck must always emit the same one (spec 11 "Determinism")
+    expect([...presentation.matchAll(/<p14:section name="[^"]*" id="(\{[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\})"/g)]).toHaveLength(2);
+  });
+
+  it('gives the Slides ahead of the first data-section PowerPoint own default section, so every Slide is in one', async () => {
+    const sectioned = deck();
+    const first = sectioned.slides[0]!;
+    sectioned.slides = [{ ...first }, { ...first, index: 2, id: 'slide-2', name: 'Slide 2', section: 'Body' }];
+
+    const presentation = await (await JSZip.loadAsync(await emitPptx(sectioned, { created, appVersion: '1.2.3' }))).file('ppt/presentation.xml')!.async('string');
+    expect(presentation).toContain('<p14:section name="Default Section"');
+    expect(presentation).toContain('<p14:section name="Body"');
+  });
+
   it('emits notes as unmeasured text: the notes master carries the metrics, the runs carry the emphasis', async () => {
     const notesDeck = deck();
     const body = notes('Remember the margin');
@@ -552,6 +583,25 @@ describe('emitPptx', () => {
     expect(slideXml).toContain('<a:tr h="571500"><a:tc gridSpan="2">');
     expect(slideXml).toContain('<a:lnT w="28575"><a:solidFill><a:srgbClr val="0F172A"/></a:solidFill><a:prstDash val="dash"/></a:lnT>');
     expect(slideXml).toMatch(/<a:tc hMerge="1"><a:txBody><a:bodyPr\/><a:lstStyle\/><a:p><a:endParaRPr lang="en-US" sz="1500"\/><\/a:p><\/a:txBody><a:tcPr\/>/);
+  });
+
+  it('keeps the placeholder of a table on its graphic frame, so it stays the layout box PowerPoint knows', async () => {
+    const phDeck = deck();
+    phDeck.slides[0]!.elements = [
+      {
+        kind: 'table',
+        selector: '#grid',
+        name: 'table.grid',
+        placeholder: 'body:1',
+        box: { x: 40, y: 40, w: 100, h: 40 },
+        columns: [100],
+        rows: [{ height: 40, cells: [{ colSpan: 1, rowSpan: 1, borders: {}, padding: { l: 0, t: 0, r: 0, b: 0 }, anchor: 't', text: notes('Cell') }] }],
+      },
+    ];
+
+    const zip = await JSZip.loadAsync(await emitPptx(phDeck, { created, appVersion: '1.2.3' }));
+    const slideXml = await zip.file('ppt/slides/slide1.xml')!.async('string');
+    expect(slideXml).toContain('<p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvGraphicFramePr>');
   });
 
   it('emits groups as p:grpSp with child coordinate space and nested ids in document order', async () => {

@@ -249,6 +249,15 @@ describe('parsePptx', () => {
     expect(deck.slides.map((slide) => slide.section)).toEqual(['Intro', undefined, 'Body']);
   });
 
+  it('reads the placeholder a table fills, which lives on its graphic frame', async () => {
+    const frame = '<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="4" name="Table 3"/><p:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></p:cNvGraphicFramePr><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvGraphicFramePr><p:xfrm><a:off x="914400" y="914400"/><a:ext cx="1828800" cy="457200"/></p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/table"><a:tbl><a:tblPr/><a:tblGrid><a:gridCol w="1828800"/></a:tblGrid><a:tr h="457200"><a:tc><a:txBody><a:bodyPr/><a:p><a:r><a:rPr lang="en-US"/><a:t>Cell</a:t></a:r></a:p></a:txBody><a:tcPr/></a:tc></a:tr></a:tbl></a:graphicData></a:graphic></p:graphicFrame>';
+    const deck = await parsePptx(await buildPptx({ slides: [{ shapes: frame }] }));
+
+    const table = deck.slides[0]!.elements[0]!;
+    expect(table.kind).toBe('table');
+    expect(table.kind === 'table' ? table.placeholder : undefined).toBe('body:1');
+  });
+
   it('reads the placeholder a shape or picture fills, type and index as `data-placeholder` spells it', async () => {
     const sp = (id: number, name: string, ph: string): string =>
       `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${name}"/><p:cNvSpPr/><p:nvPr>${ph}</p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="914400" cy="457200"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr/><a:p><a:r><a:rPr lang="en-US" sz="1800"/><a:t>${name}</a:t></a:r></a:p></p:txBody></p:sp>`;

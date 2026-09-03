@@ -85,6 +85,8 @@ export interface TableElement {
   shapeId?: string;
   selector: string;
   name: string;
+  /** `data-placeholder`: the layout placeholder the table fills, `<type>[:idx]` (spec 06) */
+  placeholder?: string;
   /** border box, CSS px */
   box: Box;
   /** measured column widths, CSS px -> `a:gridCol` */

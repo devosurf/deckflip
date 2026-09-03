@@ -4,7 +4,7 @@
 
 import type { Line, TableCell, TableElement, TableRow } from '../model/index.js';
 import { el, type XmlNode } from '../ooxml/xml.js';
-import { readFill, readLine, readTransform, shapeIdentity, shapeName, type DrawingContext } from './drawing.js';
+import { readFill, readLine, readPlaceholder, readTransform, shapeIdentity, shapeName, type DrawingContext } from './drawing.js';
 import { DEFAULT_INSET, readRunStyle, readTextBody, type TextContext } from './text.js';
 import { px } from './units.js';
 import { child, children } from './xml.js';
@@ -26,7 +26,7 @@ export async function readTable(frame: XmlNode, ctx: DrawingContext & TextContex
     }
     rows.push({ height: px(tr.attrs.h), cells });
   }
-  return {
+  const table: TableElement = {
     kind: 'table',
     ...shapeIdentity(nvPr, ctx.slide),
     name: shapeName(nvPr),
@@ -34,6 +34,11 @@ export async function readTable(frame: XmlNode, ctx: DrawingContext & TextContex
     columns: children(child(tbl, 'a:tblGrid'), 'a:gridCol').map((col) => px(col.attrs.w)),
     rows,
   };
+  const placeholder = readPlaceholder(nvPr);
+  if (placeholder !== undefined) {
+    table.placeholder = placeholder;
+  }
+  return table;
 }
 
 const EDGES: ReadonlyArray<[keyof TableCell['borders'], string]> = [
