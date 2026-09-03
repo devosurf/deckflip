@@ -27,6 +27,11 @@ export function children(node: XmlNode | undefined, name?: string): XmlNode[] {
   return out;
 }
 
+/** The nodes of an optional chain that are actually there, in order: the shape every inheritance walk wants. */
+export function defined(nodes: Array<XmlNode | undefined>): XmlNode[] {
+  return nodes.filter((node): node is XmlNode => node !== undefined);
+}
+
 /** Concatenated text content of the node's direct text children. */
 export function textOf(node: XmlNode | undefined): string {
   if (!node) {

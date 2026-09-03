@@ -117,16 +117,15 @@ function wrap(root: TextRoot, inner: string): string {
 }
 
 export function runsHtml(runs: Run[], sheet: Stylesheet): string {
-  let html = '';
-  for (const run of runs) {
-    if (run.kind === 'break') {
-      html += '<br>';
-      continue;
-    }
-    const span = `<span class="${sheet.classFor('t', runCss(run.style))}">${escape(run.text)}</span>`;
-    html += run.style.link ? `<a href="${attr(sheet.href(run.style.link))}">${span}</a>` : span;
-  }
-  return html;
+  return renderRuns(
+    runs,
+    sheet,
+    (run, sheet) => {
+      const span = `<span class="${sheet.classFor('t', runCss(run.style))}">${escape(run.text)}</span>`;
+      return run.style.link ? `<a href="${attr(sheet.href(run.style.link))}">${span}</a>` : span;
+    },
+    '<br>',
+  );
 }
 
 /**
@@ -154,10 +153,55 @@ export function notesHtml(notes: TextBody, sheet: Stylesheet): string {
 
 /** One list at `level`; a deeper list hangs inside the item above it, the way html/notes.ts reads it back. */
 function notesList(paragraphs: Paragraph[], from: number, level: number, sheet: Stylesheet): { html: string; next: number } {
-  const first = paragraphs[from]!.bullet!;
-  const ordered = first.type === 'autonum';
+  const list = walkList(paragraphs, from, level, sheet, (paragraph, sheet) => `<li>${notesRunsHtml(paragraph.runs, sheet)}</li>`, renderNotesList);
+  return { html: renderNotesList(list), next: list.next };
+}
+
+function notesRunsHtml(runs: Run[], sheet: Stylesheet): string {
+  return renderRuns(
+    runs,
+    sheet,
+    (run, sheet) => {
+      let inner = escape(run.text);
+      if (run.style.underline) inner = `<u>${inner}</u>`;
+      if (run.style.italic) inner = `<em>${inner}</em>`;
+      if (run.style.bold) inner = `<strong>${inner}</strong>`;
+      return run.style.link ? `<a href="${attr(sheet.href(run.style.link))}">${inner}</a>` : inner;
+    },
+    '<br>\n',
+  );
+}
+
+type ListWalk = { first: Paragraph; parentMargin: number; tag: 'ol' | 'ul'; start: string; items: string[]; next: number };
+type ListItemRenderer = (paragraph: Paragraph, sheet: Stylesheet) => string;
+type RunRenderer = (run: Extract<Run, { kind: 'text' }>, sheet: Stylesheet) => string;
+
+/**
+ * Paragraphs from `from` at `level` as one list; returns where the run of this level ended. The measurer
+ * reads a list's own left padding as every item's `marginLeft` (from the body's left edge), so a nested
+ * list's padding is the difference to its parent item, and a root list's is the first item's `marginLeft`.
+ */
+function listHtml(paragraphs: Paragraph[], from: number, level: number, sheet: Stylesheet, root?: TextRoot): { html: string; next: number } {
+  const list = walkList(paragraphs, from, level, sheet, (paragraph, sheet) => {
+    const laidOut = layoutParagraph(paragraph);
+    const style = firstStyle(laidOut);
+    const li = [`margin: ${pxv(laidOut.spaceBefore)} 0 0`, `line-height: ${pxv(laidOut.lineHeight)}`, `text-align: ${ALIGN[laidOut.align]}`];
+    if (style) {
+      li.push(`font-family: ${fontFamily(style)}`, `font-size: ${pxv(style.size)}`);
+    }
+    const marker = laidOut.bullet ? ` class="${sheet.classFor('m', markerCss(laidOut.bullet, style), '::marker')}"` : '';
+    return `<li${marker} style="${li.join('; ')}">${runsHtml(laidOut.runs, sheet)}</li>`;
+  }, renderStyledList);
+  return { html: renderStyledList(list, root), next: list.next };
+}
+
+function walkList(paragraphs: Paragraph[], from: number, level: number, sheet: Stylesheet, renderItem: ListItemRenderer, renderList: (list: ListWalk) => string): ListWalk {
+  const first = paragraphs[from]!;
+  const bullet = first.bullet!;
+  const parentMargin = level === 0 ? 0 : paragraphs[from - 1]!.marginLeft;
+  const ordered = bullet.type === 'autonum';
   const tag = ordered ? 'ol' : 'ul';
-  const start = first.type === 'autonum' && first.startAt !== 1 ? ` start="${first.startAt}"` : '';
+  const start = ordered && bullet.startAt !== 1 ? ` start="${bullet.startAt}"` : '';
   const items: string[] = [];
   let index = from;
   while (index < paragraphs.length) {
@@ -167,72 +211,43 @@ function notesList(paragraphs: Paragraph[], from: number, level: number, sheet: 
       break;
     }
     if (paragraph.level > level) {
-      const nested = notesList(paragraphs, index, paragraph.level, sheet);
+      // deeper items hang inside the previous item; close its `li` after them
+      const nested = walkList(paragraphs, index, paragraph.level, sheet, renderItem, renderList);
       const parent = items.pop() ?? '<li></li>';
-      items.push(`${parent.slice(0, -'</li>'.length)}${nested.html}</li>`);
+      items.push(`${parent.slice(0, -'</li>'.length)}${renderList(nested)}</li>`);
       index = nested.next;
       continue;
     }
     if ((bullet.type === 'autonum') !== ordered) {
       break;
     }
-    items.push(`<li>${notesRunsHtml(paragraph.runs, sheet)}</li>`);
+    items.push(renderItem(paragraph, sheet));
     index += 1;
   }
-  return { html: [`<${tag}${start}>`, ...items, `</${tag}>`].join('\n'), next: index };
+  return { first, parentMargin, tag, start, items, next: index };
 }
 
-function notesRunsHtml(runs: Run[], sheet: Stylesheet): string {
+function renderNotesList(list: ListWalk): string {
+  return [`<${list.tag}${list.start}>`, ...list.items, `</${list.tag}>`].join('\n');
+}
+
+function renderStyledList(list: ListWalk, root?: TextRoot): string {
+  const bullet = list.first.bullet!;
+  const css = root ? root.css.map((declaration) => (declaration.startsWith('padding: ') ? `${declaration.split(' ').slice(0, 4).join(' ')} ${pxv(list.first.marginLeft)}` : declaration)) : ['margin: 0', `padding: 0 0 0 ${pxv(list.first.marginLeft - list.parentMargin)}`];
+  css.push(`list-style-type: ${listStyleType(bullet)}`);
+  return `<${list.tag}${root?.attrs ?? ''}${list.start} style="${css.join('; ')}">${list.items.join('')}</${list.tag}>`;
+}
+
+function renderRuns(runs: Run[], sheet: Stylesheet, renderText: RunRenderer, breakHtml: string): string {
   let html = '';
   for (const run of runs) {
     if (run.kind === 'break') {
-      html += '<br>\n';
+      html += breakHtml;
       continue;
     }
-    let inner = escape(run.text);
-    if (run.style.underline) inner = `<u>${inner}</u>`;
-    if (run.style.italic) inner = `<em>${inner}</em>`;
-    if (run.style.bold) inner = `<strong>${inner}</strong>`;
-    html += run.style.link ? `<a href="${attr(sheet.href(run.style.link))}">${inner}</a>` : inner;
+    html += renderText(run, sheet);
   }
   return html;
-}
-
-/**
- * Paragraphs from `from` at `level` as one list; returns where the run of this level ended. The measurer
- * reads a list's own left padding as every item's `marginLeft` (from the body's left edge), so a nested
- * list's padding is the difference to its parent item, and a root list's is the first item's `marginLeft`.
- */
-function listHtml(paragraphs: Paragraph[], from: number, level: number, sheet: Stylesheet, root?: TextRoot): { html: string; next: number } {
-  const first = paragraphs[from]!;
-  const bullet = first.bullet!;
-  const ordered = bullet.type === 'autonum';
-  const tag = ordered ? 'ol' : 'ul';
-  const parentMargin = level === 0 ? 0 : paragraphs[from - 1]!.marginLeft;
-  const attrs = `${root?.attrs ?? ''}${ordered && bullet.startAt !== 1 ? ` start="${bullet.startAt}"` : ''}`;
-  const css = root ? root.css.map((declaration) => (declaration.startsWith('padding: ') ? `${declaration.split(' ').slice(0, 4).join(' ')} ${pxv(first.marginLeft)}` : declaration)) : ['margin: 0', `padding: 0 0 0 ${pxv(first.marginLeft - parentMargin)}`];
-  css.push(`list-style-type: ${listStyleType(bullet)}`);
-  let html = `<${tag}${attrs} style="${css.join('; ')}">`;
-  let index = from;
-  while (index < paragraphs.length && paragraphs[index]!.level >= level) {
-    const paragraph = layoutParagraph(paragraphs[index]!);
-    if (paragraph.level > level) {
-      // deeper items hang inside the previous item; close its `li` after them
-      const nested = listHtml(paragraphs, index, paragraph.level, sheet);
-      html = `${html.slice(0, -'</li>'.length)}${nested.html}</li>`;
-      index = nested.next;
-      continue;
-    }
-    const style = firstStyle(paragraph);
-    const li = [`margin: ${pxv(paragraph.spaceBefore)} 0 0`, `line-height: ${pxv(paragraph.lineHeight)}`, `text-align: ${ALIGN[paragraph.align]}`];
-    if (style) {
-      li.push(`font-family: ${fontFamily(style)}`, `font-size: ${pxv(style.size)}`);
-    }
-    const marker = paragraph.bullet ? ` class="${sheet.classFor('m', markerCss(paragraph.bullet, style), '::marker')}"` : '';
-    html += `<li${marker} style="${li.join('; ')}">${runsHtml(paragraph.runs, sheet)}</li>`;
-    index += 1;
-  }
-  return { html: `${html}</${tag}>`, next: index };
 }
 
 const CHAR_TYPES: Record<string, string> = { '\u2022': 'disc', '\u25E6': 'circle', '\u25AA': 'square' };

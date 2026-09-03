@@ -82,7 +82,7 @@ export async function emitPreservedPptx(deck: Deck, preserved: PreservedSource, 
     // regenerated on the notes master the deck was authored on (spec 06 "Speaker notes")
     if (slide.notes && notesMasterPart && !splice.extraRelationships.some((rel) => rel.type === REL.notesSlide)) {
       const partName = slidePlan.source?.rels.find((rel) => rel.type === REL.notesSlide && !rel.external)?.target ?? freeNotesPart(pkg, reader);
-      emitNotesSlide(pkg, slide, slidePart, partName, { deckLang: deck.lang, masterPart: notesMasterPart, slidePartById });
+      emitNotesSlide(pkg, slidePart, partName, slide.notes, { deckLang: deck.lang, masterPart: notesMasterPart, slidePartById });
     }
   }
 

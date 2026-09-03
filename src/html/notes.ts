@@ -3,6 +3,7 @@
 // them: a notes run carries the emphasis and link its markup shows, and the notes master governs the rest.
 
 import type { Paragraph, Run, RunStyle, TextBody } from '../model/index.js';
+import { hasTextParagraphs } from '../model/notes.js';
 import type { HtmlChild, HtmlNode } from '../roundtrip/fingerprint.js';
 
 /** What emit leaves out for unmeasured text; the fields still have to hold something the IDM accepts. */
@@ -43,7 +44,7 @@ export function readNotes(section: HtmlNode): TextBody | undefined {
   if (paragraphs.length === 0) {
     paragraphs.push(paragraphOf(aside));
   }
-  return paragraphs.some((paragraph) => paragraph.runs.some((run) => run.kind === 'text' && run.text !== '')) ? body(paragraphs) : undefined;
+  return hasTextParagraphs(paragraphs) ? body(paragraphs) : undefined;
 }
 
 const BLOCKS = new Set(['p', 'ul', 'ol', 'li']);

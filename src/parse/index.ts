@@ -5,7 +5,7 @@ import type { Deck, Media, Slide, TextBody } from '../model/index.js';
 import { REL, OpcReader, type Relationship } from '../ooxml/opc.js';
 import type { XmlNode } from '../ooxml/xml.js';
 import { readColorScheme, readFontScheme } from './drawing.js';
-import { readInheritedStyles } from './inherit.js';
+import { inheritanceReader } from './inherit.js';
 import { readNotes } from './notes.js';
 import { readSlide } from './slide.js';
 import type { TextContext } from './text.js';
@@ -49,19 +49,22 @@ export async function parsePptx(bytes: Uint8Array): Promise<Deck> {
   const slideIdByPart = new Map(slideParts.map((part, index) => [part, `slide-${index + 1}`] as const));
   const sections = readSections(presentation, sldIds);
 
-  const layoutNames = new Map<string, string>();
-  /** the name the layout part carries, which is what `data-layout` names and a new Slide instantiates */
-  const layoutName = async (part: string | undefined): Promise<string> => {
+  const partTrees = new Map<string, Promise<XmlNode>>();
+  /** Layouts and masters are read again for every Slide that names them; the memo lives here, so `OpcReader` stays a plain reader for `roundtrip/` and `emit/preserved.ts`. */
+  const readPart = async (part: string | undefined): Promise<XmlNode | undefined> => {
     if (part === undefined || !pkg.hasPart(part)) {
-      return 'Blank';
+      return undefined;
     }
-    let name = layoutNames.get(part);
-    if (name === undefined) {
-      name = child(await pkg.xml(part), 'p:cSld')?.attrs.name?.trim() || 'Blank';
-      layoutNames.set(part, name);
+    let tree = partTrees.get(part);
+    if (tree === undefined) {
+      tree = pkg.xml(part);
+      partTrees.set(part, tree);
     }
-    return name;
+    return tree;
   };
+  const inherited = inheritanceReader(pkg, presentation, readPart);
+  /** the name the layout part carries, which is what `data-layout` names and a new Slide instantiates */
+  const layoutName = async (part: string | undefined): Promise<string> => child(await readPart(part), 'p:cSld')?.attrs.name?.trim() || 'Blank';
 
   const slides: Slide[] = [];
   for (const [position, part] of slideParts.entries()) {
@@ -69,7 +72,7 @@ export async function parsePptx(bytes: Uint8Array): Promise<Deck> {
     const slide = await readSlide(await pkg.xml(part), position + 1, {
       slide: position + 1,
       layout: await layoutName(rels.find((rel) => rel.type === REL.slideLayout && !rel.external)?.target),
-      inherited: await readInheritedStyles(pkg, part, presentation),
+      inherited: await inherited(rels),
       colors,
       fonts,
       media: (rId) => loadMedia(pkg, rels, rId),

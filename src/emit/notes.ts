@@ -3,7 +3,7 @@
 // the `sldImg` placeholder beside it is where the printed notes page draws the slide thumbnail.
 
 import path from 'node:path';
-import type { Canvas, Slide } from '../model/index.js';
+import type { Canvas, TextBody } from '../model/index.js';
 import { CT, REL, type OpcPackage } from '../ooxml/opc.js';
 import { el, serialize, type XmlNode } from '../ooxml/xml.js';
 import { buildTextBody, type TextEmissionContext } from './text.js';
@@ -53,11 +53,8 @@ export function emitNotesMaster(pkg: OpcPackage, canvas: Canvas, themePart: stri
   pkg.addPart(NOTES_MASTER_PART, CT.notesMaster, serialize(buildNotesMasterXml(canvas)));
 }
 
-/** The Slide's notes as the notes slide `partName`, related both ways: the slide points at it, it points back. */
-export function emitNotesSlide(pkg: OpcPackage, slide: Slide, slidePart: string, partName: string, ctx: NotesEmissionContext): string {
-  if (!slide.notes) {
-    throw new Error(`Slide ${slide.index} has no notes`);
-  }
+/** The notes slide part name, related both ways: the slide points at it, it points back. */
+export function emitNotesSlide(pkg: OpcPackage, slidePart: string, partName: string, notes: TextBody, ctx: NotesEmissionContext): void {
   pkg.addRelationship(partName, REL.notesMaster, relativeTarget(partName, ctx.masterPart));
   pkg.addRelationship(partName, REL.slide, relativeTarget(partName, slidePart));
 
@@ -75,13 +72,12 @@ export function emitNotesSlide(pkg: OpcPackage, slide: Slide, slidePart: string,
       el(
         'p:notes',
         pptNs(),
-        el('p:cSld', {}, el('p:spTree', {}, groupHeader(), slideImagePlaceholder(), notesPlaceholder(buildTextBody(slide.notes, textCtx, {}, { measured: false })))),
+        el('p:cSld', {}, el('p:spTree', {}, groupHeader(), slideImagePlaceholder(), notesPlaceholder(buildTextBody(notes, textCtx, {}, { measured: false })))),
         el('p:clrMapOvr', {}, el('a:masterClrMapping')),
       ),
     ),
   );
   pkg.addRelationship(slidePart, REL.notesSlide, relativeTarget(slidePart, partName));
-  return partName;
 }
 
 function buildNotesMasterXml(canvas: Canvas): XmlNode {

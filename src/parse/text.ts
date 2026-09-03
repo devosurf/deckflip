@@ -6,7 +6,7 @@ import type { AutonumScheme, Bullet, Color, Paragraph, Run, RunStyle, TextBody }
 import type { XmlNode } from '../ooxml/xml.js';
 import { readColor, type ColorScheme, type FontScheme } from './drawing.js';
 import { ptHundredthsToPx, px, exact } from './units.js';
-import { child, children, textOf } from './xml.js';
+import { child, children, defined, textOf } from './xml.js';
 
 /** Where hyperlinks resolve, and what the text inherits when it says nothing itself (parse/inherit.ts). */
 export interface TextContext {
@@ -36,10 +36,6 @@ function childOf(chain: XmlNode[], name: string): XmlNode | undefined {
     }
   }
   return undefined;
-}
-
-function defined(nodes: Array<XmlNode | undefined>): XmlNode[] {
-  return nodes.filter((node): node is XmlNode => node !== undefined);
 }
 
 /** PowerPoint's defaults when `a:bodyPr` or `a:tcPr` omits an inset (EMU). */

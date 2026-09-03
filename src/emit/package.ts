@@ -104,7 +104,7 @@ export async function emitPptx(deck: Deck, opts: EmitOptions): Promise<Buffer> {
   for (const slide of deck.slides) {
     const slidePart = emitSlide(pkg, slide, { deck, slidePartById, media });
     if (slide.notes) {
-      emitNotesSlide(pkg, slide, slidePart, notesSlidePartName(slide.index), notesCtx);
+      emitNotesSlide(pkg, slidePart, notesSlidePartName(slide.index), slide.notes, notesCtx);
     }
   }
 

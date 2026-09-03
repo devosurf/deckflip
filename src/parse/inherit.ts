@@ -3,9 +3,10 @@
 // fills on the layout and on the master, then the master's text styles, then `p:defaultTextStyle`. Chromium
 // inherits nothing from PowerPoint, so whatever the HTML does not say explicitly is lost - hence this walk.
 
-import { REL, type OpcReader } from '../ooxml/opc.js';
+import { REL, type OpcReader, type Relationship } from '../ooxml/opc.js';
 import type { XmlNode } from '../ooxml/xml.js';
-import { child, children } from './xml.js';
+import { readPlaceholder } from './drawing.js';
+import { child, children, defined } from './xml.js';
 
 /** The `a:lvl<N+1>pPr` nodes a shape falls back on, nearest first; `placeholder` is `<type>[:<idx>]`. */
 export type InheritedStyles = (placeholder: string | undefined, level: number) => XmlNode[];
@@ -13,33 +14,56 @@ export type InheritedStyles = (placeholder: string | undefined, level: number) =
 const TITLE_TYPES = new Set(['title', 'ctrTitle']);
 const BODY_TYPES = new Set(['body', 'subTitle', 'obj']);
 
-export async function readInheritedStyles(pkg: OpcReader, slidePart: string, presentation: XmlNode): Promise<InheritedStyles> {
-  const layoutPart = (await pkg.relationships(slidePart)).find((rel) => rel.type === REL.slideLayout && !rel.external)?.target;
-  const layout = layoutPart && pkg.hasPart(layoutPart) ? await pkg.xml(layoutPart) : undefined;
-  const masterPart = layoutPart ? (await pkg.relationships(layoutPart)).find((rel) => rel.type === REL.slideMaster && !rel.external)?.target : undefined;
-  const master = masterPart && pkg.hasPart(masterPart) ? await pkg.xml(masterPart) : undefined;
+/** A part's parsed XML, or undefined when the package has no such part; the deck-wide memo of parse/index.ts. */
+export type PartReader = (part: string | undefined) => Promise<XmlNode | undefined>;
+
+/**
+ * One resolver per deck: every Slide on the same layout shares its resolved styles, so the layout and the
+ * master are read and searched for placeholders once per part however many Slides name them (`OpcReader`
+ * holds no cache of its own). `slideRels` are the Slide's relationships, which the caller read anyway.
+ */
+export function inheritanceReader(pkg: OpcReader, presentation: XmlNode, readPart: PartReader): (slideRels: Relationship[]) => Promise<InheritedStyles> {
+  const byLayout = new Map<string, Promise<InheritedStyles>>();
+  return (slideRels) => {
+    const layoutPart = slideRels.find((rel) => rel.type === REL.slideLayout && !rel.external)?.target ?? '';
+    let styles = byLayout.get(layoutPart);
+    if (styles === undefined) {
+      styles = readInheritedStyles(pkg, layoutPart, presentation, readPart);
+      byLayout.set(layoutPart, styles);
+    }
+    return styles;
+  };
+}
+
+async function readInheritedStyles(pkg: OpcReader, layoutPart: string, presentation: XmlNode, readPart: PartReader): Promise<InheritedStyles> {
+  const layout = await readPart(layoutPart);
+  const masterPart = layout ? (await pkg.relationships(layoutPart)).find((rel) => rel.type === REL.slideMaster && !rel.external)?.target : undefined;
+  const master = await readPart(masterPart);
   const txStyles = child(master, 'p:txStyles');
   const defaultTextStyle = child(presentation, 'p:defaultTextStyle');
+  const layoutPlaceholders = placeholderStyles(layout);
+  const masterPlaceholders = placeholderStyles(master);
 
   return (placeholder, level) => {
-    const [type = 'body', idx] = placeholder === undefined ? [undefined, undefined] : placeholder.split(':', 2);
-    const chain: Array<XmlNode | undefined> = [];
-    if (placeholder !== undefined) {
-      chain.push(levelOf(placeholderStyle(layout, type, idx), level));
-      chain.push(levelOf(placeholderStyle(master, masterType(type), undefined), level));
+    if (placeholder === undefined) {
+      return defined([levelOf(child(txStyles, 'p:otherStyle'), level), levelOf(defaultTextStyle, level)]);
     }
-    chain.push(levelOf(child(txStyles, styleKind(placeholder === undefined ? undefined : type)), level));
-    chain.push(levelOf(defaultTextStyle, level));
-    return chain.filter((node): node is XmlNode => node !== undefined);
+    const [type = 'body', idx] = placeholder.split(':', 2);
+    return defined([
+      levelOf(layoutPlaceholders(type, idx), level),
+      levelOf(masterPlaceholders(masterType(type), undefined), level),
+      levelOf(child(txStyles, styleKind(type)), level),
+      levelOf(defaultTextStyle, level),
+    ]);
   };
 }
 
 /** `p:titleStyle` for titles, `p:bodyStyle` for body placeholders, `p:otherStyle` for everything else. */
-function styleKind(type: string | undefined): string {
-  if (type !== undefined && TITLE_TYPES.has(type)) {
+function styleKind(type: string): string {
+  if (TITLE_TYPES.has(type)) {
     return 'p:titleStyle';
   }
-  return type !== undefined && BODY_TYPES.has(type) ? 'p:bodyStyle' : 'p:otherStyle';
+  return BODY_TYPES.has(type) ? 'p:bodyStyle' : 'p:otherStyle';
 }
 
 /** A master carries one title and one body placeholder, so the slide's type collapses onto those. */
@@ -50,15 +74,32 @@ function masterType(type: string): string {
   return BODY_TYPES.has(type) ? 'body' : type;
 }
 
-/** The `a:lstStyle` of the placeholder a shape fills: same type and index, else same index, else same type. */
-function placeholderStyle(part: XmlNode | undefined, type: string, idx: string | undefined): XmlNode | undefined {
-  const shapes = children(child(child(part, 'p:cSld'), 'p:spTree'), 'p:sp');
-  const candidates = shapes.map((sp) => ({ sp, ph: child(child(child(sp, 'p:nvSpPr'), 'p:nvPr'), 'p:ph') })).filter((candidate) => candidate.ph !== undefined);
-  const match =
-    candidates.find((candidate) => (candidate.ph!.attrs.type ?? 'body') === type && candidate.ph!.attrs.idx === idx) ??
-    (idx === undefined ? undefined : candidates.find((candidate) => candidate.ph!.attrs.idx === idx)) ??
-    candidates.find((candidate) => (candidate.ph!.attrs.type ?? 'body') === type);
-  return match && child(child(match.sp, 'p:txBody'), 'a:lstStyle');
+/**
+ * The `a:lstStyle` of the placeholder a shape fills, by (type, idx): same type and index, else same index,
+ * else same type. The part's shape tree is read once, and each answer is kept, because every paragraph of
+ * every Slide on this layout asks again.
+ */
+function placeholderStyles(part: XmlNode | undefined): (type: string, idx: string | undefined) => XmlNode | undefined {
+  const candidates = children(child(child(part, 'p:cSld'), 'p:spTree'), 'p:sp').flatMap((sp) => {
+    const placeholder = readPlaceholder(child(sp, 'p:nvSpPr'));
+    if (placeholder === undefined) {
+      return [];
+    }
+    const [type = 'body', idx] = placeholder.split(':', 2);
+    return [{ type, idx, style: child(child(sp, 'p:txBody'), 'a:lstStyle') }];
+  });
+  const resolved = new Map<string, XmlNode | undefined>();
+  return (type, idx) => {
+    const key = `${type}:${idx ?? ''}`;
+    if (!resolved.has(key)) {
+      const match =
+        candidates.find((candidate) => candidate.type === type && candidate.idx === idx) ??
+        (idx === undefined ? undefined : candidates.find((candidate) => candidate.idx === idx)) ??
+        candidates.find((candidate) => candidate.type === type);
+      resolved.set(key, match?.style);
+    }
+    return resolved.get(key);
+  };
 }
 
 function levelOf(styles: XmlNode | undefined, level: number): XmlNode | undefined {

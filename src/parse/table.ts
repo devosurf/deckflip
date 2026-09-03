@@ -67,8 +67,10 @@ async function readCell(tc: XmlNode, ctx: DrawingContext & TextContext & { slide
     // one empty run the html side gives such cells
     cell.merged = merged;
     const first = text.paragraphs[0]!;
+    const p = child(txBody, 'a:p');
+    const endParaRPr = p ? child(p, 'a:endParaRPr') : undefined;
     if (!first.runs.some((run) => run.kind === 'text')) {
-      first.runs.push({ kind: 'text', text: '', style: readRunStyle(child(child(txBody, 'a:p'), 'a:endParaRPr') ? [child(child(txBody, 'a:p'), 'a:endParaRPr')!] : [], ctx) });
+      first.runs.push({ kind: 'text', text: '', style: readRunStyle(endParaRPr ? [endParaRPr] : [], ctx) });
     }
     return cell;
   }
