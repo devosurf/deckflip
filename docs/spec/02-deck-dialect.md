@@ -59,7 +59,7 @@ Same dialect, canonical single-file form, deterministic:
 - `<head>`: `<title>`, `deckflip:canvas`, one `<style>` holding the base rules plus theme tokens as custom properties (`--theme-accent1`, `--theme-major-font`, ...) and one class per distinct run/paragraph style set (`.t1`, `.t2`, ...). Geometry is never in the stylesheet.
 - One `<section id="slide-<n>" data-title data-layout>` per Slide. Each shape is a direct child of the section in z-order (backmost first), `style="position:absolute; left:..px; top:..px; width:..px; height:..px"` plus `transform: rotate(..deg)` when rotated. Groups are `<div data-group>` containers with their own absolute box and absolutely positioned children (relative to the group).
 - Text bodies are `<div>` with one `<p>` per paragraph and `<span>` runs; `ul`/`ol` for bulleted/numbered paragraphs; `<br>` for line breaks. Pictures are `<img>`, tables `<table>`, media `<video>`/`<audio>`, vector shapes that HTML cannot express are inline `<svg>`.
-- Every element that came from a shape carries `data-shape-id="<slide number>-<spid>"` (stable locator for the report and `inspect`); opaque preserved content carries `data-preserve` (#14).
+- Every element that came from a shape carries `data-shape-id="<slide number>-<spid>"` (stable locator for the report and `inspect`); opaque preserved content is an empty `div[data-preserve="<class>"]` with the shape name in `title` (#14).
 - Assets go to `<name>.assets/` next to the HTML: `media/` (pictures, media, raster PNGs), `fonts/` (extracted embedded fonts), and the round-trip manifest (#14). Filenames are deterministic (`image-001.png`, content-hash deduplicated).
 
 ## Reserved names (complete list)

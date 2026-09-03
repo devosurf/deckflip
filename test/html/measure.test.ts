@@ -576,4 +576,31 @@ describe.skipIf(!browserAvailable)('measureDeck', () => {
       await browser.close();
     }
   });
+
+  it('measures data-preserve boxes as opaque elements, reads nothing inside them, and keeps text effects editable', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'deckflip-preserve-'));
+    const file = join(dir, 'deck.html');
+    await writeFile(file, [
+      '<!doctype html><html><head><title>Deck</title></head><body>',
+      '<section id="slide-1">',
+      '  <div data-preserve="chart" data-shape-id="1-2" title="Chart 1" style="position: absolute; left: 96px; top: 96px; width: 192px; height: 96px; transform: rotate(15deg)"></div>',
+      '  <div data-preserve="ole" data-shape-id="1-3" title="Object 2" style="position: absolute; left: 0; top: 300px; width: 100px; height: 100px; background: #000"><p>edited inside</p></div>',
+      '  <div data-shape-id="1-4" data-preserve="text-effects" style="position: absolute; left: 0; top: 450px; width: 300px; height: 50px; font: 24px Arial">Arch</div>',
+      '</section>',
+      '</body></html>',
+    ].join('\n'), 'utf8');
+    const loaded = await loadDeck(file, {});
+    const browser = await chromium.launch();
+    try {
+      const measured = await measureDeck(loaded, { browser });
+      const [chart, ole, wordArt] = measured.deck.slides[0]!.elements;
+      expect(chart).toEqual({ kind: 'opaque', class: 'chart', shapeId: '1-2', selector: '[data-shape-id="1-2"]', name: 'Chart 1', box: { x: 96, y: 96, w: 192, h: 96 }, rotation: 15, parts: [] });
+      expect(ole).toMatchObject({ kind: 'opaque', class: 'ole', shapeId: '1-3', box: { x: 0, y: 300, w: 100, h: 100 } });
+      expect(wordArt).toMatchObject({ kind: 'shape', shapeId: '1-4', preserve: 'text-effects' });
+      expect(wordArt!.kind === 'shape' && wordArt!.text?.paragraphs[0]!.runs[0]).toMatchObject({ kind: 'text', text: 'Arch' });
+      expect(measured.entries.map((entry) => [entry.code, entry.severity, entry.slide, entry.locator])).toEqual([['DROPPED_EDIT_OPAQUE', 'warning', 1, { selector: '[data-shape-id="1-3"]' }]]);
+    } finally {
+      await browser.close();
+    }
+  });
 });

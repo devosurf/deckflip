@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { emitHtml } from '../../src/htmlout/index.js';
-import type { Deck, Element, PictureElement, ShapeElement } from '../../src/model/index.js';
+import type { Deck, Element, OpaqueElement, PictureElement, ShapeElement } from '../../src/model/index.js';
 
 function deckWith(elements: Element[], slides: Partial<Deck['slides'][number]>[] = [{}]): Deck {
   return {
@@ -41,5 +41,15 @@ describe('emitHtml', () => {
     expect(html).toMatch(/<div class="new" style=/);
     expect(html.match(/data-shape-id/g)).toHaveLength(2);
     expect(slides).toEqual([{ id: 'intro', background: '1-2', merged: { '1-3': ['1-3', '1-4'] } }]);
+  });
+
+  it('writes opaque content as an empty data-preserve box with its label, and marks text effects on their shape', () => {
+    const chart: OpaqueElement = { kind: 'opaque', class: 'chart', shapeId: '1-2', selector: '[data-shape-id="1-2"]', name: 'Chart 1', box: { x: 96, y: 96, w: 192, h: 96 }, rotation: 15, parts: ['/ppt/charts/chart1.xml'] };
+    const wordArt: ShapeElement = { kind: 'shape', shapeId: '1-3', preserve: 'text-effects', selector: '[data-shape-id="1-3"]', name: 'WordArt 2', box: { x: 0, y: 200, w: 100, h: 50 }, rotation: 0, geometry: { preset: 'rect' }, fill: { type: 'solid', color: { hex: '000000', alpha: 1 } } };
+    const { html, slides } = emitHtml(deckWith([chart, wordArt]));
+    expect(html).toContain('<div data-preserve="chart" data-shape-id="1-2" title="Chart 1" style="position: absolute; left: 96px; top: 96px; width: 192px; height: 96px; transform: rotate(15deg)"></div>');
+    expect(html).toMatch(/<div data-shape-id="1-3" data-preserve="text-effects" style=/);
+    expect(html).toContain('[data-preserve]');
+    expect(slides).toEqual([{ id: 'slide-1', merged: {} }]);
   });
 });

@@ -5,15 +5,17 @@ import type { Deck, Element, ResolvedFont, TextBody } from '../model/index.js';
 import { textBodiesOf } from '../model/index.js';
 
 export interface InspectElement {
-  kind: 'group' | 'picture' | 'table' | 'shape' | 'text';
-  /** `raster` for captured subtrees (spec 05), else `native` */
-  source: 'native' | 'raster';
+  kind: 'group' | 'picture' | 'table' | 'shape' | 'text' | 'opaque';
+  /** `raster` for captured subtrees (spec 05), `preserved` for opaque content carried from the source (spec 06), else `native` */
+  source: 'native' | 'raster' | 'preserved';
   /** raster pictures: whether `data-raster` asked for the capture */
   explicit?: boolean;
   selector: string;
   box: Element['box'];
   text?: string;
   children?: InspectElement[];
+  /** opaque elements: what they are and the parts they live in */
+  opaque?: { class: 'chart' | 'smartart' | 'ole' | 'vector'; parts: string[] };
 }
 
 export interface InspectDocument {
@@ -48,6 +50,9 @@ function inspectElement(element: Element): InspectElement {
   }
   if (element.kind === 'table') {
     return { kind: 'table', source: 'native', selector: element.selector, box: element.box };
+  }
+  if (element.kind === 'opaque') {
+    return { kind: 'opaque', source: 'preserved', selector: element.selector, box: element.box, opaque: { class: element.class, parts: element.parts } };
   }
   return {
     kind: element.text === undefined ? 'shape' : 'text',

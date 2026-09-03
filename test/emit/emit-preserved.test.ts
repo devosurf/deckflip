@@ -72,7 +72,7 @@ describe('emitPptx with a preserved source', () => {
       ],
     };
     const plan = planSplice(measured, sectionsOf(edited), manifest, source);
-    expect(plan.entries).toEqual([]);
+    expect(plan.entries.map((entry) => entry.code)).toEqual(['PRESERVE_OPAQUE_ANIMATION', 'PRESERVE_OPAQUE_MASTER']);
 
     const bytes = await emitPptx(measured, { appVersion: 'test', created, preserved: { source, plan } });
     const out = await entries(bytes);
@@ -122,5 +122,47 @@ describe('emitPptx with a preserved source', () => {
     const contentTypes = textOf(out.get('[Content_Types].xml'));
     expect(contentTypes).toContain('<Override PartName="/ppt/slides/slide4.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>');
     expect(contentTypes).toContain('<Override PartName="/ppt/media/image1.png" ContentType="image/png"/>');
+  });
+  it('re-emits a moved opaque element from its source with the transform rewritten, reports what it carried and what an edit dropped', async () => {
+    const chart = '<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="2" name="Chart 1"/><p:cNvGraphicFramePr/><p:nvPr/></p:nvGraphicFramePr><p:xfrm><a:off x="914400" y="914400"/><a:ext cx="1828800" cy="914400"/></p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="rId2"/></a:graphicData></a:graphic></p:graphicFrame>';
+    const wordArt = '<p:sp><p:nvSpPr><p:cNvPr id="3" name="WordArt 2"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="2743200"/><a:ext cx="1828800" cy="457200"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr wrap="none"><a:prstTxWarp prst="textArchUp"><a:avLst/></a:prstTxWarp></a:bodyPr><a:p><a:r><a:rPr lang="en-US" sz="1800"/><a:t>Arch</a:t></a:r></a:p></p:txBody></p:sp>';
+    const pptx = await buildPptx({
+      slides: [{ name: 'One', shapes: `${chart}${wordArt}${box(4, 'Box', 914400)}`, rels: [['rId2', 'chart', '../charts/chart1.xml']], tail: timing(4) }],
+      parts: { 'ppt/charts/chart1.xml': '<c:chartSpace/>' },
+      contentTypes: { overrides: { '/ppt/charts/chart1.xml': 'application/vnd.openxmlformats-officedocument.drawingml.chart+xml' } },
+      vba: true,
+    });
+    const deck = await parsePptx(pptx);
+    const source = await indexSource(await OpcReader.load(pptx));
+    const { html, slides } = emitHtml(deck);
+    const manifest = buildManifest(html, slides, source, sha256(pptx));
+
+    // move the chart, edit the WordArt text
+    const edited = html.replace('left: 96px; top: 96px; width: 192px; height: 96px', 'left: 300px; top: 100px; width: 200px; height: 100px; transform: rotate(10deg)').replace('Arch', 'Arc');
+    expect(edited).not.toBe(html);
+    const elements = deck.slides[0]!.elements;
+    const chartElement = { ...byId(elements, '1-2'), box: { x: 300, y: 100, w: 200, h: 100 }, rotation: 10 };
+    const wordArtElement = structuredClone(byId(elements, '1-3')) as ShapeElement;
+    const run = wordArtElement.text!.paragraphs[0]!.runs[0]!;
+    if (run.kind === 'text') run.text = 'Arc';
+    const measured: Deck = { ...deck, slides: [{ ...deck.slides[0]!, elements: [chartElement, wordArtElement, byId(elements, '1-4')] }] };
+    const plan = planSplice(measured, sectionsOf(edited), manifest, source);
+    expect(plan.entries.map((entry) => [entry.code, entry.severity, entry.locator])).toEqual([
+      ['PRESERVE_OPAQUE_CHART', 'info', { selector: '[data-shape-id="1-2"]' }],
+      ['DROPPED_TEXT_EFFECTS', 'warning', { selector: '[data-shape-id="1-3"]' }],
+      ['PRESERVE_OPAQUE_ANIMATION', 'info', { selector: '#slide-1' }],
+      ['PRESERVE_OPAQUE_MASTER', 'info', undefined],
+      ['PRESERVE_OPAQUE_VBA', 'info', undefined],
+    ]);
+
+    const bytes = await emitPptx(measured, { appVersion: 'test', created, preserved: { source, plan } });
+    const out = await entries(bytes);
+    const slide1 = textOf(out.get('ppt/slides/slide1.xml'));
+    expect(slide1).toContain(chart.replace('<p:xfrm><a:off x="914400" y="914400"/><a:ext cx="1828800" cy="914400"/></p:xfrm>', '<p:xfrm rot="600000"><a:off x="2857500" y="952500"/><a:ext cx="1905000" cy="952500"/></p:xfrm>').replace('r:id="rId2"', 'r:id="rId2"'));
+    expect(slide1).not.toContain('prstTxWarp');
+    expect(slide1).toContain('>Arc</a:t>');
+    expect(slide1).toContain(timing(4));
+    expect(out.has('ppt/vbaProject.bin')).toBe(true);
+    expect(out.has('ppt/charts/chart1.xml')).toBe(true);
   });
 });

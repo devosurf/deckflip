@@ -53,7 +53,7 @@ describe('planSplice', () => {
     const { deck, html, manifest, source } = await fixture();
     const plan = planSplice(deck, sectionsOf(html), manifest, source);
     expect(plan.identical).toBe(true);
-    expect(plan.entries).toEqual([]);
+    expect(plan.entries.map((entry) => [entry.code, entry.slide])).toEqual([['PRESERVE_OPAQUE_ANIMATION', 1], ['PRESERVE_OPAQUE_ANIMATION', 2], ['PRESERVE_OPAQUE_MASTER', undefined]]);
     expect(plan.slides.map((slide) => [slide.untouched, slide.shellUntouched, slide.source?.partName])).toEqual([
       [true, true, '/ppt/slides/slide1.xml'],
       [true, true, '/ppt/slides/slide2.xml'],
@@ -110,8 +110,11 @@ describe('planSplice', () => {
     expect(third!.keepIds.size).toBe(0);
 
     expect(plan.entries.map((entry) => [entry.code, entry.slide, entry.reason])).toEqual([
+      ['PRESERVE_OPAQUE_ANIMATION', 1, 'Slide 1 keeps its animations and transition from the source'],
+      ['PRESERVE_OPAQUE_ANIMATION', 2, 'Slide 2 keeps its animations and transition from the source'],
       ['PRESERVE_UNKNOWN_ID', 3, 'data-shape-id="9-9" is not in the manifest'],
       ['PRESERVE_UNKNOWN_ID', 3, 'data-shape-id="2-7" appears more than once'],
+      ['PRESERVE_OPAQUE_MASTER', undefined, 'masters, layouts and themes come from the source; new Slides instantiate the layout they name'],
     ]);
   });
 
@@ -140,7 +143,7 @@ describe('planSplice', () => {
     expect(second!.splices.get(boxElement)).toMatchObject({ fragments: [{ id: 3 }] });
     expect(second!.splices.get(boxElement)!.source.partName).toBe('/ppt/slides/slide1.xml');
     expect(third).toMatchObject({ untouched: true });
-    expect(plan.entries.map((entry) => [entry.code, entry.slide])).toEqual([['DROPPED_ANIMATION', 1]]);
+    expect(plan.entries.map((entry) => [entry.code, entry.slide])).toEqual([['DROPPED_ANIMATION', 1], ['PRESERVE_OPAQUE_ANIMATION', 2], ['PRESERVE_OPAQUE_MASTER', undefined]]);
   });
 
   it('reordering slides leaves every slide untouched but the deck not identical', async () => {

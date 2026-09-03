@@ -41,7 +41,27 @@ export interface Slide {
   notes?: TextBody;
 }
 
-export type Element = ShapeElement | PictureElement | TableElement | GroupElement;
+export type Element = ShapeElement | PictureElement | TableElement | GroupElement | OpaqueElement;
+
+export type OpaqueClass = 'chart' | 'smartart' | 'ole' | 'vector';
+
+/**
+ * PPTX content HTML cannot represent (spec 06 "Opaque"): charts, SmartArt, OLE objects, connectors, ink,
+ * metafile pictures. Shown as a positioned `data-preserve` box; only its box, rotation and presence are
+ * editable; the way back re-emits it from the source package.
+ */
+export interface OpaqueElement {
+  kind: 'opaque';
+  class: OpaqueClass;
+  shapeId?: string;
+  selector: string;
+  name: string;
+  box: Box;
+  /** degrees clockwise */
+  rotation: number;
+  /** package parts the content lives in beyond the slide (`/ppt/charts/chart1.xml`, ...) */
+  parts: string[];
+}
 
 /** A `data-group` container: `p:grpSp` around its painting descendants (spec 03 rule 4). */
 export interface GroupElement {
@@ -173,6 +193,8 @@ export interface ShapeElement {
   kind: 'shape';
   /** `<slide number>-<p:cNvPr id>`: the `data-shape-id` locator of an element that came from a PPTX shape (spec 02), the key the round-trip manifest uses */
   shapeId?: string;
+  /** WordArt, 3D or warped text (spec 06): the text is editable, the effects are kept only while the shape is untouched */
+  preserve?: 'text-effects';
   /** CSS selector locating the source element (report locator) */
   selector: string;
   /** `p:cNvPr/@name`: tag plus id/class hint */

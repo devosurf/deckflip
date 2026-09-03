@@ -1,4 +1,4 @@
-import type { Align, AutonumScheme, Box, Bullet, Color, CornerRadius, Fill, GroupElement, ImageFill, ImagePlacement, Insets, Line, Paragraph, PictureElement, Run, RunStyle, ShapeElement, TableCell, TableElement, TableRow, TextBody } from '../model/index.js';
+import type { Align, AutonumScheme, Box, Bullet, Color, CornerRadius, Fill, GroupElement, ImageFill, ImagePlacement, Insets, Line, OpaqueClass, OpaqueElement, Paragraph, PictureElement, Run, RunStyle, ShapeElement, TableCell, TableElement, TableRow, TextBody } from '../model/index.js';
 import type { HtmlChild, HtmlNode } from '../roundtrip/fingerprint.js';
 
 export interface BrowserFontFace {
@@ -50,7 +50,10 @@ export interface BrowserRaster {
   trigger?: RasterTrigger;
 }
 
-export type BrowserElement = BrowserShape | BrowserPicture | TableElement | BrowserGroup | BrowserRaster;
+/** A `data-preserve` box (spec 06): only its geometry is read; `edited` when the author put content inside it. */
+export type BrowserOpaque = Omit<OpaqueElement, 'parts'> & { edited: boolean };
+
+export type BrowserElement = BrowserShape | BrowserPicture | TableElement | BrowserGroup | BrowserRaster | BrowserOpaque;
 
 export interface BrowserMeasureResult {
   meta: {
@@ -305,6 +308,10 @@ export function measureSlideDocument(): BrowserMeasureResult {
     if (isSkipped(el)) {
       return [];
     }
+    const preserve = el.getAttribute('data-preserve');
+    if (preserve !== null && preserve !== 'text-effects') {
+      return [measureOpaque(el, preserve)];
+    }
     const raster = classifyRaster(el);
     if (raster) {
       return [raster];
@@ -313,6 +320,26 @@ export function measureSlideDocument(): BrowserMeasureResult {
       return measureGroup(el);
     }
     return walkPainting(el);
+  }
+
+
+
+  /** Opaque content (spec 06): the box and rotation of the placeholder, nothing inside it; the label is its name. */
+  function measureOpaque(el: HTMLElement, preserve: string): BrowserOpaque {
+    const cs = getComputedStyle(el);
+    const box = withoutTransform(el, () => measuredBox(el));
+    const frame = measureFrame(el, cs, box, cs.transform);
+    const edited = Array.from(el.childNodes).some((node) => node.nodeType === Node.ELEMENT_NODE || (node.nodeType === Node.TEXT_NODE && (node.textContent ?? '').trim() !== ''));
+    return {
+      kind: 'opaque',
+      class: (['chart', 'smartart', 'ole', 'vector'] as OpaqueClass[]).find((cls) => cls === preserve) ?? 'vector',
+      ...(frame.shapeId === undefined ? {} : { shapeId: frame.shapeId }),
+      selector: frame.selector,
+      name: el.getAttribute('title') || elementName(el),
+      box: frame.box,
+      rotation: frame.rotation,
+      edited,
+    };
   }
 
   /**
@@ -971,6 +998,9 @@ export function measureSlideDocument(): BrowserMeasureResult {
     }
     if (text) {
       shape.text = text;
+    }
+    if (el.getAttribute('data-preserve') === 'text-effects') {
+      shape.preserve = 'text-effects';
     }
     scaleShape(shape, scale);
     const opacity = effectiveOpacity(el);
@@ -2396,9 +2426,14 @@ export function measureSlideDocument(): BrowserMeasureResult {
     return { tag: el.localName, attrs, children };
   }
 
+  /** `#id`, else the `data-shape-id` locator of a round-tripped element (spec 02), else a positional path from the section. */
   function cssPath(el: HTMLElement): string {
     if (el.id) {
       return `#${el.id}`;
+    }
+    const shapeId = el.getAttribute('data-shape-id');
+    if (shapeId) {
+      return `[data-shape-id="${shapeId}"]`;
     }
     const parts: string[] = [];
     let current: HTMLElement | null = el;

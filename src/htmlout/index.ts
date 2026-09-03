@@ -49,6 +49,7 @@ export function emitHtml(deck: Deck, opts: EmitHtmlOptions = {}): HtmlDeck {
     `<title>${text(deck.title)}</title>`,
     '<style>',
     baseStylesheet(deck.canvas.width, deck.canvas.height),
+    OPAQUE_STYLESHEET,
     ...ctx.sheet.rules(),
     '</style>',
     '</head>',
@@ -60,6 +61,12 @@ export function emitHtml(deck: Deck, opts: EmitHtmlOptions = {}): HtmlDeck {
   ].join('\n');
   return { html, assets: ctx.assets, slides };
 }
+
+/** Opaque boxes (spec 06): a dashed frame with a label, drawn by CSS so the box itself stays empty. */
+const OPAQUE_STYLESHEET = [
+  '[data-preserve]:not([data-preserve="text-effects"]) { box-sizing: border-box; outline: 1px dashed #94a3b8; outline-offset: -1px; background: repeating-linear-gradient(135deg, rgba(148, 163, 184, 0.12) 0 8px, transparent 8px 16px); }',
+  '[data-preserve]:not([data-preserve="text-effects"])::before { content: attr(data-preserve) ": " attr(title); position: absolute; left: 4px; top: 2px; font: 11px/1.4 sans-serif; color: #64748b; }',
+].join('\n');
 
 /**
  * A text-free shape named after the section is the section's own background (the measurer pushes one when

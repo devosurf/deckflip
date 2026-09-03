@@ -3,7 +3,7 @@
 // that measuring the output names it the same way again.
 
 import { createHash } from 'node:crypto';
-import type { Element, GroupElement, Line, Media, PictureElement, ShapeElement, TableCell, TableElement } from '../model/index.js';
+import type { Element, GroupElement, Line, Media, OpaqueElement, PictureElement, ShapeElement, TableCell, TableElement } from '../model/index.js';
 import { baselineCorrectionPx } from '../emit/text.js';
 import { borderCss, boxCss, fillCss, geometryCss, lineValue, num, pxv, shadowCss } from './css.js';
 import { attr, text as escape } from './escape.js';
@@ -88,7 +88,17 @@ function elementHtml(element: Element, origin: { x: number; y: number }, ctx: El
       return tableHtml(element, origin, ctx);
     case 'group':
       return groupHtml(element, origin, ctx);
+    case 'opaque':
+      return opaqueHtml(element, origin);
   }
+}
+
+/**
+ * Opaque content (spec 06): an empty positioned box the stylesheet labels from `data-preserve` and `title`.
+ * Empty on purpose: anything an author puts inside is a content edit the way back drops (`DROPPED_EDIT_OPAQUE`).
+ */
+function opaqueHtml(element: OpaqueElement, origin: { x: number; y: number }): string {
+  return `<div data-preserve="${element.class}"${identityAttr(element)} title="${attr(element.name)}" style="${boxCss(local(element.box, origin), element.rotation).join('; ')}"></div>`;
 }
 
 function local(box: { x: number; y: number; w: number; h: number }, origin: { x: number; y: number }): { x: number; y: number; w: number; h: number } {
@@ -107,7 +117,7 @@ function shapeDecorationCss(shape: ShapeElement, ctx: ElementContext): string[] 
 /** The measurer reads a text-bearing block as one shape; a text-free painted block as one shape too. */
 export function shapeHtml(shape: ShapeElement, origin: { x: number; y: number }, ctx: ElementContext): string {
   const { tag, attrs: named } = nameParts(shape.name);
-  const attrs = `${named}${identityAttr(shape)}`;
+  const attrs = `${named}${identityAttr(shape)}${shape.preserve === undefined ? '' : ` data-preserve="${shape.preserve}"`}`;
   const css = [...boxCss(local(shape.box, origin), shape.rotation), 'box-sizing: border-box', 'margin: 0', ...shapeDecorationCss(shape, ctx)];
   if (!shape.text) {
     return `<${tag}${attrs} style="${css.join('; ')}"></${tag}>`;

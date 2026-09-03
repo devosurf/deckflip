@@ -1,6 +1,6 @@
 # Editing an existing PPTX (round trip)
 
-Availability: PPTX -> HTML ships after this version; `deckflip convert deck.pptx` and `--to html` currently exit 3. The rules below describe the round trip as specified, so decks authored now stay compatible.
+Availability: `deckflip convert deck.pptx` writes the HTML Deck and its Asset directory; `deckflip convert deck.html` splices the untouched parts back. `deckflip validate deck.pptx` lists what the round trip keeps opaque before you start.
 
 ## The flow
 
@@ -11,13 +11,13 @@ Availability: PPTX -> HTML ships after this version; `deckflip convert deck.pptx
 ## What the HTML looks like
 
 - One `<section id="slide-<n>" data-title data-layout>` per Slide; each shape a direct child with `style="position:absolute; left..; top..; width..; height.."` and `transform: rotate()` when rotated. Groups are `<div data-group>` with absolutely positioned children.
-- Text bodies are `<div>` with `<p>` and `<span>` runs; lists `ul`/`ol`; pictures `img`; tables `table`; media `video`/`audio`; geometries HTML cannot express are inline `<svg data-preserve>`.
+- Text bodies are `<div>` with `<p>` and `<span>` runs; lists `ul`/`ol`; pictures `img`; tables `table`; media `video`/`audio`; content HTML cannot show is an empty `div[data-preserve="<class>"]` box labelled by its `title`.
 - Every element from a shape carries `data-shape-id`. Leave it alone: it is how the tool knows which shape you edited. Inventing or duplicating ids is ignored (`PRESERVE_UNKNOWN_ID`).
 - Theme tokens are CSS custom properties (`--theme-accent1`, `--theme-major-font`, ...), run/paragraph styles are classes (`.t1`, `.t2`, ...). Geometry is never in the stylesheet.
 
 ## Opaque content (`data-preserve`)
 
-Charts, SmartArt, OLE objects, WordArt effects, masters/layouts/themes, animations, comments and VBA are **opaque**: shown as a positioned box (with a preview image where one exists). You may move, resize, rotate or delete the box; edits inside it are ignored (`DROPPED_EDIT_OPAQUE`, warning). To change such content, recreate it as HTML and delete the opaque box.
+Charts, SmartArt, OLE objects, connectors and metafile pictures (`data-preserve="chart|smartart|ole|vector"`), WordArt effects (`data-preserve="text-effects"` on an editable text box), masters/layouts/themes, animations, comments and VBA are **opaque**: shown as an empty positioned box labelled with the shape name. You may move, resize, rotate or delete the box; anything written inside it is ignored (`DROPPED_EDIT_OPAQUE`, warning). To change such content, recreate it as HTML and delete the opaque box.
 
 - New Slides instantiate the layout named by `data-layout` on the preserved master, else `Blank`.
 - Animations survive on untouched Slides, and on touched Slides as long as every shape they reference still exists (`DROPPED_ANIMATION` otherwise).

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { emitPptx } from '../../src/emit/index.js';
 import type { Deck, Element, Paragraph, PictureElement, RunStyle, ShapeElement, TableCell, TableElement, TextBody } from '../../src/model/index.js';
 import { parsePptx } from '../../src/parse/index.js';
-import { buildBlankPptx } from '../render/pptx-fixture.js';
+import { buildBlankPptx, buildPptx } from '../render/pptx-fixture.js';
 
 const created = new Date('2024-01-02T03:04:05.000Z');
 
@@ -54,6 +54,54 @@ describe('parsePptx', () => {
       fontFaces: [],
       slides: [{ index: 1, id: 'slide-1', name: 'Slide 1', layout: 'Blank', elements: [] }],
     });
+  });
+
+  it('reads what the IDM cannot hold as opaque records with their box, class and parts, and marks text effects', async () => {
+    const chart = '<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="2" name="Chart 1"/><p:cNvGraphicFramePr/><p:nvPr/></p:nvGraphicFramePr><p:xfrm><a:off x="914400" y="914400"/><a:ext cx="1828800" cy="914400"/></p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="rId2"/></a:graphicData></a:graphic></p:graphicFrame>';
+    const smartArt = '<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="3" name="Diagram 2"/><p:cNvGraphicFramePr/><p:nvPr/></p:nvGraphicFramePr><p:xfrm><a:off x="0" y="0"/><a:ext cx="914400" cy="914400"/></p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/diagram"><dgm:relIds xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram" r:dm="rId3" r:lo="rId4" r:qs="rId5" r:cs="rId6"/></a:graphicData></a:graphic></p:graphicFrame>';
+    const ole = '<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="4" name="Object 3"/><p:cNvGraphicFramePr/><p:nvPr/></p:nvGraphicFramePr><p:xfrm><a:off x="0" y="1828800"/><a:ext cx="914400" cy="914400"/></p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/presentationml/2006/ole"><p:oleObj r:id="rId7" progId="Excel.Sheet.12"/></a:graphicData></a:graphic></p:graphicFrame>';
+    const connector = '<p:cxnSp><p:nvCxnSpPr><p:cNvPr id="5" name="Straight Connector 4"/><p:cNvCxnSpPr/><p:nvPr/></p:nvCxnSpPr><p:spPr><a:xfrm rot="5400000"><a:off x="1828800" y="1828800"/><a:ext cx="914400" cy="0"/></a:xfrm><a:prstGeom prst="line"><a:avLst/></a:prstGeom></p:spPr></p:cxnSp>';
+    const wordArt = '<p:sp><p:nvSpPr><p:cNvPr id="6" name="WordArt 5"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="2743200"/><a:ext cx="1828800" cy="457200"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr wrap="none"><a:prstTxWarp prst="textArchUp"><a:avLst/></a:prstTxWarp></a:bodyPr><a:p><a:r><a:rPr lang="en-US" sz="1800"/><a:t>Arch</a:t></a:r></a:p></p:txBody></p:sp>';
+    const metafile = '<p:pic><p:nvPicPr><p:cNvPr id="7" name="Picture 6"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="rId8"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x="2743200" y="2743200"/><a:ext cx="914400" cy="914400"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>';
+    const pptx = await buildPptx({
+      slides: [{
+        shapes: `${chart}${smartArt}${ole}${connector}${wordArt}${metafile}`,
+        rels: [
+          ['rId2', 'chart', '../charts/chart1.xml'],
+          ['rId3', 'diagramData', '../diagrams/data1.xml'],
+          ['rId4', 'diagramLayout', '../diagrams/layout1.xml'],
+          ['rId5', 'diagramQuickStyle', '../diagrams/quickStyle1.xml'],
+          ['rId6', 'diagramColors', '../diagrams/colors1.xml'],
+          ['rId7', 'oleObject', '../embeddings/oleObject1.xlsx'],
+          ['rId8', 'image', '../media/image1.emf'],
+        ],
+      }],
+      parts: {
+        'ppt/charts/chart1.xml': '<c:chartSpace/>',
+        'ppt/diagrams/data1.xml': '<dgm:dataModel/>',
+        'ppt/diagrams/layout1.xml': '<dgm:layoutDef/>',
+        'ppt/diagrams/quickStyle1.xml': '<dgm:styleDef/>',
+        'ppt/diagrams/colors1.xml': '<dgm:colorsDef/>',
+        'ppt/embeddings/oleObject1.xlsx': new Uint8Array([1]),
+        'ppt/media/image1.emf': new Uint8Array([1]),
+      },
+    });
+    const deck = await parsePptx(pptx);
+    const elements = deck.slides[0]!.elements;
+    expect(elements.map((element) => [element.kind, element.shapeId, element.name])).toEqual([
+      ['opaque', '1-2', 'Chart 1'],
+      ['opaque', '1-3', 'Diagram 2'],
+      ['opaque', '1-4', 'Object 3'],
+      ['opaque', '1-5', 'Straight Connector 4'],
+      ['shape', '1-6', 'WordArt 5'],
+      ['opaque', '1-7', 'Picture 6'],
+    ]);
+    expect(elements[0]).toEqual({ kind: 'opaque', class: 'chart', shapeId: '1-2', selector: '[data-shape-id="1-2"]', name: 'Chart 1', box: { x: 96, y: 96, w: 192, h: 96 }, rotation: 0, parts: ['/ppt/charts/chart1.xml'] });
+    expect(elements[1]).toMatchObject({ class: 'smartart', parts: ['/ppt/diagrams/data1.xml', '/ppt/diagrams/layout1.xml', '/ppt/diagrams/quickStyle1.xml', '/ppt/diagrams/colors1.xml'] });
+    expect(elements[2]).toMatchObject({ class: 'ole', parts: ['/ppt/embeddings/oleObject1.xlsx'] });
+    expect(elements[3]).toMatchObject({ class: 'vector', box: { x: 192, y: 192, w: 96, h: 0 }, rotation: 90, parts: [] });
+    expect(elements[4]).toMatchObject({ kind: 'shape', preserve: 'text-effects' });
+    expect(elements[5]).toMatchObject({ class: 'vector', parts: ['/ppt/media/image1.emf'] });
   });
 
   it('reads shapes back with their border box, rotation, geometry, fills, line, shadow and text body', async () => {
@@ -330,7 +378,8 @@ describe('parsePptx', () => {
     expect(table.rows[1]!.cells[1]).toEqual(expected.rows[1]!.cells[1]);
 
     // a continuation cell carries no content of its own: only the end-paragraph size survives, so it reads
-    // back as the html side produces it, one empty run at that size, with no insets or borders
+    // back as the html side produces it, one empty run at that size (its typeface the theme's minor font,
+    // as any run without `a:latin`), with no insets or borders
     const continuation = (merged: 'h' | 'v', size: number, lineHeight: number): TableCell => ({
       colSpan: 1,
       rowSpan: 1,
@@ -340,7 +389,7 @@ describe('parsePptx', () => {
       anchor: 't',
       text: {
         ...body(''),
-        paragraphs: [paragraph({ lineHeight, runs: [{ kind: 'text', text: '', style: { ...style({ size }), fontStack: [], color: { hex: '000000', alpha: 1 } } }] })],
+        paragraphs: [paragraph({ lineHeight, runs: [{ kind: 'text', text: '', style: { ...style({ size }), fontStack: ['Arial'], color: { hex: '000000', alpha: 1 } } }] })],
       },
     });
     expect(table.rows[0]!.cells[1]).toEqual(continuation('h', 20, 24));

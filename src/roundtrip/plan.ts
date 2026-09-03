@@ -2,9 +2,10 @@
 // "Detecting untouched"): the manifest's fingerprints against the sections the measurer saw. The plan is
 // keyed by the measured Deck's own elements, so the emitter can consult it while it walks them.
 
-import type { Deck, Element, Slide } from '../model/index.js';
+import type { Box, Deck, Element, Slide } from '../model/index.js';
 import { entry as reportEntry } from '../report/codes.js';
 import type { Entry } from '../report/types.js';
+import { animationEntry, commentsEntry, deckEntries, hasComments, hasTiming, opaqueEntry, textEffectsEntry } from './entries.js';
 import type { HtmlNode } from './fingerprint.js';
 import { observeSection, type Manifest, type ManifestShape, type ManifestSlide, type ObservedSection } from './manifest.js';
 import type { SourceIndex, SourceShape, SourceSlide } from './source.js';
@@ -14,6 +15,8 @@ export interface ElementSplice {
   source: SourceSlide;
   /** verbatim fragments standing in for the element, in z-order; empty when an earlier element already stands for it */
   fragments: SourceShape[];
+  /** an opaque element moved, resized or rotated: the fragments' first transform is rewritten to this */
+  geometry?: { box: Box; rotation: number };
 }
 
 export interface SlidePlan {
@@ -61,11 +64,17 @@ export function planSplice(deck: Deck, sections: HtmlNode[], manifest: Manifest,
   }
 
   const entries: Entry[] = [];
+  const taken = new Set<ManifestSlide>();
   const slides = deck.slides.map((slide, index) => {
     const section = sections[index];
     const observed = section ? observeSection(section) : undefined;
-    return planSlide(slide, observed, manifestById.get(slide.id), sourceByPart, known, entries);
+    // a section id claimed twice: the second is a new Slide (two parts cannot share a name)
+    const manifestSlide = manifestById.get(slide.id);
+    const claimable = manifestSlide !== undefined && !taken.has(manifestSlide) ? manifestSlide : undefined;
+    if (claimable) taken.add(claimable);
+    return planSlide(slide, observed, claimable, sourceByPart, known, entries);
   });
+  entries.push(...deckEntries(source));
 
   const sameOrder = slides.length === manifest.slides.length && slides.every((slide, index) => slide.id === manifest.slides[index]!.id);
   return { identical: sameOrder && slides.every((slide) => slide.untouched), slides, entries };
@@ -112,15 +121,33 @@ function planSlide(
         const claim = claimed.get(shapeId) ?? 0;
         claimed.set(shapeId, claim + 1);
         const fragments = hit.shape.spids.map((spid) => hit.source.shapes.get(spid)).filter((shape): shape is SourceShape => shape !== undefined);
-        if (observedFingerprints.get(shapeId) === hit.shape.fingerprint && fragments.length === hit.shape.spids.length) {
+        const complete = fragments.length === hit.shape.spids.length;
+        if (observedFingerprints.get(shapeId) === hit.shape.fingerprint && complete) {
           splices.set(element, { source: hit.source, fragments: claim === 0 ? fragments : [] });
           if (claim === 0 && hit.source === source) for (const spid of hit.shape.spids) survivingIds.add(spid);
+          if (element.kind === 'opaque') entries.push(opaqueEntry(element, slide.index, 'html'));
+          else if (element.kind === 'shape' && element.preserve === 'text-effects') entries.push(textEffectsEntry(element, slide.index, 'html'));
+          return;
+        }
+        if (element.kind === 'opaque') {
+          // only its geometry is editable: the source fragments follow the box the author gave them
+          if (claim === 0 && complete) {
+            splices.set(element, { source: hit.source, fragments, geometry: { box: element.box, rotation: element.rotation } });
+            if (hit.source === source) for (const spid of hit.shape.spids) survivingIds.add(spid);
+            entries.push(opaqueEntry(element, slide.index, 'html'));
+          }
           return;
         }
         const own = hit.shape.spids[claim];
         if (own !== undefined && hit.source === source) {
           keepIds.set(element, [own]);
           survivingIds.add(own);
+        }
+        if (element.kind === 'shape' && element.preserve === 'text-effects') {
+          entries.push(reportEntry('DROPPED_TEXT_EFFECTS', { slide: slide.index, locator: { selector: element.selector }, reason: `${element.name} was edited; its text effects cannot be re-emitted from HTML` }));
+        }
+        if (fragments.some((fragment) => /<(?:p|a):extLst\b/.test(fragment.xml))) {
+          entries.push(reportEntry('DROPPED_EXTENSION', { slide: slide.index, locator: { selector: element.selector }, reason: `${element.name} was edited; the extensions on its source shape are not carried` }));
         }
       }
     }
@@ -136,10 +163,12 @@ function planSlide(
   }
 
   const timing = source?.pieces.get('p:timing');
-  let keepTiming = timing !== undefined && (untouched || [...timing.matchAll(/\bspid="(\d+)"/g)].every((match) => survivingIds.has(Number(match[1]))));
-  if (timing !== undefined && !keepTiming) {
-    entries.push(reportEntry('DROPPED_ANIMATION', { slide: slide.index, locator: { selector: `#${slide.id}` }, reason: 'the animation targets a shape that no longer exists' }));
-    keepTiming = false;
+  const keepTiming = timing !== undefined && (untouched || [...timing.matchAll(/\bspid="(\d+)"/g)].every((match) => survivingIds.has(Number(match[1]))));
+  if (source && hasTiming(source)) {
+    entries.push(keepTiming ? animationEntry(slide, 'html') : reportEntry('DROPPED_ANIMATION', { slide: slide.index, locator: { selector: `#${slide.id}` }, reason: 'the animation targets a shape that no longer exists' }));
+  }
+  if (source && hasComments(source) && (untouched || shellUntouched)) {
+    entries.push(commentsEntry(slide, 'html'));
   }
 
   return { id: slide.id, ...(source === undefined ? {} : { source }), untouched, shellUntouched, ...(leading === undefined ? {} : { leading }), splices, keepIds, keepTiming };

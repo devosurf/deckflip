@@ -61,7 +61,7 @@ describe.skipIf(!browserAvailable)('PPTX -> HTML -> PPTX round trip', () => {
     const output = join(dir, 'back.pptx');
     const result = await convertHtmlToPptx(html, { ...options, browser, output });
     expect(result.exitCode).toBe(0);
-    expect(result.report.entries).toEqual([]);
+    expect(result.report.entries.map((entry) => [entry.code, entry.slide])).toEqual([['PRESERVE_OPAQUE_ANIMATION', 1], ['PRESERVE_OPAQUE_CHART', 2], ['PRESERVE_OPAQUE_MASTER', undefined]]);
     expect(await parts(await readFile(output))).toEqual(await parts(pptx));
   });
 
@@ -75,7 +75,7 @@ describe.skipIf(!browserAvailable)('PPTX -> HTML -> PPTX round trip', () => {
     const validated = await validateHtml(html, { ...options, browser });
     const result = await convertHtmlToPptx(html, { ...options, browser, output });
     expect(result.exitCode).toBe(0);
-    expect(result.report.entries.map((entry) => [entry.code, entry.slide])).toEqual([['DROPPED_ANIMATION', 1]]);
+    expect(result.report.entries.map((entry) => [entry.code, entry.slide])).toEqual([['DROPPED_ANIMATION', 1], ['PRESERVE_OPAQUE_CHART', 2], ['PRESERVE_OPAQUE_MASTER', undefined]]);
     expect(validated.report.entries).toEqual(result.report.entries);
 
     const after = await parts(await readFile(output));

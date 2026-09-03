@@ -131,7 +131,8 @@ describe.skipIf(!browserAvailable)('roundtrip corpus: PPTX -> HTML -> PPTX untou
       const { outputPath: htmlPath } = await convertPptxToHtml(firstPath, { output: join(workDir, 'first.html') });
       const backPath = join(workDir, 'back.pptx');
       const back = await convertHtmlToPptx(htmlPath, { ...convert, output: backPath });
-      expect(back.report.entries.filter((entry) => entry.code.startsWith('PRESERVE_') || entry.code.startsWith('DROPPED_')), JSON.stringify(back.report.entries, null, 1)).toEqual([]);
+      const unexpected = back.report.entries.filter((entry) => (entry.code.startsWith('PRESERVE_') && !entry.code.startsWith('PRESERVE_OPAQUE_')) || entry.code.startsWith('DROPPED_'));
+      expect(unexpected, JSON.stringify(back.report.entries, null, 1)).toEqual([]);
       expect(await allParts(await readFile(backPath))).toEqual(await allParts(await readFile(firstPath)));
     });
   }

@@ -54,7 +54,7 @@ Everything else in CSS is allowed and only influences the measured geometry. Ful
 
 ## Editing an existing PPTX
 
-`deckflip convert deck.pptx` (PPTX -> HTML) is not available in this version; `convert --to html` exits 3. When it is: convert, edit `deck.html` in place keeping `deck.assets/` beside it, then `deckflip convert deck.html` back. Elements marked `data-preserve` are opaque (charts, SmartArt, OLE, masters): move, resize or delete them, but content edits inside are ignored (`DROPPED_EDIT_OPAQUE`). `PRESERVE_*` entries list what came through untouched. Details: `reference/round-trip.md`.
+`deckflip convert deck.pptx` (PPTX -> HTML) writes `deck.html` and `deck.assets/`; edit `deck.html` in place keeping `deck.assets/` beside it, then `deckflip convert deck.html` back: everything you did not touch is copied from the source byte for byte. Elements marked `data-preserve` are opaque (charts, SmartArt, OLE, connectors, WordArt effects): move, resize or delete them, but content edits inside are ignored (`DROPPED_EDIT_OPAQUE`). `PRESERVE_*` entries list what came through untouched; `deckflip validate deck.pptx` lists them before you start. Details: `reference/round-trip.md`.
 
 ## Reading the report
 

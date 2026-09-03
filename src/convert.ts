@@ -13,6 +13,7 @@ import { chromiumVersion, launchChromium } from './render/chromium.js';
 import { entry as reportEntry } from './report/codes.js';
 import { buildReport, writeSidecar } from './report/index.js';
 import type { Entry, Report } from './report/types.js';
+import { hasVba, sourceEntries } from './roundtrip/entries.js';
 import { buildManifest, MANIFEST_FILE, sha256, SOURCE_FILE } from './roundtrip/manifest.js';
 import { resolveRoundTrip, type RoundTrip } from './roundtrip/index.js';
 import { indexSource } from './roundtrip/source.js';
@@ -107,14 +108,21 @@ export async function convertHtmlToPptx(
   input: string,
   opts: ConvertOptions,
 ): Promise<{ report: Report; outputPath: string; exitCode: 0 | 2 | 4 }> {
-  const outputPath = opts.output ?? (await defaultPptxOutputPath(input));
-  const reportPath = opts.report ?? `${outputPath}.report.json`;
+  let outputPath = opts.output ?? (await defaultPptxOutputPath(input));
   const run = await runHtmlPipeline(input, opts, 'convert', outputPath);
 
   if (run.deck === undefined) {
+    const reportPath = opts.report ?? `${outputPath}.report.json`;
     await writeSidecar(run.report, reportPath);
     return { report: run.report, outputPath, exitCode: 2 };
   }
+
+  // a macro-enabled source stays macro-enabled (spec 06 "VBA project"): the default output takes the .pptm extension
+  if (opts.output === undefined && run.roundTrip?.preserved !== undefined && hasVba(run.roundTrip.preserved.source)) {
+    outputPath = replaceExtension(outputPath, '.pptm');
+    if (run.report.output) run.report.output = { ...run.report.output, path: outputPath };
+  }
+  const reportPath = opts.report ?? `${outputPath}.report.json`;
 
   const epoch = process.env.SOURCE_DATE_EPOCH;
   const pptx =
@@ -155,7 +163,7 @@ export async function convertPptxToHtml(input: string, opts: ConvertToHtmlOption
   const deck = await parsePptx(bytes);
   const source = await indexSource(await OpcReader.load(bytes));
   const catalog = await FontCatalog.scan({ extraFiles: [] });
-  const entries = resolveDeckFonts(deck, catalog, { embedFonts: false });
+  const entries = [...resolveDeckFonts(deck, catalog, { embedFonts: false }), ...sourceEntries(deck, source)];
   const { html, assets, slides } = emitHtml(deck, { assetsDir: basename(assetsDir) });
   const manifest = buildManifest(html, slides, source, sha256(bytes));
 
@@ -174,4 +182,18 @@ export async function convertPptxToHtml(input: string, opts: ConvertToHtmlOption
   const report = buildReport(base, entries, deck.slides.length, native);
   await writeSidecar(report, `${outputPath}.report.json`);
   return { report, outputPath, assetsDir, exitCode: 0 };
+}
+
+/** `validate deck.pptx` (spec 01): the package parses, and the report lists what a round trip would carry opaquely. */
+export async function validatePptx(input: string, opts: { report?: string } = {}): Promise<{ report: Report; exitCode: 0 }> {
+  const bytes = new Uint8Array(await readFile(input));
+  const deck = await parsePptx(bytes);
+  const source = await indexSource(await OpcReader.load(bytes));
+  const catalog = await FontCatalog.scan({ extraFiles: [] });
+  const entries = [...resolveDeckFonts(deck, catalog, { embedFonts: false }), ...sourceEntries(deck, source)];
+  const native = deck.slides.reduce((n, slide) => n + slide.elements.length, 0);
+  const base = { ...reportBase(input, undefined, deck.canvas, undefined, 'validate'), input: { path: input, kind: 'pptx' as const } };
+  const report = buildReport(base, entries, deck.slides.length, native);
+  if (opts.report !== undefined) await writeSidecar(report, opts.report);
+  return { report, exitCode: 0 };
 }

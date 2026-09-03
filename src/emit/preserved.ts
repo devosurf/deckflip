@@ -7,12 +7,12 @@
 import path from 'node:path';
 import type { Deck, Slide } from '../model/index.js';
 import { OpcPackage, REL, type OpcReader } from '../ooxml/opc.js';
-import { el, parseXml, serialize, type XmlNode } from '../ooxml/xml.js';
+import { pxToEmu } from '../ooxml/emu.js';
+import { el, parseXml, raw, serialize, type XmlNode } from '../ooxml/xml.js';
 import type { ElementSplice, SlidePlan, SplicePlan } from '../roundtrip/plan.js';
 import type { SourceIndex, SourceShape, SourceSlide } from '../roundtrip/source.js';
 import { MediaStore } from './media.js';
 import { emitSlide, type SlideSplice } from './slide.js';
-import { raw } from '../ooxml/xml.js';
 
 export interface PreservedSource {
   source: SourceIndex;
@@ -172,7 +172,7 @@ async function prepareSplice(pkg: OpcPackage, slide: Slide, plan: SlidePlan, ide
 
   // relationships the fragments carry, registered once per source relationship on this slide
   const registered = new Map<string, string>();
-  const remap = (fragment: SourceShape, from: SourceSlide): XmlNode => {
+  const remap = (fragment: SourceShape, from: SourceSlide, geometry?: ElementSplice['geometry']): XmlNode => {
     const mapping = new Map<string, string>();
     for (const rId of fragment.rIds) {
       const rel = from.rels.find((candidate) => candidate.id === rId);
@@ -185,7 +185,8 @@ async function prepareSplice(pkg: OpcPackage, slide: Slide, plan: SlidePlan, ide
       }
       mapping.set(rId, id);
     }
-    return raw(fragment.xml.replace(/(\sr:[A-Za-z]+=")(rId\d+)(")/g, (_match, before: string, id: string, after: string) => `${before}${mapping.get(id) ?? id}${after}`));
+    const xml = fragment.xml.replace(/(\sr:[A-Za-z]+=")(rId\d+)(")/g, (_match, before: string, id: string, after: string) => `${before}${mapping.get(id) ?? id}${after}`);
+    return raw(geometry ? withGeometry(xml, geometry) : xml);
   };
   const splices: ElementSplice[] = [...(plan.leading ? [plan.leading] : []), ...plan.splices.values()];
   for (const splice of splices) {
@@ -235,7 +236,7 @@ async function prepareSplice(pkg: OpcPackage, slide: Slide, plan: SlidePlan, ide
     leading: plan.leading ? plan.leading.fragments.map((fragment) => remap(fragment, plan.leading!.source)) : [],
     fragments: (element) => {
       const splice = plan.splices.get(element);
-      return splice ? splice.fragments.map((fragment) => remap(fragment, splice.source)) : undefined;
+      return splice ? splice.fragments.map((fragment) => remap(fragment, splice.source, splice.geometry)) : undefined;
     },
     keepIds: (element) => plan.keepIds.get(element) ?? [],
     before,
@@ -243,4 +244,21 @@ async function prepareSplice(pkg: OpcPackage, slide: Slide, plan: SlidePlan, ide
     tail,
     extraRelationships,
   };
+}
+
+/** The fragment with its first transform (`a:xfrm` under `p:spPr`/`p:grpSpPr`, or `p:xfrm` on a graphic frame) set to the box and rotation the author gave it. */
+function withGeometry(xml: string, geometry: NonNullable<ElementSplice['geometry']>): string {
+  const open = /<(a|p):xfrm(\s[^>]*)?>/.exec(xml);
+  if (!open) return xml;
+  const start = open.index;
+  const close = xml.indexOf(`</${open[1]}:xfrm>`, start);
+  if (close === -1) return xml;
+  const rot = Math.round(geometry.rotation * 60000);
+  const attrs = (open[2] ?? '').replace(/\s+rot="[^"]*"/, '');
+  const openTag = `<${open[1]}:xfrm${rot === 0 ? '' : ` rot="${rot}"`}${attrs}>`;
+  const inner = xml
+    .slice(start + open[0].length, close)
+    .replace(/<a:off\s[^>]*\/>/, `<a:off x="${pxToEmu(geometry.box.x)}" y="${pxToEmu(geometry.box.y)}"/>`)
+    .replace(/<a:ext\s[^>]*\/>/, `<a:ext cx="${pxToEmu(geometry.box.w)}" cy="${pxToEmu(geometry.box.h)}"/>`);
+  return `${xml.slice(0, start)}${openTag}${inner}${xml.slice(close)}`;
 }

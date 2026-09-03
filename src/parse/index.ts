@@ -3,7 +3,7 @@
 
 import type { Deck, Media, Slide } from '../model/index.js';
 import { REL, OpcReader, type Relationship } from '../ooxml/opc.js';
-import { readColorScheme } from './drawing.js';
+import { readColorScheme, readFontScheme } from './drawing.js';
 import { readSlide } from './slide.js';
 import { px } from './units.js';
 import { child, children, textOf } from './xml.js';
@@ -29,7 +29,9 @@ export async function parsePptx(bytes: Uint8Array): Promise<Deck> {
 
   const presentationRels = await pkg.relationships(presentationPart);
   const themeRel = presentationRels.find((rel) => rel.type === REL.theme);
-  const colors = readColorScheme(themeRel && pkg.hasPart(themeRel.target) ? await pkg.xml(themeRel.target) : undefined);
+  const theme = themeRel && pkg.hasPart(themeRel.target) ? await pkg.xml(themeRel.target) : undefined;
+  const colors = readColorScheme(theme);
+  const fonts = readFontScheme(theme);
 
   const slideParts: string[] = [];
   for (const sldId of children(child(presentation, 'p:sldIdLst'), 'p:sldId')) {
@@ -46,8 +48,13 @@ export async function parsePptx(bytes: Uint8Array): Promise<Deck> {
     slides.push(await readSlide(await pkg.xml(part), position + 1, {
       slide: position + 1,
       colors,
+      fonts,
       media: (rId) => loadMedia(pkg, rels, rId),
       link: (rId) => resolveLink(rels, rId, slideIdByPart),
+      partOf: (rId) => {
+        const rel = rels.find((candidate) => candidate.id === rId);
+        return rel && !rel.external ? rel.target : undefined;
+      },
     }));
   }
 

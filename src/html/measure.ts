@@ -214,6 +214,14 @@ async function resolveElements(ctx: PageContext, measured: BrowserElement[], ent
       out.push(fill === undefined ? shape : { ...shape, fill: fill.type === 'image' ? await resolveImageFill(fill, element, slide, entries) : fill });
       continue;
     }
+    if (element.kind === 'opaque') {
+      const { edited, ...opaque } = element;
+      if (edited) {
+        entries.push(reportEntry('DROPPED_EDIT_OPAQUE', { slide, locator: { selector: element.selector }, reason: `${element.name} is opaque ${element.class} content; what was written inside it is ignored` }));
+      }
+      out.push({ ...opaque, parts: [] });
+      continue;
+    }
     out.push(element);
   }
   return out;

@@ -4,13 +4,14 @@
 
 import type { AutonumScheme, Bullet, Color, Paragraph, Run, RunStyle, TextBody } from '../model/index.js';
 import type { XmlNode } from '../ooxml/xml.js';
-import { readColor, type ColorScheme } from './drawing.js';
+import { readColor, type ColorScheme, type FontScheme } from './drawing.js';
 import { ptHundredthsToPx, px, exact } from './units.js';
 import { child, children, textOf } from './xml.js';
 
 /** Where hyperlinks resolve: an external URL, or the `#<slide id>` of a slide relationship. */
 export interface TextContext {
   colors: ColorScheme;
+  fonts: FontScheme;
   link(rId: string): string | undefined;
 }
 
@@ -109,7 +110,7 @@ export function readRunStyle(rPr: XmlNode | undefined, ctx: TextContext): RunSty
   const bold = rPr?.attrs.b === '1' || rPr?.attrs.b === 'true';
   const typeface = child(rPr, 'a:latin')?.attrs.typeface;
   const style: RunStyle = {
-    fontStack: typeface ? [typeface] : [],
+    fontStack: [resolveTypeface(typeface, ctx.fonts)],
     weight: bold ? 700 : 400,
     size: rPr?.attrs.sz === undefined ? DEFAULT_SIZE_PX : ptHundredthsToPx(rPr.attrs.sz),
     bold,
@@ -131,4 +132,11 @@ export function readRunStyle(rPr: XmlNode | undefined, ctx: TextContext): RunSty
     style.link = link;
   }
   return style;
+}
+
+/** `+mj-lt`/`+mn-lt` and an absent typeface resolve through the theme (spec 11: inheritance resolved to explicit values). */
+function resolveTypeface(typeface: string | undefined, fonts: FontScheme): string {
+  if (typeface === undefined || typeface === '' || typeface.startsWith('+mn')) return fonts.minor;
+  if (typeface.startsWith('+mj')) return fonts.major;
+  return typeface;
 }

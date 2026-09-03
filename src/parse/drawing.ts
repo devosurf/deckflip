@@ -29,6 +29,19 @@ export function readColorScheme(theme: XmlNode | undefined): ColorScheme {
   return scheme;
 }
 
+/** Theme font scheme: the major (headings) and minor (body) latin typefaces `+mj-lt`/`+mn-lt` and runs without `a:latin` resolve to. */
+export interface FontScheme {
+  major: string;
+  minor: string;
+}
+
+export function readFontScheme(theme: XmlNode | undefined): FontScheme {
+  const fontScheme = child(child(theme, 'a:themeElements'), 'a:fontScheme');
+  const major = child(child(fontScheme, 'a:majorFont'), 'a:latin')?.attrs.typeface || 'Calibri Light';
+  const minor = child(child(fontScheme, 'a:minorFont'), 'a:latin')?.attrs.typeface || 'Calibri';
+  return { major, minor };
+}
+
 /** Resolves the media behind an `r:embed` id on the current part; `raster` when the part is a `raster-<hash>` capture (spec 05). */
 export interface DrawingContext {
   colors: ColorScheme;
@@ -37,7 +50,11 @@ export interface DrawingContext {
 
 /** The locator htmlout writes for a shape, `data-shape-id="<slide number>-<p:cNvPr id>"` (spec 02), and the report selector matching it. */
 export function shapeIdentity(nvPr: XmlNode | undefined, slide: number): { shapeId: string; selector: string } {
-  const shapeId = `${slide}-${child(nvPr, 'p:cNvPr')?.attrs.id ?? ''}`;
+  return identityOf(child(nvPr, 'p:cNvPr'), slide);
+}
+
+export function identityOf(cNvPr: XmlNode | undefined, slide: number): { shapeId: string; selector: string } {
+  const shapeId = `${slide}-${cNvPr?.attrs.id ?? ''}`;
   return { shapeId, selector: `[data-shape-id="${shapeId}"]` };
 }
 

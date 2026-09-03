@@ -1,14 +1,15 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Command, InvalidArgumentError, Option } from 'commander';
 import type { Browser } from 'playwright-core';
 import type { Canvas } from '../model/index.js';
-import { convertHtmlToPptx, convertPptxToHtml, validateHtml } from '../convert.js';
+import { convertHtmlToPptx, convertPptxToHtml, validateHtml, validatePptx } from '../convert.js';
 import { FontCatalog, resolveDeckFonts } from '../fonts/index.js';
 import { loadDeck } from '../html/load.js';
 import { measureDeck } from '../html/measure.js';
 import { inspectDeck } from '../inspect/index.js';
+import { parsePptx } from '../parse/index.js';
 import { launchChromium, renderHtml } from '../render/chromium.js';
 import { renderPptxLibreOffice } from '../render/libreoffice.js';
 import { renderPptxPowerPoint } from '../render/powerpoint.js';
@@ -104,11 +105,8 @@ export function parseRasterDpi(value: string): number {
 }
 
 function inferInputKind(input: string): 'html' | 'pptx' {
-  return extname(input).toLowerCase() === '.pptx' ? 'pptx' : 'html';
-}
-
-function notImplemented(): never {
-  throw new DeckflipError('not implemented in 0.1.0', 3);
+  const extension = extname(input).toLowerCase();
+  return extension === '.pptx' || extension === '.pptm' ? 'pptx' : 'html';
 }
 
 function defaultValidateReportPath(input: string): string {
@@ -152,17 +150,17 @@ async function handleConvert(input: string, options: ConvertCliOptions): Promise
 }
 
 async function handleValidate(input: string, options: ValidateCliOptions): Promise<number> {
-  if (inferInputKind(input) !== 'html') {
-    notImplemented();
-  }
-  const result = await validateHtml(input, {
-    ...(options.size === undefined ? {} : { size: options.size }),
-    embedFonts: options.embedFonts ?? false,
-    rasterDpi: options.rasterDpi,
-    ...(options.report === undefined ? {} : { report: options.report }),
-    ...(options.browser === undefined ? {} : { browserPath: options.browser }),
-    offline: options.offline,
-  });
+  const result =
+    inferInputKind(input) === 'pptx'
+      ? await validatePptx(input)
+      : await validateHtml(input, {
+          ...(options.size === undefined ? {} : { size: options.size }),
+          embedFonts: options.embedFonts ?? false,
+          rasterDpi: options.rasterDpi,
+          ...(options.report === undefined ? {} : { report: options.report }),
+          ...(options.browser === undefined ? {} : { browserPath: options.browser }),
+          offline: options.offline,
+        });
   await writeSidecar(result.report, options.report ?? defaultValidateReportPath(input));
   if (options.json) {
     process.stdout.write(`${JSON.stringify(result.report, null, 2)}\n`);
@@ -217,8 +215,12 @@ async function handleRender(input: string, options: RenderCliOptions): Promise<n
 }
 
 async function handleInspect(input: string): Promise<number> {
-  if (inferInputKind(input) !== 'html') {
-    notImplemented();
+  if (inferInputKind(input) === 'pptx') {
+    const deck = await parsePptx(new Uint8Array(await readFile(input)));
+    const catalog = await FontCatalog.scan({ extraFiles: [] });
+    resolveDeckFonts(deck, catalog, { embedFonts: false });
+    process.stdout.write(`${JSON.stringify(inspectDeck(deck), null, 2)}\n`);
+    return 0;
   }
   const loaded = await loadDeck(input, {});
   const browser = await launchChromium({ offline: false });
@@ -302,7 +304,7 @@ function buildProgram(): Command {
   program
     .command('validate <input>')
     .description(
-      'Check an HTML Deck and report what would be flattened or rasterised. The same report format as convert is written and/or printed; this command does not emit a PPTX.',
+      'Check an HTML Deck and report what would be flattened or rasterised, or check that a PPTX parses and report what a round trip keeps opaque. The same report format as convert is written and/or printed; this command does not emit anything else.',
     )
     .option('--size <size>', 'override the canvas size')
     .option('--embed-fonts [names]', 'embed all safe fonts or a comma-separated list', parseEmbedFonts, false)
@@ -337,7 +339,7 @@ function buildProgram(): Command {
   program
     .command('inspect <input>')
     .description(
-      'Print a JSON snapshot of the measured HTML Deck. PPTX input is not implemented in 0.1.0.',
+      'Print a JSON snapshot of the Deck: measured from HTML, or parsed from PPTX.',
     )
     .action(async (input: string) => {
       process.exitCode = await handleInspect(input);

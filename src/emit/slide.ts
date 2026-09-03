@@ -68,7 +68,10 @@ export function emitSlide(pkg: OpcPackage, slide: Slide, ctx: SlideEmissionConte
   return partName;
 }
 
-/** An untouched element is its source fragments; a touched one is built, its first ids being the ones it had. */
+/**
+ * An untouched element is its source fragments; a touched one is built, its first ids being the ones it had.
+ * An opaque element only exists through the splice (its source fragments, geometry rewritten when moved).
+ */
 export function buildElement(element: Element, ctx: ShapeEmissionContext, nextFresh: () => number): XmlNode[] {
   const spliced = ctx.splice?.fragments(element);
   if (spliced) return spliced;
@@ -82,6 +85,8 @@ export function buildElement(element: Element, ctx: ShapeEmissionContext, nextFr
       return [buildTable(element, ctx, nextId)];
     case 'group':
       return [buildGroup(element, ctx, nextId, nextFresh)];
+    case 'opaque':
+      return [];
     default:
       return buildShape(element, ctx, nextId);
   }
