@@ -2,7 +2,7 @@
 
 ## Runtime and dependencies
 
-Node >= 20, TypeScript strict, ESM, single npm package `deckflip` with a `bin`. Build with `tsup`, test with `vitest`.
+Node >= 20.16, TypeScript strict, ESM, single npm package `deckflip` with a `bin`. Build with `tsup`, test with `vitest`.
 
 | Dependency | Role | Why this one (from [#7](https://github.com/devosurf/deckflip/issues/7), [#3](https://github.com/devosurf/deckflip/issues/3), [#5](https://github.com/devosurf/deckflip/issues/5)) |
 | --- | --- | --- |
