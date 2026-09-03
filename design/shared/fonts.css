@@ -1,0 +1,6 @@
+/*
+ * Project fonts, plain CSS, loaded in every frame document:
+ * a hosted @import url(...), or @font-face with absolute/data src.
+ * A relative url() resolves from this folder — drop the file in
+ * assets/fonts/ and spool carries it in the document.
+ */

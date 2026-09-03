@@ -1,0 +1,7 @@
+/*
+ * spool tokens, the single token file for this canvas.
+ * Distilling from an existing product: paste its variables into :root verbatim.
+ * Spool-born tokens: use @theme (Tailwind v4, shadcn v4 shape).
+ * Starts empty on purpose: tokens arrive per change, carried by the agent.
+ */
+:root {}
