@@ -14,8 +14,8 @@ export interface TextContext {
   link(rId: string): string | undefined;
 }
 
-/** PowerPoint's defaults when `a:bodyPr` omits an inset (EMU). */
-const DEFAULT_INSET = { l: '91440', t: '45720', r: '91440', b: '45720' };
+/** PowerPoint's defaults when `a:bodyPr` or `a:tcPr` omits an inset (EMU). */
+export const DEFAULT_INSET = { l: '91440', t: '45720', r: '91440', b: '45720' };
 const DEFAULT_SIZE_PX = 24;
 const DEFAULT_COLOR: Color = { hex: '000000', alpha: 1 };
 

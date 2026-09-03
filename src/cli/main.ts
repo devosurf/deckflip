@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { Command, InvalidArgumentError, Option } from 'commander';
 import type { Browser } from 'playwright-core';
 import type { Canvas } from '../model/index.js';
-import { convertHtmlToPptx, validateHtml } from '../convert.js';
+import { convertHtmlToPptx, convertPptxToHtml, validateHtml } from '../convert.js';
 import { FontCatalog, resolveDeckFonts } from '../fonts/index.js';
 import { loadDeck } from '../html/load.js';
 import { measureDeck } from '../html/measure.js';
@@ -126,19 +126,22 @@ async function printSummary(report: Report, color: boolean): Promise<void> {
 async function handleConvert(input: string, options: ConvertCliOptions): Promise<number> {
   const inputKind = inferInputKind(input);
   const targetKind = options.to ?? (inputKind === 'html' ? 'pptx' : 'html');
-  if (targetKind !== 'pptx' || inputKind !== 'html') {
-    notImplemented();
+  if (targetKind === inputKind) {
+    throw new DeckflipError(`cannot convert ${inputKind} to ${targetKind}`, 3);
   }
-  const result = await convertHtmlToPptx(input, {
-    ...(options.output === undefined ? {} : { output: options.output }),
-    ...(options.size === undefined ? {} : { size: options.size }),
-    embedFonts: options.embedFonts ?? false,
-    rasterDpi: options.rasterDpi,
-    ...(options.report === undefined ? {} : { report: options.report }),
-    strict: options.strict,
-    ...(options.browser === undefined ? {} : { browserPath: options.browser }),
-    offline: options.offline,
-  });
+  const result =
+    inputKind === 'pptx'
+      ? await convertPptxToHtml(input, options.output === undefined ? {} : { output: options.output })
+      : await convertHtmlToPptx(input, {
+          ...(options.output === undefined ? {} : { output: options.output }),
+          ...(options.size === undefined ? {} : { size: options.size }),
+          embedFonts: options.embedFonts ?? false,
+          rasterDpi: options.rasterDpi,
+          ...(options.report === undefined ? {} : { report: options.report }),
+          strict: options.strict,
+          ...(options.browser === undefined ? {} : { browserPath: options.browser }),
+          offline: options.offline,
+        });
   if (options.json) {
     process.stdout.write(`${JSON.stringify(result.report, null, 2)}\n`);
   }
@@ -278,10 +281,10 @@ function buildProgram(): Command {
   program
     .command('convert <input>')
     .description(
-      'Convert HTML or a Deck directory to PPTX. The direction is inferred from the input unless --to overrides it. Validation runs first; a validation error exits 2 and nothing is written. --to html is not implemented in 0.1.0.',
+      'Convert HTML or a Deck directory to PPTX, or a PPTX to an HTML Deck with its Asset directory. The direction is inferred from the input unless --to overrides it. Validation runs first; a validation error exits 2 and nothing is written.',
     )
     .addOption(new Option('--to <kind>').choices(['pptx', 'html']))
-    .option('-o, --output <output>', 'output PPTX path')
+    .option('-o, --output <output>', 'output path')
     .option('--size <size>', 'override the canvas size')
     .option('--embed-fonts [names]', 'embed all safe fonts or a comma-separated list', parseEmbedFonts, false)
     .option('--raster-dpi <n>', 'raster density for captured subtrees, 96-384', parseRasterDpi, 192)

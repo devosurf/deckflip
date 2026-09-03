@@ -1488,7 +1488,8 @@ export function measureSlideDocument(): BrowserMeasureResult {
       lastParagraphGap: lineBox ? round(Math.max(0, contentBottom - lineBox.lastBottom)) : 0,
       wrap,
       rtl,
-      trailingGuard: resolveTrailingGuard(lineGroups, availWidth, align, { el, skipNestedLists: false }),
+      // a block that never wraps has no wrap width to guard; PowerPoint's `wrap="none"` lays the line out regardless
+      trailingGuard: wrap ? resolveTrailingGuard(lineGroups, availWidth, align, { el, skipNestedLists: false }) : 0,
       paragraphs: paragraphs.length ? paragraphs : [{ align, lineHeight: 0, spaceBefore: 0, spaceAfter: 0, indent, marginLeft: 0, level: 0, runs: runs.length ? runs : [{ kind: 'text', text: '', style: styleFromElement(el) }] }],
     };
 
@@ -1850,6 +1851,10 @@ export function measureSlideDocument(): BrowserMeasureResult {
    * change when Chromium gets 0.5 px more, so PowerPoint (whose advances may come out narrower) gets 1 px less.
    */
   function resolveTrailingGuard(groups: LineGroup[], availWidth: number, align: Align, block?: { el: HTMLElement; skipNestedLists: boolean }): number {
+    if (align === 'just' && block) {
+      // justification stretches every line but the last to the full width; the guard is about the natural width
+      return withNaturalAlignment(block.el, () => resolveTrailingGuard(measureLineGroups(block.el, block.skipNestedLists), availWidth, 'l', block));
+    }
     let guard = 0;
     for (const group of groups) {
       if (availWidth - Math.max(0, group.right - group.left) < 0.5) {
@@ -1860,6 +1865,19 @@ export function measureSlideDocument(): BrowserMeasureResult {
       guard = align === 'ctr' ? -0.5 : -1;
     }
     return guard;
+  }
+
+  /** Runs `fn` with the block's `text-align` forced to `start` (same breaks, unstretched lines), then restores it. */
+  function withNaturalAlignment<T>(el: HTMLElement, fn: () => T): T {
+    const style = el.style;
+    const prior = { value: style.getPropertyValue('text-align'), priority: style.getPropertyPriority('text-align') };
+    style.setProperty('text-align', 'start', 'important');
+    try {
+      return fn();
+    } finally {
+      if (prior.value) style.setProperty('text-align', prior.value, prior.priority);
+      else style.removeProperty('text-align');
+    }
   }
 
   function breaksChangeWhenWidened(el: HTMLElement, delta: number, before: LineGroup[], skipNestedLists: boolean): boolean {
@@ -2216,7 +2234,9 @@ export function measureSlideDocument(): BrowserMeasureResult {
       return undefined;
     }
     const degrees = (Math.atan2(b, a) * 180) / Math.PI;
-    return { rotation: round(((degrees % 360) + 360) % 360) % 360, scale: round(sx), a, b, c, d, e, f };
+    // decomposed from a float matrix, not layout: 3 decimals absorb its noise (1e-5 deg would flip a 1/60000 deg `rot`)
+    const round3 = (value: number): number => Math.round(value * 1000) / 1000;
+    return { rotation: round3(((degrees % 360) + 360) % 360) % 360, scale: round3(sx), a, b, c, d, e, f };
   }
 
   /**
@@ -2490,8 +2510,9 @@ export function measureSlideDocument(): BrowserMeasureResult {
     return faces;
   }
 
+  /** Kills float noise from rect arithmetic while keeping Chromium's 1/64 px layout values (6 decimals) exact, so they survive the EMU round trip. */
   function round(value: number): number {
-    return Math.round(value * 1000) / 1000;
+    return Math.round(value * 1000000) / 1000000;
   }
 
   function px(value: string): number {

@@ -1,11 +1,13 @@
-import { mkdir, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, join } from 'node:path';
 import type { Browser } from 'playwright-core';
 import { emitPptx } from './emit/index.js';
 import { FontCatalog, resolveDeckFonts } from './fonts/index.js';
 import { loadDeck } from './html/load.js';
 import { measureDeck } from './html/measure.js';
+import { emitHtml } from './htmlout/index.js';
 import type { Canvas, Deck } from './model/index.js';
+import { parsePptx } from './parse/index.js';
 import { chromiumVersion, launchChromium } from './render/chromium.js';
 import { entry as reportEntry } from './report/codes.js';
 import { buildReport, writeSidecar } from './report/index.js';
@@ -121,4 +123,35 @@ export async function validateHtml(input: string, opts: ValidateOptions): Promis
   const run = await runHtmlPipeline(input, opts, 'validate');
   if (opts.report !== undefined) await writeSidecar(run.report, opts.report);
   return { report: run.report, exitCode: run.deck === undefined ? 2 : 0 };
+}
+
+export interface ConvertToHtmlOptions {
+  output?: string;
+}
+
+/**
+ * PPTX -> HTML Deck + Asset directory (spec 02 "Absolute-positioned form", spec 06 "Attachment"). Fonts are
+ * resolved on the parsed Deck first, as they are on the HTML side, so the emitted text carries the same
+ * baseline correction the emitter applied. Report entries from font resolution are the report.
+ */
+export async function convertPptxToHtml(input: string, opts: ConvertToHtmlOptions = {}): Promise<{ report: Report; outputPath: string; assetsDir: string; exitCode: 0 }> {
+  const outputPath = opts.output ?? replaceExtension(input, '.html');
+  const assetsDir = replaceExtension(outputPath, '.assets');
+  const deck = await parsePptx(new Uint8Array(await readFile(input)));
+  const catalog = await FontCatalog.scan({ extraFiles: [] });
+  const entries = resolveDeckFonts(deck, catalog, { embedFonts: false });
+  const { html, assets } = emitHtml(deck, { assetsDir: basename(assetsDir) });
+
+  await mkdir(dirname(outputPath), { recursive: true });
+  await writeFile(outputPath, html);
+  for (const [relative, bytes] of assets) {
+    const path = join(assetsDir, relative);
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, bytes);
+  }
+  const native = deck.slides.reduce((n, slide) => n + slide.elements.length, 0);
+  const base = { ...reportBase(input, outputPath, deck.canvas, undefined, 'convert'), input: { path: input, kind: 'pptx' as const }, output: { path: outputPath, kind: 'html' as const } };
+  const report = buildReport(base, entries, deck.slides.length, native);
+  await writeSidecar(report, `${outputPath}.report.json`);
+  return { report, outputPath, assetsDir, exitCode: 0 };
 }

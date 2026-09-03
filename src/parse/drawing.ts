@@ -35,6 +35,15 @@ export interface DrawingContext {
   media(rId: string): Promise<{ media: Media; raster: boolean } | undefined>;
 }
 
+/** The locator htmlout writes for a shape: `data-shape-id="<slide number>-<p:cNvPr id>"` (spec 02). */
+export function shapeSelector(nvPr: XmlNode | undefined, slide: number): string {
+  return `[data-shape-id="${slide}-${child(nvPr, 'p:cNvPr')?.attrs.id ?? ''}"]`;
+}
+
+export function shapeName(nvPr: XmlNode | undefined): string {
+  return child(nvPr, 'p:cNvPr')?.attrs.name ?? '';
+}
+
 /** `a:srgbClr` (with `a:alpha`) or `a:schemeClr` through the theme; `a:lumMod`/`a:lumOff` tints are applied on scheme colours. */
 export function readColor(container: XmlNode | undefined, colors: ColorScheme): Color | undefined {
   const srgb = child(container, 'a:srgbClr');

@@ -44,6 +44,7 @@ export async function parsePptx(bytes: Uint8Array): Promise<Deck> {
   for (const [position, part] of slideParts.entries()) {
     const rels = await pkg.relationships(part);
     slides.push(await readSlide(await pkg.xml(part), position + 1, {
+      slide: position + 1,
       colors,
       media: (rId) => loadMedia(pkg, rels, rId),
       link: (rId) => resolveLink(rels, rId, slideIdByPart),
