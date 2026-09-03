@@ -120,17 +120,25 @@ function readSpacing(node: XmlNode | undefined, sizePx: number): number | undefi
 
 const AUTONUM_SCHEMES = new Set(['arabicPeriod', 'alphaLcPeriod', 'alphaUcPeriod', 'romanLcPeriod', 'romanUcPeriod']);
 
+/** The bullet elements of CT_TextParagraphProperties: whichever node in the chain declares one of them decides. */
+const BULLET_DECLARATIONS = ['a:buNone', 'a:buChar', 'a:buAutoNum', 'a:buBlip'];
+
+/**
+ * The nearest declaration wins. `a:buNone` and a chain declaring nothing both mean no marker, which the IDM
+ * spells as no bullet at all (`bullet` marks a list item); emit writes `a:buNone` back either way, so no
+ * marker is ever inherited.
+ */
 function readBullet(chain: XmlNode[], runColor: Color, colors: ColorScheme): Bullet | undefined {
-  // the nearest of the four bullet elements wins: whichever node in the chain declares one decides
-  const declaring = chain.find((node) => child(node, 'a:buNone') || child(node, 'a:buChar') || child(node, 'a:buAutoNum'));
+  const declaring = chain.find((node) => BULLET_DECLARATIONS.some((name) => child(node, name)));
   if (!declaring || child(declaring, 'a:buNone')) {
-    return declaring ? { type: 'none' } : undefined;
+    return undefined;
   }
   const color = readColor(childOf(chain, 'a:buClr'), colors) ?? runColor;
   const sizePct = Number(childOf(chain, 'a:buSzPct')?.attrs.val ?? 100000) / 1000;
   const char = child(declaring, 'a:buChar');
-  if (char) {
-    return { type: 'char', char: char.attrs.char ?? '\u2022', color, sizePct };
+  if (char || child(declaring, 'a:buBlip')) {
+    // HTML has no picture marker, so a picture bullet still wins its level, flattened to the default character
+    return { type: 'char', char: char?.attrs.char ?? '\u2022', color, sizePct };
   }
   const autonum = child(declaring, 'a:buAutoNum')!;
   const type = autonum.attrs.type ?? '';

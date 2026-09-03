@@ -315,6 +315,36 @@ describe('parsePptx', () => {
     expect(content.text!.paragraphs.map((paragraph) => (paragraph.runs[0]!.kind === 'text' ? paragraph.runs[0]!.style.size : 0))).toEqual([32, 26.666666666666668]);
   });
 
+  it('reads a paragraph whose nearest bullet declaration is a:buNone as a plain paragraph, not a marker-less list item', async () => {
+    // the master hands the body placeholder a square bullet; `a:buNone` on the paragraph turns it off, and a
+    // paragraph PowerPoint paints no marker for is no list item (the IDM carries `bullet` on those only)
+    const txStyles = '<p:txStyles><p:titleStyle><a:lvl1pPr/></p:titleStyle><p:bodyStyle><a:lvl1pPr><a:buChar char="\u25AA"/></a:lvl1pPr></p:bodyStyle><p:otherStyle><a:lvl1pPr/></p:otherStyle></p:txStyles>';
+    const body = '<p:sp><p:nvSpPr><p:cNvPr id="2" name="Content 1"/><p:cNvSpPr/><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="5486400" cy="2743200"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr/><a:p><a:pPr><a:buNone/></a:pPr><a:r><a:rPr lang="en-US"/><a:t>Plain</a:t></a:r></a:p></p:txBody></p:sp>';
+    const deck = await parsePptx(await buildPptx({
+      slides: [{ shapes: body }],
+      master: { txStyles },
+    }));
+
+    const content = deck.slides[0]!.elements[0] as ShapeElement;
+    expect(content.text!.paragraphs[0]!.bullet).toBeUndefined();
+  });
+
+  it('lets a layout level declaring a:buBlip win over the master bullet, as the nearest declaration', async () => {
+    // the layout's body placeholder paints a picture bullet, so the master's square never reaches the slide;
+    // HTML has no picture marker, so the walk stops there and flattens it to the default character bullet
+    const txStyles = '<p:txStyles><p:titleStyle><a:lvl1pPr/></p:titleStyle><p:bodyStyle><a:lvl1pPr><a:buChar char="\u25AA"/></a:lvl1pPr></p:bodyStyle><p:otherStyle><a:lvl1pPr/></p:otherStyle></p:txStyles>';
+    const layoutBody = '<p:sp><p:nvSpPr><p:cNvPr id="2" name="Content Placeholder 1"/><p:cNvSpPr/><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle><a:lvl1pPr><a:buBlip><a:blip r:embed="rId9"/></a:buBlip></a:lvl1pPr></a:lstStyle><a:p><a:endParaRPr/></a:p></p:txBody></p:sp>';
+    const body = '<p:sp><p:nvSpPr><p:cNvPr id="2" name="Content 1"/><p:cNvSpPr/><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="5486400" cy="2743200"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr/><a:p><a:r><a:rPr lang="en-US"/><a:t>Item</a:t></a:r></a:p></p:txBody></p:sp>';
+    const deck = await parsePptx(await buildPptx({
+      slides: [{ shapes: body }],
+      layouts: { 'slideLayout1.xml': { name: 'Blank', shapes: layoutBody } },
+      master: { txStyles },
+    }));
+
+    const content = deck.slides[0]!.elements[0] as ShapeElement;
+    expect(content.text!.paragraphs[0]!.bullet).toEqual({ type: 'char', char: '\u2022', color: { hex: '000000', alpha: 1 }, sizePct: 100 });
+  });
+
   it('inherits unresolved non-placeholder run properties from the default text style after other style', async () => {
     const free = '<p:sp><p:nvSpPr><p:cNvPr id="3" name="TextBox 2"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="2743200" cy="457200"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr/><a:p><a:r><a:rPr lang="en-US"/><a:t>Loose</a:t></a:r></a:p></p:txBody></p:sp>';
     const deck = await parsePptx(await buildPptx({

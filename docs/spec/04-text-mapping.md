@@ -15,9 +15,10 @@ Decided in [#12](https://github.com/devosurf/deckflip/issues/12).
 
 - One `a:p` per paragraph: the Text block itself, or each `li`, or each line-group in `pre`. Consecutive Text blocks are never merged (settled: one text box per HTML block).
 - `a:lnSpc` = `a:spcPts` from the measured line-box height of that paragraph (`round(px * 75)`), always; never `spcPct` (the spike measured a +6 px/line error with it). Mixed sizes inside a line are already inside the measured line box.
-- `a:spcBef`/`a:spcAft` = `spcPts` from the measured gap between consecutive paragraphs in the same text body (li margins). The first paragraph's top gap and the last paragraph's bottom gap are folded into `tIns`/`bIns` instead, so `spcFirstLastPara` is never needed and PowerPoint's edge rule cannot bite.
+- `a:spcBef`/`a:spcAft` = `spcPts` from the measured gap between consecutive paragraphs in the same text body (li margins), always, `0` included. The first paragraph's top gap and the last paragraph's bottom gap are folded into `tIns`/`bIns` instead, so `spcFirstLastPara` is never needed and PowerPoint's edge rule cannot bite.
 - `algn` from `text-align` (`l`, `ctr`, `r`, `just`; `start`/`end` resolved by direction). `indent` from `text-indent`.
 - Tabs are not mapped (a literal tab is emitted as a tab character; PowerPoint uses default stops).
+- Every paragraph states its marker: one the HTML paints none for writes `a:buNone`. Nothing measured is left for DrawingML to inherit, so a `p:ph` (spec 06 "Placeholders"), `p:bodyStyle`, `p:otherStyle` or `p:defaultTextStyle` can add neither a bullet nor a gap. On the way back, `a:buNone` reads as a plain paragraph, which is what it paints.
 
 ## Lists
 

@@ -73,9 +73,9 @@ export function buildTextBody(text: TextBody, ctx: TextEmissionContext, bodyPrAt
           indent: pxToEmu(paragraph.indent),
         },
         measured ? el('a:lnSpc', {}, el('a:spcPts', { val: pxToHundredthsPt(paragraph.lineHeight) })) : undefined,
-        measured && paragraph.spaceBefore > 0 ? el('a:spcBef', {}, el('a:spcPts', { val: pxToHundredthsPt(paragraph.spaceBefore) })) : undefined,
-        measured && paragraph.spaceAfter > 0 ? el('a:spcAft', {}, el('a:spcPts', { val: pxToHundredthsPt(paragraph.spaceAfter) })) : undefined,
-        ...buildBulletNodes(paragraph.bullet),
+        measured ? el('a:spcBef', {}, el('a:spcPts', { val: pxToHundredthsPt(paragraph.spaceBefore) })) : undefined,
+        measured ? el('a:spcAft', {}, el('a:spcPts', { val: pxToHundredthsPt(paragraph.spaceAfter) })) : undefined,
+        ...buildBulletNodes(paragraph.bullet, measured),
       ),
     ];
 
@@ -110,24 +110,32 @@ export function buildTextBody(text: TextBody, ctx: TextEmissionContext, bodyPrAt
     return el('a:p', {}, paragraphNodes);
   });
 
+  const element = opts.element ?? 'p:txBody';
   return el(
-    opts.element ?? 'p:txBody',
+    element,
     {},
-    el('a:bodyPr', bodyPrAttrs),
+    // autofit belongs to a text box, whose box Chromium measured (spec 04); a cell's height comes from its row
+    el('a:bodyPr', bodyPrAttrs, measured && element === 'p:txBody' ? el('a:noAutofit') : undefined),
     el('a:lstStyle'),
     ...paragraphs,
   );
 }
 
-/** CT_TextParagraphProperties order after spacing: buClr, buSzPct, buFontTx, then buNone | buAutoNum | buChar. */
-function buildBulletNodes(bullet: Bullet | undefined): XmlNode[] {
+/**
+ * CT_TextParagraphProperties order after spacing: buClr, buSzPct, buFontTx, then buNone | buAutoNum | buChar.
+ *
+ * Measured text states what the HTML showed: a paragraph with no marker writes `a:buNone`, because a `p:ph`
+ * (spec 06 "Placeholders") or `p:otherStyle` would otherwise hand it the master's `buChar`. Unmeasured text
+ * (speaker notes) leaves the colour to the notes master, which governs it.
+ */
+function buildBulletNodes(bullet: Bullet | undefined, measured: boolean): XmlNode[] {
   if (!bullet) {
-    return [];
+    return measured ? [el('a:buNone')] : [];
   }
   if (bullet.type === 'none') {
     return [el('a:buNone')];
   }
-  const nodes: XmlNode[] = [el('a:buClr', {}, colorNode(bullet.color))];
+  const nodes: XmlNode[] = measured ? [el('a:buClr', {}, colorNode(bullet.color))] : [];
   if (bullet.sizePct !== 100) {
     nodes.push(el('a:buSzPct', { val: Math.round(bullet.sizePct * 1000) }));
   }

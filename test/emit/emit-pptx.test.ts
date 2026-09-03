@@ -215,6 +215,39 @@ describe('emitPptx', () => {
     expect(await zip.file('ppt/notesMasters/notesMaster1.xml')!.async('string')).toContain('<p:notesStyle><a:lvl1pPr><a:defRPr sz="1200"/></a:lvl1pPr></p:notesStyle>');
   });
 
+  it('emits a notes list item with its marker but no bullet colour, which the notes master governs', async () => {
+    const notesDeck = deck();
+    const body = notes('Remember the margin');
+    // html/notes.ts has to put some colour in the model for a notes `li`; no browser measured it, so it is
+    // the tool's invention, not something the notes markup showed
+    body.paragraphs[0]!.bullet = { type: 'char', char: '\u2022', color: { hex: 'FF0000', alpha: 1 }, sizePct: 100 };
+    notesDeck.slides[0]!.notes = body;
+
+    const zip = await JSZip.loadAsync(await emitPptx(notesDeck, { created, appVersion: '1.2.3' }));
+    const notesXml = await zip.file('ppt/notesSlides/notesSlide1.xml')!.async('string');
+    // the item stays an item: the notes pane shows the marker its markup asked for
+    expect(notesXml).toContain('<a:buFontTx/><a:buChar char="\u2022"/>');
+    expect(notesXml).not.toContain('a:buClr');
+  });
+
+  it('writes a touched placeholder body explicitly: no bullets, no gaps, no autofit to inherit', async () => {
+    const phDeck = deck();
+    // a `body` placeholder the agent edited: `p:ph` keeps it the layout box (spec 06 "Placeholders"), so
+    // everything the emitter leaves out comes from the master's `p:bodyStyle` and the layout's autofit
+    shapeAt(phDeck, 1).placeholder = 'body:1';
+
+    const zip = await JSZip.loadAsync(await emitPptx(phDeck, { created, appVersion: '1.2.3' }));
+    const slideXml = await zip.file('ppt/slides/slide1.xml')!.async('string');
+    const placeholder = slideXml.split('<p:sp>').find((fragment) => fragment.includes('<p:ph type="body" idx="1"/>'))!;
+
+    // the HTML showed plain paragraphs: no marker, no gap between them
+    for (const pPr of placeholder.match(/<a:pPr[^>]*>.*?<\/a:pPr>/g)!) {
+      expect(pPr).toContain('<a:spcBef><a:spcPts val="0"/></a:spcBef><a:spcAft><a:spcPts val="0"/></a:spcAft><a:buNone/>');
+    }
+    // Chromium measured the box, so the layout's `a:normAutofit` must not shrink the text (spec 04)
+    expect(placeholder).toContain('<a:noAutofit/>');
+  });
+
   it('emits list paragraphs with marL, negative indent and bullet properties', async () => {
     const listDeck = deck();
     const base = shapeAt(listDeck, 1);
@@ -243,8 +276,8 @@ describe('emitPptx', () => {
     expect(pPrs[0]).toContain('marL="381000"');
     expect(pPrs[0]).toContain('indent="-143542"');
     expect(pPrs[0]).toContain('lvl="0"');
-    // bullet children follow spacing, in schema order: buClr, buSzPct, buFontTx, buChar
-    expect(pPrs[0]).toMatch(/<a:spcBef>.*<\/a:spcBef><a:buClr><a:srgbClr val="FF0000"\/><\/a:buClr><a:buFontTx\/><a:buChar char="•"\/>/);
+    // bullet children follow the spacing, in schema order: buClr, buSzPct, buFontTx, buChar
+    expect(pPrs[0]).toMatch(/<a:spcBef>.*<\/a:spcBef><a:spcAft><a:spcPts val="0"\/><\/a:spcAft><a:buClr><a:srgbClr val="FF0000"\/><\/a:buClr><a:buFontTx\/><a:buChar char="•"\/>/);
     expect(pPrs[0]).not.toContain('a:buSzPct');
 
     expect(pPrs[1]).toContain('marL="762000"');

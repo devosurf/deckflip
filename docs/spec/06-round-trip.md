@@ -13,7 +13,7 @@ Decided in [#14](https://github.com/devosurf/deckflip/issues/14).
 | Feature class | Mode | HTML form | Notes |
 | --- | --- | --- | --- |
 | Slides, order | Represented | `section` order | new/deleted/reordered slides handled; `sldIdLst` rewritten |
-| Text boxes and autoshapes with `rect`/`roundRect`/`ellipse`/`line` geometry | Represented | `div` (+ `p`/`span`), `hr` for lines | inherited placeholder/theme properties resolved into explicit inline CSS so Chromium renders them |
+| Text boxes and autoshapes with `rect`/`roundRect`/`ellipse`/`line` geometry | Represented | `div` (+ `p`/`span`), `hr` for lines | inherited placeholder/theme properties resolved into explicit inline CSS so Chromium renders them; the nearest level declaring any of `a:buNone`/`a:buChar`/`a:buAutoNum`/`a:buBlip` decides the marker, and a picture bullet, which HTML cannot paint, comes back as `•` |
 | Other preset and custom geometries (`prstGeom` others, `custGeom`) | Represented | `div` at the box, rectangular | untouched -> original shape XML; touched -> re-emitted as the rectangle HTML shows (rendering the geometry to `<svg data-preserve>` is a later slice) |
 | Connectors, ink, metafile pictures, `mc:AlternateContent` | Opaque (`vector`) | `div[data-preserve="vector"]` | untouched or moved -> original XML |
 | Pictures (incl. crop, SVG blips) | Represented | `img` with `object-fit`/`clip-path: inset()` for crops | media part copied verbatim (hash-named) |
