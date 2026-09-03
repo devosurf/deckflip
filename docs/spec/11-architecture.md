@@ -61,4 +61,4 @@ Part names and rel ids are assigned in emission order; media are content-hash na
 4. **Parser, PPTX -> HTML, round trip**: `parse`, `htmlout`, manifest, fingerprints, opaque handling. Accept: `roundtrip` corpus part-identity and idempotence gates; foreign decks list every opaque element.
 5. **Fonts embedding, render, inspect polish**: EOT embedding verified in PowerPoint for Windows and Mac; LibreOffice/PowerPoint renderers; `inspect` schema frozen. Accept: `fonts` corpus; embedded font opens on both platforms.
 
-Publish `0.1.0` after milestone 3 (HTML -> PPTX only, documented as such), `0.2.0` after 4, `1.0.0` after 5 and the report schema is declared stable.
+The initial `0.1.0` release includes milestones 1-4: bidirectional conversion and round-trip preservation. Publish `1.0.0` after milestone 5 and the report schema is declared stable.

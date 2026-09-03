@@ -4,15 +4,35 @@
   "description": "Bidirectional converter between HTML slides and PowerPoint (PPTX), built for coding agents",
   "type": "module",
   "license": "MIT",
-  "repository": "github:devosurf/deckflip",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/devosurf/deckflip.git"
+  },
+  "homepage": "https://github.com/devosurf/deckflip#readme",
+  "bugs": {
+    "url": "https://github.com/devosurf/deckflip/issues"
+  },
+  "keywords": [
+    "powerpoint",
+    "pptx",
+    "html",
+    "slides",
+    "presentation",
+    "cli",
+    "agent-skill"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=20"
   },
   "bin": {
-    "deckflip": "./bin/deckflip.js"
+    "deckflip": "bin/deckflip.js"
   },
   "files": [
     "bin",
+    "CHANGELOG.md",
     "dist",
     "skills"
   ],
@@ -22,7 +42,9 @@
     "test": "vitest run",
     "test:corpus": "vitest run test/corpus",
     "typecheck": "tsc --noEmit",
-    "corpus:oracle": "tsx scripts/corpus-oracle.ts"
+    "corpus:oracle": "tsx scripts/corpus-oracle.ts",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm run typecheck && npm test"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.80",

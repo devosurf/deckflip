@@ -5,6 +5,7 @@ on:
     branches: [main]
     tags: ['v*']
   pull_request:
+  workflow_dispatch:
 
 env:
   CI: 'true'
@@ -29,12 +30,13 @@ jobs:
         run: node node_modules/playwright-core/cli.js install --with-deps chromium
       - run: npm run typecheck
       - run: npm test
-      - name: Determinism: two conversions of the skill template are byte-identical
+      - name: 'Determinism: two conversions of the skill template are byte-identical'
         run: |
           npx tsx src/cli/main.ts convert skills/deckflip/templates/deck.html -o /tmp/first.pptx --offline --strict
           npx tsx src/cli/main.ts convert skills/deckflip/templates/deck.html -o /tmp/second.pptx --offline --strict
           cmp /tmp/first.pptx /tmp/second.pptx
       - run: npm run build
+      - run: npm pack --dry-run
 
   windows:
     # Unit tests and the Windows font scan; no LibreOffice, so image gates skip themselves.
