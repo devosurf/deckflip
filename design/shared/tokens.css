@@ -5,3 +5,37 @@
  * Starts empty on purpose: tokens arrive per change, carried by the agent.
  */
 :root {}
+
+@theme {
+	/* Surfaces, darkest to lightest. The page is ink-950; panels sit above it. */
+	--color-ink-950: #08090b;
+	--color-ink-900: #0e1013;
+	--color-ink-850: #14171b;
+	--color-ink-800: #1b1f24;
+	--color-line: #24292f;
+	--color-line-strong: #333a43;
+
+	/* Type */
+	--color-paper: #f4f6f8;
+	--color-mist-200: #c3cad3;
+	--color-mist-400: #8b939e;
+	--color-mist-600: #5b636d;
+
+	/* Accent: the ember deckflip flips PowerPoint's brick into */
+	--color-ember-600: #e0410f;
+	--color-ember-500: #ff5c2b;
+	--color-ember-400: #ff8058;
+	--color-ember-100: #ffd9cc;
+
+	/* Report semantics: native / rasterised / rejected */
+	--color-jade-400: #3ad39b;
+	--color-gold-400: #f2b134;
+	--color-rose-400: #f4565f;
+
+	/* PowerPoint's own selection blue, for the editable-shape proof */
+	--color-office-400: #5b9bd5;
+
+	--font-display: "Inter Tight", "Inter", ui-sans-serif, system-ui, sans-serif;
+	--font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+	--font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}

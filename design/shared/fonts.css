@@ -4,3 +4,4 @@
  * A relative url() resolves from this folder — drop the file in
  * assets/fonts/ and spool carries it in the document.
  */
+@import url("https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap");

@@ -1,4 +1,10 @@
 {
 	"format": 1,
-	"history": true
+	"history": true,
+	"places": {
+		"landing": {
+			"x": 80,
+			"y": 80
+		}
+	}
 }
