@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1 - 2026-09-03
+
+### Fixed
+
+- Decks with speaker notes opened in PowerPoint with "found a problem with content" and lost their notes to the repair: the emitted notes master shared the slide master's theme part, and PowerPoint allows a theme part exactly one master. The notes master now gets a theme part of its own (`theme2.xml`, or the next free `themeN.xml` on a round trip).
+
 ## 0.1.0 - 2026-09-03
 
 Initial release.

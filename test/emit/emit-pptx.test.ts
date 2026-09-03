@@ -192,6 +192,21 @@ describe('emitPptx', () => {
     );
   });
 
+  it('gives the notes master a theme part of its own, since PowerPoint repairs a deck whose masters share one', async () => {
+    const notesDeck = deck();
+    notesDeck.slides[0]!.notes = notes('Remember the margin');
+    const zip = await JSZip.loadAsync(await emitPptx(notesDeck, { created, appVersion: '1.2.3' }));
+    const themeTarget = async (rels: string): Promise<string> =>
+      /<Relationship [^>]*Type="[^"]*\/theme" Target="([^"]+)"/.exec(await zip.file(rels)!.async('string'))?.[1] ?? '';
+
+    expect(await themeTarget('ppt/slideMasters/_rels/slideMaster1.xml.rels')).toBe('../theme/theme1.xml');
+    expect(await themeTarget('ppt/notesMasters/_rels/notesMaster1.xml.rels')).toBe('../theme/theme2.xml');
+    expect(await zip.file('ppt/theme/theme2.xml')!.async('string')).toContain('<a:theme ');
+    expect(await zip.file('[Content_Types].xml')!.async('string')).toContain(
+      '<Override PartName="/ppt/theme/theme2.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>',
+    );
+  });
+
   it('regenerates p14:sectionLst from the sections the Slides carry', async () => {
     const sectioned = deck();
     const first = sectioned.slides[0]!;

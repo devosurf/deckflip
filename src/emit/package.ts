@@ -1,12 +1,13 @@
 import type { Deck } from '../model/index.js';
 import { pxToEmu } from '../ooxml/emu.js';
 import { CT, REL, OpcPackage } from '../ooxml/opc.js';
-import { parseXml, el, serialize, type XmlNode } from '../ooxml/xml.js';
+import { el, serialize, type XmlNode } from '../ooxml/xml.js';
 import { MediaStore } from './media.js';
 import { emitNotesMaster, emitNotesSlide, notesSlidePartName, NOTES_MASTER_PART } from './notes.js';
 import { emitPreservedPptx, type PreservedSource } from './preserved.js';
 import { deckSections, sectionExtNode } from './sections.js';
 import { emitSlide, slidePartName } from './slide.js';
+import { emitOwnTheme } from './theme.js';
 
 export interface EmitOptions {
   created?: Date;
@@ -19,55 +20,10 @@ const DEFAULT_DATE = new Date('1980-01-01T00:00:00.000Z');
 const MASTER_PART = '/ppt/slideMasters/slideMaster1.xml';
 const LAYOUT_PART = '/ppt/slideLayouts/slideLayout1.xml';
 const THEME_PART = '/ppt/theme/theme1.xml';
+const NOTES_THEME_PART = '/ppt/theme/theme2.xml';
 const PRESENTATION_PART = '/ppt/presentation.xml';
 const CORE_PART = '/docProps/core.xml';
 const APP_PART = '/docProps/app.xml';
-
-const THEME_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Office">
-  <a:themeElements>
-    <a:clrScheme name="Office">
-      <a:dk1><a:srgbClr val="000000"/></a:dk1>
-      <a:lt1><a:srgbClr val="FFFFFF"/></a:lt1>
-      <a:dk2><a:srgbClr val="44546A"/></a:dk2>
-      <a:lt2><a:srgbClr val="E7E6E6"/></a:lt2>
-      <a:accent1><a:srgbClr val="4472C4"/></a:accent1>
-      <a:accent2><a:srgbClr val="ED7D31"/></a:accent2>
-      <a:accent3><a:srgbClr val="A5A5A5"/></a:accent3>
-      <a:accent4><a:srgbClr val="FFC000"/></a:accent4>
-      <a:accent5><a:srgbClr val="5B9BD5"/></a:accent5>
-      <a:accent6><a:srgbClr val="70AD47"/></a:accent6>
-      <a:hlink><a:srgbClr val="0563C1"/></a:hlink>
-      <a:folHlink><a:srgbClr val="954F72"/></a:folHlink>
-    </a:clrScheme>
-    <a:fontScheme name="Office">
-      <a:majorFont><a:latin typeface="Arial"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont>
-      <a:minorFont><a:latin typeface="Arial"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont>
-    </a:fontScheme>
-    <a:fmtScheme name="Office">
-      <a:fillStyleLst>
-        <a:solidFill><a:schemeClr val="phClr"/></a:solidFill>
-        <a:solidFill><a:schemeClr val="phClr"/></a:solidFill>
-        <a:solidFill><a:schemeClr val="phClr"/></a:solidFill>
-      </a:fillStyleLst>
-      <a:lnStyleLst>
-        <a:ln w="6350"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln>
-        <a:ln w="12700"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln>
-        <a:ln w="19050"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln>
-      </a:lnStyleLst>
-      <a:effectStyleLst>
-        <a:effectStyle><a:effectLst/></a:effectStyle>
-        <a:effectStyle><a:effectLst/></a:effectStyle>
-        <a:effectStyle><a:effectLst/></a:effectStyle>
-      </a:effectStyleLst>
-      <a:bgFillStyleLst>
-        <a:solidFill><a:schemeClr val="phClr"/></a:solidFill>
-        <a:solidFill><a:schemeClr val="phClr"/></a:solidFill>
-        <a:solidFill><a:schemeClr val="phClr"/></a:solidFill>
-      </a:bgFillStyleLst>
-    </a:fmtScheme>
-  </a:themeElements>
-</a:theme>`;
 
 export async function emitPptx(deck: Deck, opts: EmitOptions): Promise<Buffer> {
   const created = opts.created ?? DEFAULT_DATE;
@@ -87,7 +43,6 @@ export async function emitPptx(deck: Deck, opts: EmitOptions): Promise<Buffer> {
   pkg.addRelationship(PRESENTATION_PART, REL.theme, 'theme/theme1.xml');
 
   const masterLayoutId = pkg.addRelationship(MASTER_PART, REL.slideLayout, '../slideLayouts/slideLayout1.xml');
-  pkg.addRelationship(MASTER_PART, REL.theme, '../theme/theme1.xml');
   pkg.addRelationship(LAYOUT_PART, REL.slideMaster, '../slideMasters/slideMaster1.xml');
 
   pkg.addPart(CORE_PART, CT.core, serialize(buildCoreXml(deck, created)));
@@ -96,7 +51,7 @@ export async function emitPptx(deck: Deck, opts: EmitOptions): Promise<Buffer> {
   pkg.addPart(MASTER_PART, CT.slideMaster, serialize(buildMasterXml(masterLayoutId)));
   pkg.addPart(LAYOUT_PART, CT.slideLayout, serialize(buildLayoutXml()));
   if (notesMasterId) {
-    emitNotesMaster(pkg, deck.canvas, THEME_PART);
+    emitNotesMaster(pkg, deck.canvas, NOTES_THEME_PART);
   }
 
   const media = new MediaStore(pkg);
@@ -108,7 +63,7 @@ export async function emitPptx(deck: Deck, opts: EmitOptions): Promise<Buffer> {
     }
   }
 
-  pkg.addPart(THEME_PART, CT.theme, serialize(buildThemeXml()));
+  emitOwnTheme(pkg, MASTER_PART, THEME_PART);
 
   return pkg.toBuffer({ date: created, compression: 'DEFLATE' });
 }
@@ -214,10 +169,6 @@ function buildLayoutXml(): XmlNode {
     ),
     el('p:clrMapOvr', {}, el('a:masterClrMapping')),
   );
-}
-
-function buildThemeXml(): XmlNode {
-  return parseXml(THEME_XML);
 }
 
 function pptNs(): Record<string, string> {

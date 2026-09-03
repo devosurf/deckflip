@@ -63,7 +63,7 @@ export async function emitPreservedPptx(deck: Deck, preserved: PreservedSource, 
   const identities = assignSlideIdentities(plan, source, reader);
   await emitPresentation(pkg, deck, source, plan, identities, copy, ownNotesMaster);
   if (ownNotesMaster) {
-    emitNotesMaster(pkg, deck.canvas, source.presentation.rels.find((rel) => rel.type === REL.theme && !rel.external)?.target);
+    emitNotesMaster(pkg, deck.canvas, freePart(pkg, reader, (index) => `/ppt/theme/theme${index}.xml`));
   }
 
   const slidePartById = new Map(deck.slides.map((slide, index) => [slide.id, identities.get(plan.slides[index]!)!.partName] as const));
@@ -81,7 +81,7 @@ export async function emitPreservedPptx(deck: Deck, preserved: PreservedSource, 
     // an untouched shell keeps the source notes part verbatim (prepareSplice copied it); anything else is
     // regenerated on the notes master the deck was authored on (spec 06 "Speaker notes")
     if (slide.notes && notesMasterPart && !splice.extraRelationships.some((rel) => rel.type === REL.notesSlide)) {
-      const partName = slidePlan.source?.rels.find((rel) => rel.type === REL.notesSlide && !rel.external)?.target ?? freeNotesPart(pkg, reader);
+      const partName = slidePlan.source?.rels.find((rel) => rel.type === REL.notesSlide && !rel.external)?.target ?? freePart(pkg, reader, (index) => `/ppt/notesSlides/notesSlide${index}.xml`);
       emitNotesSlide(pkg, slidePart, partName, slide.notes, { deckLang: deck.lang, masterPart: notesMasterPart, slidePartById });
     }
   }
@@ -93,11 +93,11 @@ function relsName(part: string): string {
   return part === '/' ? '/_rels/.rels' : `${path.posix.dirname(part)}/_rels/${path.posix.basename(part)}.rels`;
 }
 
-/** A notes slide part name no source part and no emitted part holds yet (a slide the author gave notes to). */
-function freeNotesPart(pkg: OpcPackage, reader: OpcReader): string {
+/** The first of `name(1)`, `name(2)`, ... that no source part and no emitted part holds yet. */
+function freePart(pkg: OpcPackage, reader: OpcReader, name: (index: number) => string): string {
   for (let index = 1; ; index += 1) {
-    const name = `/ppt/notesSlides/notesSlide${index}.xml`;
-    if (!pkg.hasPart(name) && !reader.hasPart(name)) return name;
+    const candidate = name(index);
+    if (!pkg.hasPart(candidate) && !reader.hasPart(candidate)) return candidate;
   }
 }
 

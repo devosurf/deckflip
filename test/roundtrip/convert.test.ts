@@ -131,6 +131,9 @@ describe.skipIf(!browserAvailable)('PPTX -> HTML -> PPTX round trip', () => {
     expect(after.has('ppt/notesMasters/notesMaster1.xml')).toBe(true);
     expect(Buffer.from(after.get('ppt/notesSlides/_rels/notesSlide1.xml.rels')!, 'base64').toString('utf8')).toContain('../notesMasters/notesMaster1.xml');
     expect(Buffer.from(after.get('ppt/presentation.xml')!, 'base64').toString('utf8')).toContain('<p:notesMasterIdLst>');
+    // ...and the master needs a theme of its own: PowerPoint repairs a deck whose masters share one
+    expect(Buffer.from(after.get('ppt/notesMasters/_rels/notesMaster1.xml.rels')!, 'base64').toString('utf8')).toContain('Target="../theme/theme2.xml"');
+    expect(after.has('ppt/theme/theme2.xml')).toBe(true);
   });
 
   it('carries the lists the notes dialect allows into the notes body as bulleted paragraphs', async () => {

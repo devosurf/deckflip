@@ -7,6 +7,7 @@ import type { Canvas, TextBody } from '../model/index.js';
 import { CT, REL, type OpcPackage } from '../ooxml/opc.js';
 import { el, serialize, type XmlNode } from '../ooxml/xml.js';
 import { buildTextBody, type TextEmissionContext } from './text.js';
+import { emitOwnTheme } from './theme.js';
 
 export const NOTES_MASTER_PART = '/ppt/notesMasters/notesMaster1.xml';
 
@@ -45,11 +46,9 @@ export function notesSlidePartName(index: number): string {
   return `/ppt/notesSlides/notesSlide${index}.xml`;
 }
 
-/** The tool's own notes master, for a deck whose source has none; `themePart` is the deck's theme part. */
-export function emitNotesMaster(pkg: OpcPackage, canvas: Canvas, themePart: string | undefined): void {
-  if (themePart !== undefined) {
-    pkg.addRelationship(NOTES_MASTER_PART, REL.theme, relativeTarget(NOTES_MASTER_PART, themePart));
-  }
+/** The tool's own notes master, for a deck whose source has none, on a theme part of its own at `themePart`. */
+export function emitNotesMaster(pkg: OpcPackage, canvas: Canvas, themePart: string): void {
+  emitOwnTheme(pkg, NOTES_MASTER_PART, themePart);
   pkg.addPart(NOTES_MASTER_PART, CT.notesMaster, serialize(buildNotesMasterXml(canvas)));
 }
 

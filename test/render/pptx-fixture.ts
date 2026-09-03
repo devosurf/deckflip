@@ -102,7 +102,7 @@ export async function buildPptx(options: FixtureOptions = {}): Promise<Buffer> {
     '/docProps/core.xml': 'application/vnd.openxmlformats-package.core-properties+xml',
     '/docProps/app.xml': 'application/vnd.openxmlformats-officedocument.extended-properties+xml',
     ...(options.vba ? { '/ppt/vbaProject.bin': 'application/vnd.ms-office.vbaProject' } : {}),
-    ...(hasNotes ? { '/ppt/notesMasters/notesMaster1.xml': NOTES_MASTER_CT } : {}),
+    ...(hasNotes ? { '/ppt/notesMasters/notesMaster1.xml': NOTES_MASTER_CT, '/ppt/theme/theme2.xml': 'application/vnd.openxmlformats-officedocument.theme+xml' } : {}),
     ...Object.fromEntries(notesFiles.filter((file) => file !== undefined).map((file) => [`/ppt/notesSlides/${file}`, NOTES_SLIDE_CT])),
     ...options.contentTypes?.overrides,
   };
@@ -135,8 +135,10 @@ export async function buildPptx(options: FixtureOptions = {}): Promise<Buffer> {
   zip.file('ppt/_rels/presentation.xml.rels', rels(presentationRels));
 
   if (hasNotes) {
+    // PowerPoint gives each master a theme part of its own, and repairs a deck whose masters share one
     zip.file('ppt/notesMasters/notesMaster1.xml', notesMasterXml());
-    zip.file('ppt/notesMasters/_rels/notesMaster1.xml.rels', rels([['rId1', 'theme', '../theme/theme1.xml']]));
+    zip.file('ppt/notesMasters/_rels/notesMaster1.xml.rels', rels([['rId1', 'theme', '../theme/theme2.xml']]));
+    zip.file('ppt/theme/theme2.xml', themeXml());
   }
 
   const layoutFiles = Object.keys(layouts);
