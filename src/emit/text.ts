@@ -132,9 +132,6 @@ function buildBulletNodes(bullet: Bullet | undefined, measured: boolean): XmlNod
   if (!bullet) {
     return measured ? [el('a:buNone')] : [];
   }
-  if (bullet.type === 'none') {
-    return [el('a:buNone')];
-  }
   const nodes: XmlNode[] = measured ? [el('a:buClr', {}, colorNode(bullet.color))] : [];
   if (bullet.sizePct !== 100) {
     nodes.push(el('a:buSzPct', { val: Math.round(bullet.sizePct * 1000) }));

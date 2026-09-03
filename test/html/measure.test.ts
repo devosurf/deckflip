@@ -161,7 +161,8 @@ describe.skipIf(!browserAvailable)('measureDeck', () => {
       expect(inside.text?.paragraphs[0]!.indent).toBe(-32);
 
       const plain = shapeByName(measured.deck, 'ul.plain');
-      expect(plain.text?.paragraphs[0]!.bullet).toEqual({ type: 'none' });
+      // a list CSS paints no marker for is a run of plain paragraphs: the IDM has one spelling of "no marker"
+      expect(plain.text?.paragraphs[0]!.bullet).toBeUndefined();
       expect(plain.text?.paragraphs[0]!.marginLeft).toBe(0);
       expect(plain.text?.paragraphs[0]!.indent).toBe(0);
     } finally {

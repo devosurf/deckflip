@@ -266,7 +266,7 @@ describe('emitPptx', () => {
       paragraph({ bullet: { type: 'char', char: '•', color: { hex: 'FF0000', alpha: 1 }, sizePct: 100 } }),
       paragraph({ level: 1, marginLeft: 80, bullet: { type: 'char', char: '◦', color: { hex: '000000', alpha: 1 }, sizePct: 80 } }),
       paragraph({ bullet: { type: 'autonum', scheme: 'alphaLcPeriod', startAt: 3, color: { hex: '000000', alpha: 1 }, sizePct: 100 } }),
-      paragraph({ indent: 0, marginLeft: 0, bullet: { type: 'none' } }),
+      paragraph({ indent: 0, marginLeft: 0 }),
     ];
 
     const zip = await JSZip.loadAsync(await emitPptx(listDeck, { created, appVersion: '1.2.3' }));

@@ -139,7 +139,7 @@ export function notesHtml(notes: TextBody, sheet: Stylesheet): string {
   const lines: string[] = ['<aside class="notes">'];
   for (let index = 0; index < notes.paragraphs.length; ) {
     const paragraph = notes.paragraphs[index]!;
-    if (paragraph.bullet && paragraph.bullet.type !== 'none') {
+    if (paragraph.bullet) {
       const list = notesList(notes.paragraphs, index, paragraph.level, sheet);
       lines.push(list.html);
       index = list.next;
@@ -163,7 +163,7 @@ function notesList(paragraphs: Paragraph[], from: number, level: number, sheet: 
   while (index < paragraphs.length) {
     const paragraph = paragraphs[index]!;
     const bullet = paragraph.bullet;
-    if (!bullet || bullet.type === 'none' || paragraph.level < level) {
+    if (!bullet || paragraph.level < level) {
       break;
     }
     if (paragraph.level > level) {
@@ -228,7 +228,7 @@ function listHtml(paragraphs: Paragraph[], from: number, level: number, sheet: S
     if (style) {
       li.push(`font-family: ${fontFamily(style)}`, `font-size: ${pxv(style.size)}`);
     }
-    const marker = paragraph.bullet && paragraph.bullet.type !== 'none' ? ` class="${sheet.classFor('m', markerCss(paragraph.bullet, style), '::marker')}"` : '';
+    const marker = paragraph.bullet ? ` class="${sheet.classFor('m', markerCss(paragraph.bullet, style), '::marker')}"` : '';
     html += `<li${marker} style="${li.join('; ')}">${runsHtml(paragraph.runs, sheet)}</li>`;
     index += 1;
   }
@@ -239,16 +239,13 @@ const CHAR_TYPES: Record<string, string> = { '\u2022': 'disc', '\u25E6': 'circle
 const SCHEME_TYPES = { arabicPeriod: 'decimal', alphaLcPeriod: 'lower-alpha', alphaUcPeriod: 'upper-alpha', romanLcPeriod: 'lower-roman', romanUcPeriod: 'upper-roman' } as const;
 
 function listStyleType(bullet: Bullet): string {
-  if (bullet.type === 'none') {
-    return 'none';
-  }
   if (bullet.type === 'autonum') {
     return SCHEME_TYPES[bullet.scheme];
   }
   return CHAR_TYPES[bullet.char] ?? `"${bullet.char.replace(/"/g, '\\"')}"`;
 }
 
-function markerCss(bullet: Exclude<Bullet, { type: 'none' }>, style: RunStyle | undefined): string {
+function markerCss(bullet: Bullet, style: RunStyle | undefined): string {
   const out = [`color: ${color(bullet.color)}`];
   if (style && bullet.sizePct !== 100) {
     out.push(`font-size: ${pxv((style.size * bullet.sizePct) / 100)}`);

@@ -277,7 +277,7 @@ export interface Paragraph {
   marginLeft: number;
   /** list nesting depth 0-8; 0 for non-list paragraphs */
   level: number;
-  /** present on list items only */
+  /** the marker of a list item; a paragraph with no marker carries none (emit writes `a:buNone` for it) */
   bullet?: Bullet;
   runs: Run[];
 }
@@ -286,8 +286,7 @@ export type AutonumScheme = 'arabicPeriod' | 'alphaLcPeriod' | 'alphaUcPeriod' |
 
 export type Bullet =
   | { type: 'char'; char: string; color: Color; sizePct: number }
-  | { type: 'autonum'; scheme: AutonumScheme; startAt: number; color: Color; sizePct: number }
-  | { type: 'none' };
+  | { type: 'autonum'; scheme: AutonumScheme; startAt: number; color: Color; sizePct: number };
 
 export type Run = { kind: 'text'; text: string; style: RunStyle } | { kind: 'break' };
 

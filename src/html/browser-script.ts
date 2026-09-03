@@ -1491,7 +1491,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
       shape.shadow.color = withAlpha(shape.shadow.color, opacity);
     }
     for (const paragraph of shape.text?.paragraphs ?? []) {
-      if (paragraph.bullet && paragraph.bullet.type !== 'none') {
+      if (paragraph.bullet) {
         paragraph.bullet.color = withAlpha(paragraph.bullet.color, opacity);
       }
       for (const run of paragraph.runs) {
@@ -1600,7 +1600,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
           entries.push({ code: 'SUBSTITUTE_LIST_STYLE', selector: cssPath(current), reason: `list-style-type ${liStyle.listStyleType}${reversed ? ' (reversed)' : ''} on ${elementName(current)} has no PowerPoint numbering scheme` });
         }
         let indent = 0;
-        if (bullet.type !== 'none') {
+        if (bullet) {
           bullet.sizePct = Math.round((marker.fontSize / runStyle.size) * 100);
           const textStart = liStyle.listStylePosition === 'inside' ? firstTextLeft(host) : undefined;
           if (textStart !== undefined) {
@@ -1631,7 +1631,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
           indent,
           marginLeft,
           level,
-          bullet,
+          ...(bullet === undefined ? {} : { bullet }),
           runs: runs.length ? runs : [{ kind: 'text', text: '', style: runStyle }],
         });
         if (parts.nested) {
@@ -1687,14 +1687,15 @@ export function measureSlideDocument(): BrowserMeasureResult {
     return { host: paragraph ?? li, nested };
   }
 
-  function resolveMarker(li: HTMLElement, liStyle: CSSStyleDeclaration, list: HTMLElement, ordinal: number): { bullet: Bullet; advance: number; fontSize: number; substituted: boolean } {
+  /** `list-style-type: none` paints no marker, so the item is a plain paragraph: `marL`, `indent` and `lvl` still carry its layout. */
+  function resolveMarker(li: HTMLElement, liStyle: CSSStyleDeclaration, list: HTMLElement, ordinal: number): { bullet: Bullet | undefined; advance: number; fontSize: number; substituted: boolean } {
     const markerStyle = getComputedStyle(li, '::marker');
     const fontSize = px(markerStyle.fontSize) || px(liStyle.fontSize);
     const color = parseColor(markerStyle.color) ?? parseColor(liStyle.color) ?? { hex: '000000', alpha: 1 };
     const type = liStyle.listStyleType;
     const reversed = list.hasAttribute('reversed');
     if (type === 'none') {
-      return { bullet: { type: 'none' }, advance: 0, fontSize, substituted: false };
+      return { bullet: undefined, advance: 0, fontSize, substituted: false };
     }
     const char = type === 'disc' ? '•' : type === 'circle' ? '◦' : type === 'square' ? '▪' : undefined;
     if (char) {
