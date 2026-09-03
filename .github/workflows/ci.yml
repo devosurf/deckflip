@@ -22,10 +22,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Install LibreOffice and metric-compatible fonts
+      - name: Install LibreOffice and PowerPoint-compatible fonts
         run: |
+          echo 'ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true' | sudo debconf-set-selections
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libreoffice-impress fonts-liberation fonts-crosextra-carlito fonts-crosextra-caladea
+          sudo apt-get install -y --no-install-recommends libreoffice-impress fonts-liberation fonts-crosextra-carlito fonts-crosextra-caladea ttf-mscorefonts-installer
+          sudo fc-cache -f
       - name: Install managed Chromium
         run: node node_modules/playwright-core/cli.js install --with-deps chromium
       - run: npm run typecheck
