@@ -43,7 +43,7 @@ function buildCell(cell: TableCell, ctx: TextEmissionContext): XmlNode {
     return el('a:tc', attrs, el('a:txBody', {}, el('a:bodyPr'), el('a:lstStyle'), el('a:p', {}, buildEndParaRPr(style?.size ?? 12, ctx.deckLang))), el('a:tcPr'));
   }
   const text = cell.text;
-  const body = buildTextBody(text, ctx, {}, 'a:txBody');
+  const body = buildTextBody(text, ctx, {}, { element: 'a:txBody' });
   // the first-baseline correction (spec 04) applies to the top inset exactly as for a text box
   const baseline = cell.anchor === 't' && text.paragraphs[0] ? baselineCorrectionPx(text.paragraphs[0]) : 0;
   const tcPr = el(

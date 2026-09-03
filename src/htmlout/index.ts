@@ -7,7 +7,7 @@ import { baseStylesheet } from '../html/base.css.js';
 import { borderCss, fillCss, geometryCss, shadowCss } from './css.js';
 import { elementsHtml, nameParts, type ElementContext } from './elements.js';
 import { attr, text } from './escape.js';
-import { Stylesheet } from './text.js';
+import { notesHtml, Stylesheet } from './text.js';
 
 export interface HtmlDeck {
   html: string;
@@ -98,7 +98,8 @@ function emitSlide(slide: Slide, id: string, ctx: ElementContext): { html: strin
     attrs.push(`style="${css.join('; ')}"`);
   }
   const elements = elementsHtml(rest, { x: 0, y: 0 }, ctx);
-  const html = [`<section ${attrs.join(' ')}>`, ...elements, '</section>'].join('\n');
+  const notes = slide.notes ? [notesHtml(slide.notes, ctx.sheet)] : [];
+  const html = [`<section ${attrs.join(' ')}>`, ...elements, ...notes, '</section>'].join('\n');
   const record: HtmlSlide = { id, ...(shape?.shapeId === undefined ? {} : { background: shape.shapeId }), merged: Object.fromEntries(ctx.merged) };
   return { html, record };
 }

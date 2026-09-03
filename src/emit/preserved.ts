@@ -12,6 +12,7 @@ import { el, parseXml, raw, serialize, type XmlNode } from '../ooxml/xml.js';
 import type { ElementSplice, SlidePlan, SplicePlan } from '../roundtrip/plan.js';
 import type { SourceIndex, SourceShape, SourceSlide } from '../roundtrip/source.js';
 import { MediaStore } from './media.js';
+import { emitNotesMaster, emitNotesSlide, NOTES_MASTER_PART } from './notes.js';
 import { emitSlide, type SlideSplice } from './slide.js';
 
 export interface PreservedSource {
@@ -56,11 +57,17 @@ export async function emitPreservedPptx(deck: Deck, preserved: PreservedSource, 
     if (!rel.external && rel.target !== source.presentation.partName) await copy(rel.target);
   }
 
+  const sourceNotesMaster = source.presentation.rels.find((rel) => rel.type === REL.notesMaster && !rel.external)?.target;
+  const ownNotesMaster = sourceNotesMaster === undefined && deck.slides.some((slide) => slide.notes);
   const identities = assignSlideIdentities(plan, source, reader);
-  await emitPresentation(pkg, source, plan, identities, copy);
+  await emitPresentation(pkg, source, plan, identities, copy, ownNotesMaster);
+  if (ownNotesMaster) {
+    emitNotesMaster(pkg, deck.canvas, source.presentation.rels.find((rel) => rel.type === REL.theme && !rel.external)?.target);
+  }
 
   const slidePartById = new Map(deck.slides.map((slide, index) => [slide.id, identities.get(plan.slides[index]!)!.partName] as const));
   const media = new MediaStore(pkg);
+  const notesMasterPart = sourceNotesMaster ?? (ownNotesMaster ? NOTES_MASTER_PART : undefined);
   for (const [index, slide] of deck.slides.entries()) {
     const slidePlan = plan.slides[index]!;
     const identity = identities.get(slidePlan)!;
@@ -69,7 +76,13 @@ export async function emitPreservedPptx(deck: Deck, preserved: PreservedSource, 
       continue;
     }
     const splice = await prepareSplice(pkg, slide, slidePlan, identity, source, copy);
-    emitSlide(pkg, slide, { deck, slidePartById, media }, splice);
+    const slidePart = emitSlide(pkg, slide, { deck, slidePartById, media }, splice);
+    // an untouched shell keeps the source notes part verbatim (prepareSplice copied it); anything else is
+    // regenerated on the notes master the deck was authored on (spec 06 "Speaker notes")
+    if (slide.notes && notesMasterPart && !splice.extraRelationships.some((rel) => rel.type === REL.notesSlide)) {
+      const partName = slidePlan.source?.rels.find((rel) => rel.type === REL.notesSlide && !rel.external)?.target ?? freeNotesPart(pkg, reader);
+      emitNotesSlide(pkg, slide, slidePart, partName, { deckLang: deck.lang, masterPart: notesMasterPart, slidePartById });
+    }
   }
 
   return pkg.toBuffer({ date: created, compression: 'DEFLATE' });
@@ -77,6 +90,14 @@ export async function emitPreservedPptx(deck: Deck, preserved: PreservedSource, 
 
 function relsName(part: string): string {
   return part === '/' ? '/_rels/.rels' : `${path.posix.dirname(part)}/_rels/${path.posix.basename(part)}.rels`;
+}
+
+/** A notes slide part name no source part and no emitted part holds yet (a slide the author gave notes to). */
+function freeNotesPart(pkg: OpcPackage, reader: OpcReader): string {
+  for (let index = 1; ; index += 1) {
+    const name = `/ppt/notesSlides/notesSlide${index}.xml`;
+    if (!pkg.hasPart(name) && !reader.hasPart(name)) return name;
+  }
 }
 
 /** Kept slides keep their `p:sldId`, relationship id and part name; new ones get the next of each. */
@@ -96,17 +117,23 @@ function assignSlideIdentities(plan: SplicePlan, source: SourceIndex, reader: Op
 }
 
 /** The source presentation part with `p:sldIdLst` (and a `p14:sectionLst`) following the Deck's slides; every other relationship kept under its id. */
-async function emitPresentation(pkg: OpcPackage, source: SourceIndex, plan: SplicePlan, identities: Map<SlidePlan, SlideIdentity>, copy: (part: string) => Promise<void>): Promise<void> {
+async function emitPresentation(pkg: OpcPackage, source: SourceIndex, plan: SplicePlan, identities: Map<SlidePlan, SlideIdentity>, copy: (part: string) => Promise<void>, ownNotesMaster: boolean): Promise<void> {
   const part = source.presentation.partName;
   const ordered = plan.slides.map((slide) => identities.get(slide)!);
   const tree = parseXml(source.presentation.xml);
   const list = find(tree, 'p:sldIdLst');
   if (list) list.children = ordered.map((identity) => el('p:sldId', { id: identity.id, 'r:id': identity.rId }));
   rewriteSections(tree, plan, ordered);
+  const dir = path.posix.dirname(part);
+  const notesMasterRel = ownNotesMaster ? { id: freeRelId(source, ordered), target: path.posix.relative(dir, NOTES_MASTER_PART) } : undefined;
+  if (notesMasterRel) {
+    // CT_Presentation orders the master lists: slide masters, then notes master, then the slide list
+    const after = tree.children.findIndex((child) => typeof child !== 'string' && child.name === 'p:sldMasterIdLst');
+    tree.children.splice(after + 1, 0, el('p:notesMasterIdLst', {}, el('p:notesMasterId', { 'r:id': notesMasterRel.id })));
+  }
   pkg.addPart(part, source.contentType(part) ?? 'application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml', serialize(tree));
 
   const kept = new Set(ordered.filter((identity, index) => plan.slides[index]!.source).map((identity) => identity.partName));
-  const dir = path.posix.dirname(part);
   for (const rel of source.presentation.rels) {
     const isSlide = rel.type === REL.slide;
     if (isSlide && !kept.has(rel.target)) continue;
@@ -118,6 +145,16 @@ async function emitPresentation(pkg: OpcPackage, source: SourceIndex, plan: Spli
     if (plan.slides[index]!.source) continue;
     pkg.addRelationship(part, REL.slide, path.posix.relative(dir, identity.partName), { id: identity.rId });
   }
+  if (notesMasterRel) {
+    pkg.addRelationship(part, REL.notesMaster, notesMasterRel.target, { id: notesMasterRel.id });
+  }
+}
+
+/** A presentation relationship id above every id the source holds and every id a new slide took. */
+function freeRelId(source: SourceIndex, ordered: SlideIdentity[]): string {
+  const number = (id: string): number => Number(/^rId(\d+)$/.exec(id)?.[1] ?? 0);
+  const taken = [...source.presentation.rels.map((rel) => number(rel.id)), ...ordered.map((identity) => number(identity.rId))];
+  return `rId${Math.max(0, ...taken) + 1}`;
 }
 
 /** Removed slides leave their sections; a new slide joins the section of the slide before it. */

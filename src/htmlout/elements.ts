@@ -40,9 +40,13 @@ export function nameParts(name: string, extraClass?: string): { tag: string; att
   return { tag, attrs: `${id}${cls}` };
 }
 
-/** `data-shape-id` for an element that came from a PPTX shape (spec 02), the key the round-trip manifest uses. */
-function identityAttr(element: { shapeId?: string }): string {
-  return element.shapeId === undefined ? '' : ` data-shape-id="${attr(element.shapeId)}"`;
+/**
+ * `data-shape-id` for an element that came from a PPTX shape (spec 02), the key the round-trip manifest uses,
+ * and `data-placeholder` for the layout placeholder it fills (spec 06 "Placeholders").
+ */
+function identityAttr(element: { shapeId?: string; placeholder?: string }): string {
+  const shape = element.shapeId === undefined ? '' : ` data-shape-id="${attr(element.shapeId)}"`;
+  return element.placeholder === undefined ? shape : `${shape} data-placeholder="${attr(element.placeholder)}"`;
 }
 
 function recordMerge(ctx: ElementContext, written: { shapeId?: string }, parts: Array<{ shapeId?: string }>): void {

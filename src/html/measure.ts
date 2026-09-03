@@ -11,6 +11,7 @@ import type { BrowserElement, BrowserImageFill, BrowserMeasureResult, BrowserPic
 import { loadMedia, reencodeToPng } from './media.js';
 import { FREEZE_ATTR, measureSlideDocument, preloadBackgroundImages } from './browser-script.js';
 import type { LoadedDeck, SlideDocument } from './load.js';
+import { readNotes } from './notes.js';
 import { captureRaster } from './raster.js';
 import type { HtmlNode } from '../roundtrip/fingerprint.js';
 
@@ -70,6 +71,7 @@ export async function measureDeck(loaded: LoadedDeck, opts: MeasureOptions): Pro
           }
         }
 
+        const notes = readNotes(result.tree);
         const slide: Slide = {
           index: document.index,
           id: result.meta.id,
@@ -77,6 +79,7 @@ export async function measureDeck(loaded: LoadedDeck, opts: MeasureOptions): Pro
           layout: result.meta.layout || 'Blank',
           elements: measuredElements,
           ...(result.meta.section ? { section: result.meta.section } : {}),
+          ...(notes ? { notes } : {}),
         };
         slides.push(slide);
         sections.push(result.tree);

@@ -48,8 +48,18 @@ export function baselineCorrectionPx(paragraph: Paragraph): number {
   return powerpointBaseline - chromiumBaseline;
 }
 
-/** `p:txBody` for shapes; table cells pass `a:txBody`. */
-export function buildTextBody(text: TextBody, ctx: TextEmissionContext, bodyPrAttrs: Record<string, string | number | undefined>, elementName: 'p:txBody' | 'a:txBody' = 'p:txBody'): XmlNode {
+export interface TextBodyOptions {
+  /** `a:txBody` for table cells; `p:txBody` otherwise */
+  element?: 'p:txBody' | 'a:txBody';
+  /**
+   * False for text no browser ever measured (speaker notes): exact line spacing, gaps, typefaces, sizes and
+   * colours are left out, so the part the text lands in governs them.
+   */
+  measured?: boolean;
+}
+
+export function buildTextBody(text: TextBody, ctx: TextEmissionContext, bodyPrAttrs: Record<string, string | number | undefined>, opts: TextBodyOptions = {}): XmlNode {
+  const measured = opts.measured ?? true;
   let previousTextStyle: RunStyle | undefined;
   const paragraphs = text.paragraphs.map((paragraph) => {
     const firstStyle = firstTextRunStyle(paragraph);
@@ -62,9 +72,9 @@ export function buildTextBody(text: TextBody, ctx: TextEmissionContext, bodyPrAt
           lvl: paragraph.level,
           indent: pxToEmu(paragraph.indent),
         },
-        el('a:lnSpc', {}, el('a:spcPts', { val: pxToHundredthsPt(paragraph.lineHeight) })),
-        paragraph.spaceBefore > 0 ? el('a:spcBef', {}, el('a:spcPts', { val: pxToHundredthsPt(paragraph.spaceBefore) })) : undefined,
-        paragraph.spaceAfter > 0 ? el('a:spcAft', {}, el('a:spcPts', { val: pxToHundredthsPt(paragraph.spaceAfter) })) : undefined,
+        measured ? el('a:lnSpc', {}, el('a:spcPts', { val: pxToHundredthsPt(paragraph.lineHeight) })) : undefined,
+        measured && paragraph.spaceBefore > 0 ? el('a:spcBef', {}, el('a:spcPts', { val: pxToHundredthsPt(paragraph.spaceBefore) })) : undefined,
+        measured && paragraph.spaceAfter > 0 ? el('a:spcAft', {}, el('a:spcPts', { val: pxToHundredthsPt(paragraph.spaceAfter) })) : undefined,
         ...buildBulletNodes(paragraph.bullet),
       ),
     ];
@@ -72,21 +82,21 @@ export function buildTextBody(text: TextBody, ctx: TextEmissionContext, bodyPrAt
     if (!paragraph.runs.some((run) => run.kind === 'text')) {
       const style = previousTextStyle ?? firstStyle;
       const size = style?.size ?? paragraph.lineHeight;
-      paragraphNodes.push(buildEndParaRPr(size, ctx.deckLang));
+      paragraphNodes.push(measured ? buildEndParaRPr(size, ctx.deckLang) : el('a:endParaRPr', { lang: ctx.deckLang }));
       return el('a:p', {}, paragraphNodes);
     }
 
     for (const run of paragraph.runs) {
       if (run.kind === 'break') {
         const style = previousTextStyle ?? firstStyle;
-        paragraphNodes.push(el('a:br', {}, buildRunProperties(style, ctx)));
+        paragraphNodes.push(el('a:br', {}, buildRunProperties(style, ctx, measured)));
         continue;
       }
       paragraphNodes.push(
         el(
           'a:r',
           {},
-          buildRunProperties(run.style, ctx),
+          buildRunProperties(run.style, ctx, measured),
           el('a:t', { 'xml:space': 'preserve' }, run.text),
         ),
       );
@@ -101,7 +111,7 @@ export function buildTextBody(text: TextBody, ctx: TextEmissionContext, bodyPrAt
   });
 
   return el(
-    elementName,
+    opts.element ?? 'p:txBody',
     {},
     el('a:bodyPr', bodyPrAttrs),
     el('a:lstStyle'),
@@ -126,13 +136,13 @@ function buildBulletNodes(bullet: Bullet | undefined): XmlNode[] {
   return nodes;
 }
 
-export function buildRunProperties(style: RunStyle | undefined, ctx: TextEmissionContext): XmlNode {
+export function buildRunProperties(style: RunStyle | undefined, ctx: TextEmissionContext, measured = true): XmlNode {
   const effectiveStyle = style ?? fallbackStyle();
   const typeface = effectiveTypeface(effectiveStyle);
-  const attrs: Record<string, string | number> = {
-    lang: ctx.deckLang,
-    sz: pxToHundredthsPt(effectiveStyle.size),
-  };
+  const attrs: Record<string, string | number> = { lang: ctx.deckLang };
+  if (measured) {
+    attrs.sz = pxToHundredthsPt(effectiveStyle.size);
+  }
   if (effectiveStyle.bold) {
     attrs.b = 1;
   }
@@ -148,16 +158,23 @@ export function buildRunProperties(style: RunStyle | undefined, ctx: TextEmissio
   if (effectiveStyle.caps === 'small') {
     attrs.cap = 'small';
   }
-  attrs.baseline = effectiveStyle.baseline;
-  if (effectiveStyle.letterSpacing !== 0) {
-    attrs.spc = pxToHundredthsPt(effectiveStyle.letterSpacing);
+  if (measured) {
+    attrs.baseline = effectiveStyle.baseline;
+    if (effectiveStyle.letterSpacing !== 0) {
+      attrs.spc = pxToHundredthsPt(effectiveStyle.letterSpacing);
+    }
+  } else if (effectiveStyle.baseline !== 0) {
+    attrs.baseline = effectiveStyle.baseline;
   }
 
-  const children: XmlNode[] = [solidFillNode(effectiveStyle.color)];
-  if (effectiveStyle.highlight) {
-    children.push(el('a:highlight', {}, colorNode(effectiveStyle.highlight)));
+  const children: XmlNode[] = [];
+  if (measured) {
+    children.push(solidFillNode(effectiveStyle.color));
+    if (effectiveStyle.highlight) {
+      children.push(el('a:highlight', {}, colorNode(effectiveStyle.highlight)));
+    }
+    children.push(el('a:latin', { typeface }), el('a:ea', { typeface }), el('a:cs', { typeface }));
   }
-  children.push(el('a:latin', { typeface }), el('a:ea', { typeface }), el('a:cs', { typeface }));
 
   if (effectiveStyle.link) {
     const hyperlink = buildHyperlink(effectiveStyle.link, ctx);

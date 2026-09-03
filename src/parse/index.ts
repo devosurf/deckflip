@@ -1,10 +1,14 @@
 // PPTX -> IDM (docs/spec/11-architecture.md `parse/`): the inverse of emit/, reading only what the IDM models.
 // Nothing here knows about the DOM; everything the IDM cannot hold is left for the opaque records of spec 06.
 
-import type { Deck, Media, Slide } from '../model/index.js';
+import type { Deck, Media, Slide, TextBody } from '../model/index.js';
 import { REL, OpcReader, type Relationship } from '../ooxml/opc.js';
+import type { XmlNode } from '../ooxml/xml.js';
 import { readColorScheme, readFontScheme } from './drawing.js';
+import { readInheritedStyles } from './inherit.js';
+import { readNotes } from './notes.js';
 import { readSlide } from './slide.js';
+import type { TextContext } from './text.js';
 import { px } from './units.js';
 import { child, children, textOf } from './xml.js';
 
@@ -34,19 +38,38 @@ export async function parsePptx(bytes: Uint8Array): Promise<Deck> {
   const fonts = readFontScheme(theme);
 
   const slideParts: string[] = [];
+  const sldIds: string[] = [];
   for (const sldId of children(child(presentation, 'p:sldIdLst'), 'p:sldId')) {
     const rel = presentationRels.find((candidate) => candidate.id === sldId.attrs['r:id']);
     if (rel) {
       slideParts.push(rel.target);
+      sldIds.push(sldId.attrs.id ?? '');
     }
   }
   const slideIdByPart = new Map(slideParts.map((part, index) => [part, `slide-${index + 1}`] as const));
+  const sections = readSections(presentation, sldIds);
+
+  const layoutNames = new Map<string, string>();
+  /** the name the layout part carries, which is what `data-layout` names and a new Slide instantiates */
+  const layoutName = async (part: string | undefined): Promise<string> => {
+    if (part === undefined || !pkg.hasPart(part)) {
+      return 'Blank';
+    }
+    let name = layoutNames.get(part);
+    if (name === undefined) {
+      name = child(await pkg.xml(part), 'p:cSld')?.attrs.name?.trim() || 'Blank';
+      layoutNames.set(part, name);
+    }
+    return name;
+  };
 
   const slides: Slide[] = [];
   for (const [position, part] of slideParts.entries()) {
     const rels = await pkg.relationships(part);
-    slides.push(await readSlide(await pkg.xml(part), position + 1, {
+    const slide = await readSlide(await pkg.xml(part), position + 1, {
       slide: position + 1,
+      layout: await layoutName(rels.find((rel) => rel.type === REL.slideLayout && !rel.external)?.target),
+      inherited: await readInheritedStyles(pkg, part, presentation),
       colors,
       fonts,
       media: (rId) => loadMedia(pkg, rels, rId),
@@ -55,7 +78,16 @@ export async function parsePptx(bytes: Uint8Array): Promise<Deck> {
         const rel = rels.find((candidate) => candidate.id === rId);
         return rel && !rel.external ? rel.target : undefined;
       },
-    }));
+    });
+    const section = sections.get(position);
+    if (section !== undefined) {
+      slide.section = section;
+    }
+    const notes = await readSlideNotes(pkg, rels, { colors, fonts }, slideIdByPart);
+    if (notes) {
+      slide.notes = notes;
+    }
+    slides.push(slide);
   }
 
   return {
@@ -65,6 +97,47 @@ export async function parsePptx(bytes: Uint8Array): Promise<Deck> {
     slides,
     fontFaces: [],
   };
+}
+
+/**
+ * `p14:sectionLst` (spec 06 "Sections") by the position of the first Slide each section holds, which is where
+ * `data-section` goes; `sldIds` are the `p:sldId/@id`s in presentation order.
+ */
+function readSections(presentation: XmlNode, sldIds: string[]): Map<number, string> {
+  const out = new Map<number, string>();
+  for (const section of findAll(presentation, 'p14:section')) {
+    const name = section.attrs.name;
+    if (!name) {
+      continue;
+    }
+    const held = new Set(children(child(section, 'p14:sldIdLst'), 'p14:sldId').map((node) => node.attrs.id ?? ''));
+    const first = sldIds.findIndex((id) => held.has(id));
+    if (first !== -1 && !out.has(first)) {
+      out.set(first, name);
+    }
+  }
+  return out;
+}
+
+function findAll(node: XmlNode, name: string, out: XmlNode[] = []): XmlNode[] {
+  for (const child of children(node)) {
+    if (child.name === name) {
+      out.push(child);
+    } else {
+      findAll(child, name, out);
+    }
+  }
+  return out;
+}
+
+/** The notes slide the slide relates to, as the text of its body placeholder; its own rels resolve links in it. */
+async function readSlideNotes(pkg: OpcReader, rels: Relationship[], text: Omit<TextContext, 'link'>, slideIdByPart: Map<string, string>): Promise<TextBody | undefined> {
+  const rel = rels.find((candidate) => candidate.type === REL.notesSlide && !candidate.external);
+  if (!rel || !pkg.hasPart(rel.target)) {
+    return undefined;
+  }
+  const notesRels = await pkg.relationships(rel.target);
+  return readNotes(await pkg.xml(rel.target), { ...text, link: (rId) => resolveLink(notesRels, rId, slideIdByPart) });
 }
 
 /** `dc:title` and `dc:language`; the core-properties relationship is matched by its type suffix since some writers put it in the officeDocument namespace. */

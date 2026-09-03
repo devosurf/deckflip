@@ -2,7 +2,7 @@ import type { PictureElement, ShapeElement } from '../model/index.js';
 import { pxToEmu } from '../ooxml/emu.js';
 import { el, type XmlNode } from '../ooxml/xml.js';
 import { relateMedia } from './media.js';
-import { buildEffects, buildShape, type ShapeEmissionContext } from './shape.js';
+import { buildEffects, buildPlaceholder, buildShape, type ShapeEmissionContext } from './shape.js';
 
 const SVG_BLIP_EXT_URI = '{96DAC541-7B7A-43D3-8B79-37D633B846F1}';
 const SVG_NS = 'http://schemas.microsoft.com/office/drawing/2016/SVG/main';
@@ -26,7 +26,7 @@ export function buildPicture(picture: PictureElement, ctx: ShapeEmissionContext,
   const pic = el(
     'p:pic',
     {},
-    el('p:nvPicPr', {}, el('p:cNvPr', { id: nextId(), name: picture.name }), el('p:cNvPicPr', {}, el('a:picLocks', { noChangeAspect: '1' })), el('p:nvPr')),
+    el('p:nvPicPr', {}, el('p:cNvPr', { id: nextId(), name: picture.name }), el('p:cNvPicPr', {}, el('a:picLocks', { noChangeAspect: '1' })), el('p:nvPr', {}, buildPlaceholder(picture.placeholder))),
     el('p:blipFill', {}, el('a:blip', { 'r:embed': embed }, blipChildren), srcRect, el('a:stretch', {}, el('a:fillRect'))),
     el(
       'p:spPr',

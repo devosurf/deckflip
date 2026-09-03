@@ -31,12 +31,25 @@ export function buildShape(shape: ShapeElement, ctx: ShapeEmissionContext, nextI
       {},
       el('p:cNvPr', { id: nextId(), name: shape.name }),
       el('p:cNvSpPr', shape.text && !shape.fill && !shape.line && !shape.borders ? { txBox: '1' } : {}),
-      el('p:nvPr'),
+      el('p:nvPr', {}, buildPlaceholder(shape.placeholder)),
     ),
     el('p:spPr', {}, xfrm, geometry, fill, line, effects),
     text,
   );
   return [sp, ...buildBorderLines(shape, nextId)];
+}
+
+/**
+ * `p:ph` for a shape or picture that fills a layout placeholder (spec 06 "Placeholders"): `data-placeholder`
+ * spells it `<type>[:<idx>]`. A touched placeholder keeps its `p:ph` and gets its properties written
+ * explicitly, so PowerPoint still treats it as the layout box while the deck renders what the HTML showed.
+ */
+export function buildPlaceholder(placeholder: string | undefined): XmlNode | undefined {
+  if (placeholder === undefined) {
+    return undefined;
+  }
+  const [type, idx] = placeholder.split(':', 2);
+  return el('p:ph', { type: type || 'body', idx });
 }
 
 interface Frame {

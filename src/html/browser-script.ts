@@ -988,7 +988,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
   function makeShape(el: HTMLElement, box: Box, text?: TextBody): BrowserShape {
     const cs = getComputedStyle(el);
     const { scale, ...frame } = measureFrame(el, cs, box, cs.transform);
-    const shape: BrowserShape = { kind: 'shape', ...frame };
+    const shape: BrowserShape = { kind: 'shape', ...frame, ...placeholderOf(el) };
     const fill = parseFill(el, cs, box);
     if (fill) {
       shape.fill = fill;
@@ -1119,6 +1119,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
     const picture: BrowserPicture = {
       kind: 'picture',
       ...decorated,
+      ...placeholderOf(el),
       box: transform ? transformedBoxAround(cs, borderBox, visibleBox, transform) : visibleBox,
       crop,
       source,
@@ -2412,6 +2413,12 @@ export function measureSlideDocument(): BrowserMeasureResult {
   function shapeIdOf(el: HTMLElement): { shapeId?: string } {
     const id = el.getAttribute('data-shape-id');
     return id ? { shapeId: id } : {};
+  }
+
+  /** `data-placeholder` (spec 06): the layout placeholder a round-tripped shape or picture fills. */
+  function placeholderOf(el: HTMLElement): { placeholder?: string } {
+    const placeholder = el.getAttribute('data-placeholder');
+    return placeholder ? { placeholder } : {};
   }
 
   /** The DOM as the round trip fingerprints it (roundtrip/fingerprint.ts): element names, attributes and text; comments dropped. */

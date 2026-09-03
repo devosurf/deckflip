@@ -124,6 +124,8 @@ export interface PictureElement {
   source?: 'raster';
   /** raster pictures: `true` when the author asked for it with `data-raster` */
   explicit?: boolean;
+  /** `p:ph` as `data-placeholder` spells it: `<type>[:<idx>]` (spec 06 "Placeholders") */
+  placeholder?: string;
   shapeId?: string;
   selector: string;
   name: string;
@@ -195,6 +197,8 @@ export interface ShapeElement {
   shapeId?: string;
   /** WordArt, 3D or warped text (spec 06): the text is editable, the effects are kept only while the shape is untouched */
   preserve?: 'text-effects';
+  /** `p:ph` as `data-placeholder` spells it: `<type>[:<idx>]` (spec 06 "Placeholders") */
+  placeholder?: string;
   /** CSS selector locating the source element (report locator) */
   selector: string;
   /** `p:cNvPr/@name`: tag plus id/class hint */

@@ -1,6 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import { emitHtml } from '../../src/htmlout/index.js';
-import type { Deck, Element, OpaqueElement, PictureElement, ShapeElement } from '../../src/model/index.js';
+import type { Deck, Element, OpaqueElement, PictureElement, Paragraph, RunStyle, ShapeElement, TextBody } from '../../src/model/index.js';
+
+function runStyle(overrides: Partial<RunStyle> = {}): RunStyle {
+  return { fontStack: ['Arial'], weight: 400, size: 12, bold: false, italic: false, underline: false, strike: false, color: { hex: '000000', alpha: 1 }, letterSpacing: 0, caps: 'none', baseline: 0, ...overrides };
+}
+
+function notes(...paragraphs: Array<Paragraph['runs']>): TextBody {
+  return {
+    padding: { l: 0, t: 0, r: 0, b: 0 },
+    firstParagraphGap: 0,
+    lastParagraphGap: 0,
+    wrap: true,
+    rtl: false,
+    trailingGuard: 0,
+    paragraphs: paragraphs.map((runs) => ({ align: 'l', lineHeight: 0, spaceBefore: 0, spaceAfter: 0, indent: 0, marginLeft: 0, level: 0, runs })),
+  };
+}
 
 function deckWith(elements: Element[], slides: Partial<Deck['slides'][number]>[] = [{}]): Deck {
   return {
@@ -51,5 +67,58 @@ describe('emitHtml', () => {
     expect(html).toMatch(/<div data-shape-id="1-3" data-preserve="text-effects" style=/);
     expect(html).toContain('[data-preserve]');
     expect(slides).toEqual([{ id: 'slide-1', merged: {} }]);
+  });
+
+  it('writes speaker notes as an aside the stylesheet hides, one paragraph each, with emphasis and links as markup', () => {
+    const body = notes(
+      [{ kind: 'text', text: 'Speak slowly & ', style: runStyle() }, { kind: 'text', text: 'pause', style: runStyle({ bold: true, italic: true }) }],
+      [{ kind: 'text', text: 'Then ', style: runStyle() }, { kind: 'text', text: 'slide two', style: runStyle({ link: '#slide-2' }) }, { kind: 'break' }, { kind: 'text', text: 'aloud', style: runStyle({ underline: true }) }],
+    );
+    const { html } = emitHtml(deckWith([], [{ notes: body }, {}]));
+
+    expect(html).toContain('<aside class="notes">\n<p>Speak slowly &amp; <strong><em>pause</em></strong></p>\n<p>Then <a href="#slide-2">slide two</a><br>\n<u>aloud</u></p>\n</aside>');
+    expect(html).toContain('aside.notes { display: none !important; }');
+    // a Slide without notes gets no aside
+    expect(html.match(/<aside/g)).toHaveLength(1);
+  });
+
+  it('writes bulleted notes paragraphs as the lists the notes dialect allows, nesting deeper levels', () => {
+    const body = notes([{ kind: 'text', text: 'Cover', style: runStyle() }]);
+    const item = (text: string, level: number, bullet: NonNullable<Paragraph['bullet']>): Paragraph => ({
+      align: 'l', lineHeight: 0, spaceBefore: 0, spaceAfter: 0, indent: 0, marginLeft: 0, level, bullet, runs: [{ kind: 'text', text, style: runStyle() }],
+    });
+    const disc = { type: 'char', char: '\u2022', color: { hex: '000000', alpha: 1 }, sizePct: 100 } as const;
+    body.paragraphs.push(
+      item('first', 0, disc),
+      item('nested', 1, { type: 'char', char: '\u25E6', color: { hex: '000000', alpha: 1 }, sizePct: 100 }),
+      item('second', 0, disc),
+      item('then this', 0, { type: 'autonum', scheme: 'arabicPeriod', startAt: 3, color: { hex: '000000', alpha: 1 }, sizePct: 100 }),
+    );
+    const { html } = emitHtml(deckWith([], [{ notes: body }]));
+
+    expect(html).toContain([
+      '<aside class="notes">',
+      '<p>Cover</p>',
+      '<ul>',
+      '<li>first<ul>',
+      '<li>nested</li>',
+      '</ul></li>',
+      '<li>second</li>',
+      '</ul>',
+      '<ol start="3">',
+      '<li>then this</li>',
+      '</ol>',
+      '</aside>',
+    ].join('\n'));
+  });
+
+  it('marks the placeholder a shape or picture fills with data-placeholder', () => {
+    const box = { x: 10, y: 10, w: 100, h: 50 };
+    const title: ShapeElement = { kind: 'shape', shapeId: '1-2', placeholder: 'title', selector: '[data-shape-id="1-2"]', name: 'div.title', box, rotation: 0, geometry: { preset: 'rect' }, fill: { type: 'solid', color: { hex: 'EEEEEE', alpha: 1 } } };
+    const photo: PictureElement = { kind: 'picture', shapeId: '1-3', placeholder: 'pic:3', selector: '[data-shape-id="1-3"]', name: 'img.photo', box: { ...box, y: 100 }, rotation: 0, crop: { l: 0, t: 0, r: 0, b: 0 }, geometry: { preset: 'rect' }, media: { data: new Uint8Array([1, 2, 3]), contentType: 'image/png' } };
+    const { html } = emitHtml(deckWith([title, photo]));
+
+    expect(html).toMatch(/<div class="title" data-shape-id="1-2" data-placeholder="title" style=/);
+    expect(html).toMatch(/<img class="photo" data-shape-id="1-3" data-placeholder="pic:3" /);
   });
 });

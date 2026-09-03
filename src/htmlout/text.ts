@@ -130,6 +130,75 @@ export function runsHtml(runs: Run[], sheet: Stylesheet): string {
 }
 
 /**
+ * Speaker notes: `aside.notes` (the tool's stylesheet hides it), a `p` per plain paragraph, `ul`/`ol` items
+ * for bulleted ones, emphasis and links as plain markup. No browser measures notes, so nothing here carries
+ * a measured style; the notes master the deck was authored on governs typeface, size and spacing
+ * (docs/spec/06-round-trip.md "Speaker notes").
+ */
+export function notesHtml(notes: TextBody, sheet: Stylesheet): string {
+  const lines: string[] = ['<aside class="notes">'];
+  for (let index = 0; index < notes.paragraphs.length; ) {
+    const paragraph = notes.paragraphs[index]!;
+    if (paragraph.bullet && paragraph.bullet.type !== 'none') {
+      const list = notesList(notes.paragraphs, index, paragraph.level, sheet);
+      lines.push(list.html);
+      index = list.next;
+      continue;
+    }
+    lines.push(`<p>${notesRunsHtml(paragraph.runs, sheet)}</p>`);
+    index += 1;
+  }
+  lines.push('</aside>');
+  return lines.join('\n');
+}
+
+/** One list at `level`; a deeper list hangs inside the item above it, the way html/notes.ts reads it back. */
+function notesList(paragraphs: Paragraph[], from: number, level: number, sheet: Stylesheet): { html: string; next: number } {
+  const first = paragraphs[from]!.bullet!;
+  const ordered = first.type === 'autonum';
+  const tag = ordered ? 'ol' : 'ul';
+  const start = first.type === 'autonum' && first.startAt !== 1 ? ` start="${first.startAt}"` : '';
+  const items: string[] = [];
+  let index = from;
+  while (index < paragraphs.length) {
+    const paragraph = paragraphs[index]!;
+    const bullet = paragraph.bullet;
+    if (!bullet || bullet.type === 'none' || paragraph.level < level) {
+      break;
+    }
+    if (paragraph.level > level) {
+      const nested = notesList(paragraphs, index, paragraph.level, sheet);
+      const parent = items.pop() ?? '<li></li>';
+      items.push(`${parent.slice(0, -'</li>'.length)}${nested.html}</li>`);
+      index = nested.next;
+      continue;
+    }
+    if ((bullet.type === 'autonum') !== ordered) {
+      break;
+    }
+    items.push(`<li>${notesRunsHtml(paragraph.runs, sheet)}</li>`);
+    index += 1;
+  }
+  return { html: [`<${tag}${start}>`, ...items, `</${tag}>`].join('\n'), next: index };
+}
+
+function notesRunsHtml(runs: Run[], sheet: Stylesheet): string {
+  let html = '';
+  for (const run of runs) {
+    if (run.kind === 'break') {
+      html += '<br>\n';
+      continue;
+    }
+    let inner = escape(run.text);
+    if (run.style.underline) inner = `<u>${inner}</u>`;
+    if (run.style.italic) inner = `<em>${inner}</em>`;
+    if (run.style.bold) inner = `<strong>${inner}</strong>`;
+    html += run.style.link ? `<a href="${attr(sheet.href(run.style.link))}">${inner}</a>` : inner;
+  }
+  return html;
+}
+
+/**
  * Paragraphs from `from` at `level` as one list; returns where the run of this level ended. The measurer
  * reads a list's own left padding as every item's `marginLeft` (from the body's left edge), so a nested
  * list's padding is the difference to its parent item, and a root list's is the first item's `marginLeft`.

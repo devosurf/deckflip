@@ -15,6 +15,7 @@ export const REL = {
   slideLayout: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout',
   theme: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme',
   notesSlide: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide',
+  notesMaster: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesMaster',
   hyperlink: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink',
   image: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
   font: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/font',
@@ -29,6 +30,7 @@ export const CT = {
   core: 'application/vnd.openxmlformats-package.core-properties+xml',
   app: 'application/vnd.openxmlformats-officedocument.extended-properties+xml',
   notesSlide: 'application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml',
+  notesMaster: 'application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml',
   fontData: 'application/vnd.openxmlformats-officedocument.obfuscatedFont',
 } as const;
 

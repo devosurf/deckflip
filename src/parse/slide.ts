@@ -7,6 +7,7 @@
 import type { Element, GroupElement, Insets, Line, OpaqueClass, OpaqueElement, PictureElement, ShapeElement, Slide } from '../model/index.js';
 import type { XmlNode } from '../ooxml/xml.js';
 import { identityOf, readFill, readGeometry, readLine, readShadow, readSrcRect, readTransform, shapeIdentity, shapeName, type ColorScheme, type DrawingContext } from './drawing.js';
+import type { InheritedStyles } from './inherit.js';
 import { readTable } from './table.js';
 import { readTextBody, type TextContext } from './text.js';
 import { exact, px } from './units.js';
@@ -15,6 +16,10 @@ import { child, children } from './xml.js';
 export interface SlideContext extends DrawingContext, TextContext {
   /** 1-based slide number, the first half of every `data-shape-id` */
   slide: number;
+  /** `p:cSld/@name` of the layout the slide instantiates, `Blank` when it names none */
+  layout: string;
+  /** what a shape's text inherits from the layout, the master and the theme (parse/inherit.ts) */
+  inherited: InheritedStyles;
   /** the internal part a relationship id targets; undefined for unknown ids and external targets */
   partOf(rId: string): string | undefined;
 }
@@ -27,7 +32,7 @@ export async function readSlide(sld: XmlNode, index: number, ctx: SlideContext):
     index,
     id: `slide-${index}`,
     name: cSld?.attrs.name || `Slide ${index}`,
-    layout: 'Blank',
+    layout: ctx.layout,
     elements: await readElements(children(child(cSld, 'p:spTree')), ctx),
   };
 }
@@ -104,6 +109,19 @@ function hasTextEffects(sp: XmlNode): boolean {
   return descendant(sp, (node) => node.name === 'a:scene3d' || node.name === 'a:sp3d' || (node.name === 'a:prstTxWarp' && node.attrs.prst !== 'textNoShape')) !== undefined;
 }
 
+/**
+ * `p:ph` as `data-placeholder` spells it (spec 06 "Placeholders"): `<type>[:<idx>]`. A placeholder without a
+ * type is a body one, which is what PowerPoint means by the bare `idx` it writes on layout body boxes.
+ */
+function readPlaceholder(nv: XmlNode | undefined): string | undefined {
+  const ph = child(child(nv, 'p:nvPr'), 'p:ph');
+  if (!ph) {
+    return undefined;
+  }
+  const type = ph.attrs.type ?? 'body';
+  return ph.attrs.idx === undefined ? type : `${type}:${ph.attrs.idx}`;
+}
+
 const BORDER_SIDES = ['top', 'right', 'bottom', 'left'] as const;
 type BorderSide = (typeof BORDER_SIDES)[number];
 
@@ -156,6 +174,10 @@ async function readShape(sp: XmlNode, borders: ShapeElement['borders'], ctx: Sli
     rotation,
     geometry,
   };
+  const placeholder = readPlaceholder(nvSpPr);
+  if (placeholder !== undefined) {
+    shape.placeholder = placeholder;
+  }
   const fill = await readFill(spPr, ctx);
   if (fill) {
     shape.fill = fill;
@@ -170,7 +192,7 @@ async function readShape(sp: XmlNode, borders: ShapeElement['borders'], ctx: Sli
   if (shadow) {
     shape.shadow = shadow;
   }
-  const text = readTextBody(child(sp, 'p:txBody'), ctx);
+  const text = readTextBody(child(sp, 'p:txBody'), { ...ctx, levelStyles: (level) => ctx.inherited(placeholder, level) });
   if (text) {
     // the emitter folded the stroke into every inset (spec 04): half a uniform line, or the full border side;
     // take it back out so re-emission does not double it
@@ -233,6 +255,10 @@ async function readPicture(pic: XmlNode, ctx: SlideContext): Promise<PictureElem
     geometry: readGeometry(spPr, frame, 0),
     media: loaded.media,
   };
+  const placeholder = readPlaceholder(nvPicPr);
+  if (placeholder !== undefined) {
+    picture.placeholder = placeholder;
+  }
   const alpha = child(blip, 'a:alphaModFix')?.attrs.amt;
   if (alpha !== undefined) {
     picture.opacity = Number(alpha) / 100000;

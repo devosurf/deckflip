@@ -3,6 +3,7 @@ import { pxToEmu } from '../ooxml/emu.js';
 import { CT, REL, OpcPackage } from '../ooxml/opc.js';
 import { parseXml, el, serialize, type XmlNode } from '../ooxml/xml.js';
 import { MediaStore } from './media.js';
+import { emitNotesMaster, emitNotesSlide, notesSlidePartName, NOTES_MASTER_PART } from './notes.js';
 import { emitPreservedPptx, type PreservedSource } from './preserved.js';
 import { emitSlide, slidePartName } from './slide.js';
 
@@ -80,6 +81,7 @@ export async function emitPptx(deck: Deck, opts: EmitOptions): Promise<Buffer> {
   pkg.addRelationship('/', REL.extendedProperties, 'docProps/app.xml');
 
   const presentationMasterId = pkg.addRelationship(PRESENTATION_PART, REL.slideMaster, 'slideMasters/slideMaster1.xml');
+  const notesMasterId = deck.slides.some((slide) => slide.notes) ? pkg.addRelationship(PRESENTATION_PART, REL.notesMaster, 'notesMasters/notesMaster1.xml') : undefined;
   const presentationSlideIds = deck.slides.map((slide) => pkg.addRelationship(PRESENTATION_PART, REL.slide, `slides/slide${slide.index}.xml`));
   pkg.addRelationship(PRESENTATION_PART, REL.theme, 'theme/theme1.xml');
 
@@ -89,13 +91,20 @@ export async function emitPptx(deck: Deck, opts: EmitOptions): Promise<Buffer> {
 
   pkg.addPart(CORE_PART, CT.core, serialize(buildCoreXml(deck, created)));
   pkg.addPart(APP_PART, CT.app, serialize(buildAppXml(opts.appVersion, deck.slides.length)));
-  pkg.addPart(PRESENTATION_PART, CT.presentation, serialize(buildPresentationXml(deck, presentationMasterId, presentationSlideIds)));
+  pkg.addPart(PRESENTATION_PART, CT.presentation, serialize(buildPresentationXml(deck, presentationMasterId, notesMasterId, presentationSlideIds)));
   pkg.addPart(MASTER_PART, CT.slideMaster, serialize(buildMasterXml(masterLayoutId)));
   pkg.addPart(LAYOUT_PART, CT.slideLayout, serialize(buildLayoutXml()));
+  if (notesMasterId) {
+    emitNotesMaster(pkg, deck.canvas, THEME_PART);
+  }
 
   const media = new MediaStore(pkg);
+  const notesCtx = { deckLang: deck.lang, masterPart: NOTES_MASTER_PART, slidePartById };
   for (const slide of deck.slides) {
-    emitSlide(pkg, slide, { deck, slidePartById, media });
+    const slidePart = emitSlide(pkg, slide, { deck, slidePartById, media });
+    if (slide.notes) {
+      emitNotesSlide(pkg, slide, slidePart, notesSlidePartName(slide.index), notesCtx);
+    }
   }
 
   pkg.addPart(THEME_PART, CT.theme, serialize(buildThemeXml()));
@@ -103,11 +112,12 @@ export async function emitPptx(deck: Deck, opts: EmitOptions): Promise<Buffer> {
   return pkg.toBuffer({ date: created, compression: 'DEFLATE' });
 }
 
-function buildPresentationXml(deck: Deck, masterId: string, slideIds: string[]): XmlNode {
+function buildPresentationXml(deck: Deck, masterId: string, notesMasterId: string | undefined, slideIds: string[]): XmlNode {
   return el(
     'p:presentation',
     pptNs(),
     el('p:sldMasterIdLst', {}, el('p:sldMasterId', { id: 2147483648, 'r:id': masterId })),
+    notesMasterId ? el('p:notesMasterIdLst', {}, el('p:notesMasterId', { 'r:id': notesMasterId })) : undefined,
     el('p:sldIdLst', {}, ...slideIds.map((rId, index) => el('p:sldId', { id: 256 + index, 'r:id': rId }))),
     el('p:sldSz', { cx: pxToEmu(deck.canvas.width), cy: pxToEmu(deck.canvas.height) }),
     el('p:notesSz', { cx: 6858000, cy: 9144000 }),

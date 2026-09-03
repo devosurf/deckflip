@@ -119,6 +119,18 @@ async function zipEntries(buffer: Buffer): Promise<string[]> {
   return Object.keys(zip.files).filter((name) => !name.endsWith('/'));
 }
 
+function notes(text: string): TextBody {
+  return {
+    padding: { l: 0, t: 0, r: 0, b: 0 },
+    firstParagraphGap: 0,
+    lastParagraphGap: 0,
+    wrap: true,
+    rtl: false,
+    trailingGuard: 0,
+    paragraphs: [{ align: 'l', lineHeight: 16, spaceBefore: 0, spaceAfter: 0, indent: 0, marginLeft: 0, level: 0, runs: [{ kind: 'text', text, style: runStyle() }] }],
+  };
+}
+
 describe('emitPptx', () => {
   it('emits reproducible PPTX bytes and the expected slide XML', async () => {
     const pptx = await emitPptx(deck(), { created, appVersion: '1.2.3' });
@@ -150,6 +162,57 @@ describe('emitPptx', () => {
     // Arial 24px in a 33.6px line: Chromium baseline 25.3, PowerPoint 26.611 -> correction 1.311; tIns = (3 + 2 - 1.311) px = 35138 EMU
     expect(slideXml).toContain('tIns="35138"');
     expect(slideXml).toContain('p:cNvSpPr txBox="1"');
+  });
+
+  it('emits a notes slide on a notes master for each Slide that carries notes', async () => {
+    const notesDeck = deck();
+    notesDeck.slides[0]!.notes = notes('Remember the margin');
+    notesDeck.slides.push({ index: 2, id: 'slide-2', name: 'Slide 2', layout: 'Blank', elements: [] });
+
+    const pptx = await emitPptx(notesDeck, { created, appVersion: '1.2.3' });
+    // the second Slide has no notes, so it gets no notes slide
+    expect((await zipEntries(pptx)).filter((name) => name.toLowerCase().includes('notes'))).toEqual([
+      'ppt/notesMasters/notesMaster1.xml',
+      'ppt/notesMasters/_rels/notesMaster1.xml.rels',
+      'ppt/notesSlides/notesSlide1.xml',
+      'ppt/notesSlides/_rels/notesSlide1.xml.rels',
+    ]);
+
+    const zip = await JSZip.loadAsync(pptx);
+    const notesXml = await zip.file('ppt/notesSlides/notesSlide1.xml')!.async('string');
+    expect(notesXml).toContain('<a:t xml:space="preserve">Remember the margin</a:t>');
+    // PowerPoint's notes pane reads the body placeholder, and needs the slide image placeholder beside it
+    expect(notesXml).toContain('<p:ph type="body" idx="1"/>');
+    expect(notesXml).toContain('<p:ph type="sldImg"/>');
+    expect(await zip.file('ppt/slides/_rels/slide1.xml.rels')!.async('string')).toContain('../notesSlides/notesSlide1.xml');
+    expect(await zip.file('ppt/notesSlides/_rels/notesSlide1.xml.rels')!.async('string')).toContain('../notesMasters/notesMaster1.xml');
+    expect(await zip.file('ppt/presentation.xml')!.async('string')).toContain('<p:notesMasterIdLst>');
+    expect(await zip.file('[Content_Types].xml')!.async('string')).toContain(
+      '<Override PartName="/ppt/notesSlides/notesSlide1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml"/>',
+    );
+  });
+
+  it('emits notes as unmeasured text: the notes master carries the metrics, the runs carry the emphasis', async () => {
+    const notesDeck = deck();
+    const body = notes('Remember the margin');
+    body.paragraphs[0]!.spaceBefore = 8;
+    body.paragraphs[0]!.spaceAfter = 4;
+    body.paragraphs.push({ ...body.paragraphs[0]!, align: 'ctr', runs: [{ kind: 'text', text: 'Loudly', style: runStyle({ bold: true, italic: true, link: 'https://example.com/' }) }] });
+    notesDeck.slides[0]!.notes = body;
+
+    const zip = await JSZip.loadAsync(await emitPptx(notesDeck, { created, appVersion: '1.2.3' }));
+    const notesXml = await zip.file('ppt/notesSlides/notesSlide1.xml')!.async('string');
+    // nothing in a notes body was ever measured in a browser: an exact line, a fixed gap, a typeface or a
+    // size here would override the notes page the deck was authored on
+    for (const unmeasured of ['a:lnSpc', 'a:spcBef', 'a:spcAft', 'a:latin', 'a:solidFill', 'sz="']) {
+      expect(notesXml, unmeasured).not.toContain(unmeasured);
+    }
+    // text, emphasis, alignment and links are what the notes pane edits
+    expect(notesXml).toContain('<a:t xml:space="preserve">Remember the margin</a:t>');
+    expect(notesXml).toContain('<a:rPr lang="en-US" b="1" i="1"><a:hlinkClick r:id="rId3"/></a:rPr>');
+    expect(notesXml).toContain('algn="ctr"');
+    // the master gives that text PowerPoint's own notes size
+    expect(await zip.file('ppt/notesMasters/notesMaster1.xml')!.async('string')).toContain('<p:notesStyle><a:lvl1pPr><a:defRPr sz="1200"/></a:lvl1pPr></p:notesStyle>');
   });
 
   it('emits list paragraphs with marL, negative indent and bullet properties', async () => {
