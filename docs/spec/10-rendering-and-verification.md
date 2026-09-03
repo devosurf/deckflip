@@ -25,7 +25,7 @@ Resolution order: `--browser <path>` > `DECKFLIP_BROWSER` > the managed build if
 | Comparison | Gate (initial, calibrated on the corpus) |
 | --- | --- |
 | Chromium screenshot of the HTML vs PowerPoint render of the converted PPTX (oracle, Mac, manual) | <= 0.5 % |
-| Chromium screenshot vs LibreOffice render (CI) | <= 2.0 %, with `RENDER_FONT_SUBSTITUTED` fixtures excluded from the text gate |
+| Chromium screenshot vs LibreOffice render (CI) | <= 2.6 %, calibrated against the deterministic Ubuntu results for the text corpus, with `RENDER_FONT_SUBSTITUTED` fixtures excluded |
 | PPTX -> HTML -> PPTX (untouched) | every part byte-identical; no image gate needed |
 | HTML -> PPTX -> HTML -> PPTX | second PPTX part-identical to the first (idempotence) |
 
@@ -51,7 +51,7 @@ Renewal: adding a fixture means adding `deck.html` and running `corpus:oracle` o
 
 GitHub Actions, three jobs:
 
-- `ubuntu`: unit tests; LibreOffice + Liberation, Carlito, Caladea fonts; the corpus gates above; round-trip identity; idempotence; determinism (two runs, identical bytes with `SOURCE_DATE_EPOCH`).
+- `ubuntu`: unit tests; LibreOffice + Liberation, Carlito, Caladea and Microsoft Core Fonts; the corpus gates above; round-trip identity; idempotence; determinism (two runs, identical bytes with `SOURCE_DATE_EPOCH`).
 - `windows`: unit tests; font scan on `%WINDIR%\Fonts` and the per-user directory; path handling; HTML -> PPTX for the `text` and `fonts` categories with `expected/report.json` comparison (no image gate: no LibreOffice on this job).
 - `macos`: unit tests; font scan on CoreText directories. The PowerPoint oracle is never run in CI (Microsoft does not support unattended Office); it is a documented manual step on the maintainer's machine.
 

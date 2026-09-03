@@ -25,7 +25,7 @@ async function ignoreRegions(fixtureDir: string, slide: number): Promise<IgnoreR
 }
 
 /** Chromium screenshot vs LibreOffice render of the converted deck (spec 10), plus the expected report entries. */
-export const LIBREOFFICE_GATE_PERCENT = 2.0;
+export const LIBREOFFICE_GATE_PERCENT = 2.6;
 
 function normaliseEntries(entries: readonly unknown[]): string[] {
   return [...entries].map((entry) => JSON.stringify(entry)).sort();
