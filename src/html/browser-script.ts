@@ -578,6 +578,17 @@ export function measureSlideDocument(): BrowserMeasureResult {
   }
 
   function walkPainting(el: HTMLElement): BrowserElement[] {
+    // A round-tripped shape carries its identity on the element the body hangs under, which is a wrapper when
+    // the body needed several blocks: measure those blocks as its one text body (measureWrapperBody).
+    if (!isTextBlock(el) && !isPictureElement(el) && (el.hasAttribute('data-shape-id') || el.hasAttribute('data-placeholder'))) {
+      const measured = withoutTransform(el, () => {
+        const text = measureWrapperBody(el);
+        return text ? { box: measuredBox(el), text } : undefined;
+      });
+      if (measured) {
+        return [makeShape(el, measured.box, measured.text)];
+      }
+    }
     const info = analyze(el);
     if (!info.selfPaint) {
       const nested: BrowserElement[] = [];
@@ -1374,17 +1385,51 @@ export function measureSlideDocument(): BrowserMeasureResult {
       return body;
     }
 
+    const sequence = measureBlockSequence(cell, contentLeft, cs.direction === 'rtl');
+    if ('invalid' in sequence) {
+      entries.push({ code: 'VALIDATE_TABLE_CONTENT', selector: cssPath(cell), reason: `${elementName(cell)} ${sequence.invalid}` });
+      return undefined;
+    }
+    if (sequence.paragraphs.length === 0) {
+      return undefined;
+    }
+    return {
+      padding: { l: 0, t: 0, r: 0, b: 0 },
+      firstParagraphGap: anchor === 'bottom' || anchor === 'middle' || sequence.firstTop === undefined ? 0 : round(Math.max(0, sequence.firstTop - contentTop)),
+      lastParagraphGap: anchor === 'bottom' && sequence.lastBottom !== undefined ? round(Math.max(0, contentBottom - sequence.lastBottom)) : 0,
+      wrap: sequence.wrap,
+      rtl: sequence.rtl,
+      trailingGuard: sequence.trailingGuard,
+      paragraphs: sequence.paragraphs,
+    };
+  }
+
+  interface BlockSequence {
+    paragraphs: Paragraph[];
+    /** first line top and last line bottom in page coordinates: the caller folds the gaps into its own insets */
+    firstTop?: number;
+    lastBottom?: number;
+    trailingGuard: number;
+    rtl: boolean;
+    wrap: boolean;
+  }
+
+  /**
+   * The `p` and `ul`/`ol` children of `container` as the paragraphs of one text body: every block's paragraphs
+   * are offset to `contentLeft` and its gap to the block above becomes its first paragraph's `spaceBefore`.
+   * `invalid` names what stopped the walk, which is an error to one caller and a reason to keep walking to another.
+   */
+  function measureBlockSequence(container: HTMLElement, contentLeft: number, containerRtl: boolean): BlockSequence | { invalid: string } {
     const paragraphs: Paragraph[] = [];
     let firstTop: number | undefined;
     let previousBottom: number | undefined;
     let trailingGuard = 0;
-    let rtl = cs.direction === 'rtl';
+    let rtl = containerRtl;
     let wrap = true;
-    for (const node of Array.from(cell.childNodes)) {
+    for (const node of Array.from(container.childNodes)) {
       if (node.nodeType === Node.TEXT_NODE) {
         if ((node.textContent ?? '').trim() !== '') {
-          entries.push({ code: 'VALIDATE_TABLE_CONTENT', selector: cssPath(cell), reason: `${elementName(cell)} mixes text with block content` });
-          return undefined;
+          return { invalid: 'mixes text with block content' };
         }
         continue;
       }
@@ -1397,8 +1442,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
       }
       const isList = child.tagName === 'UL' || child.tagName === 'OL';
       if (!(child.tagName === 'P' || isList) || !isTextBlock(child)) {
-        entries.push({ code: 'VALIDATE_TABLE_CONTENT', selector: cssPath(cell), reason: `${elementName(cell)} contains ${elementName(child)}` });
-        return undefined;
+        return { invalid: `contains ${elementName(child)}` };
       }
       const childRect = child.getBoundingClientRect();
       const childStyle = getComputedStyle(child);
@@ -1427,17 +1471,42 @@ export function measureSlideDocument(): BrowserMeasureResult {
       rtl = body.rtl;
       wrap = wrap && body.wrap;
     }
-    if (paragraphs.length === 0) {
+    return {
+      paragraphs,
+      ...(firstTop === undefined ? {} : { firstTop }),
+      ...(previousBottom === undefined ? {} : { lastBottom: previousBottom }),
+      trailingGuard,
+      rtl,
+      wrap,
+    };
+  }
+
+  /**
+   * A shape whose body needed more than one block on the way out: the identity sits on the wrapper
+   * (htmlout/elements.ts `identityAttr`) and the `p` and `ul`/`ol` children below it are the paragraphs of its
+   * one text body. Measuring them as one body is what keeps the shape its `p:ph` and its manifest key (spec 06
+   * "Placeholders"); HTML that carries no identity keeps one text box per block (spec 04).
+   */
+  function measureWrapperBody(el: HTMLElement): TextBody | undefined {
+    const cs = getComputedStyle(el);
+    const rect = el.getBoundingClientRect();
+    const padding: Insets = { l: px(cs.paddingLeft), t: px(cs.paddingTop), r: px(cs.paddingRight), b: px(cs.paddingBottom) };
+    const contentLeft = rect.left + px(cs.borderLeftWidth) + padding.l;
+    const contentTop = rect.top + px(cs.borderTopWidth) + padding.t;
+    const contentBottom = rect.bottom - px(cs.borderBottomWidth) - padding.b;
+    const sequence = measureBlockSequence(el, contentLeft, cs.direction === 'rtl');
+    if ('invalid' in sequence || sequence.paragraphs.length === 0) {
       return undefined;
     }
     return {
-      padding: { l: 0, t: 0, r: 0, b: 0 },
-      firstParagraphGap: anchor === 'bottom' || anchor === 'middle' || firstTop === undefined ? 0 : round(Math.max(0, firstTop - contentTop)),
-      lastParagraphGap: anchor === 'bottom' && previousBottom !== undefined ? round(Math.max(0, contentBottom - previousBottom)) : 0,
-      wrap,
-      rtl,
-      trailingGuard,
-      paragraphs,
+      padding,
+      // the leading and trailing gaps go into the insets, as they do for a single block (spec 04)
+      firstParagraphGap: sequence.firstTop === undefined ? 0 : round(Math.max(0, sequence.firstTop - contentTop)),
+      lastParagraphGap: sequence.lastBottom === undefined ? 0 : round(Math.max(0, contentBottom - sequence.lastBottom)),
+      wrap: sequence.wrap,
+      rtl: sequence.rtl,
+      trailingGuard: sequence.trailingGuard,
+      paragraphs: sequence.paragraphs,
     };
   }
 

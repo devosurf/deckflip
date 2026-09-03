@@ -17,6 +17,10 @@ const timing = (spid: number): string =>
   `<p:timing><p:tnLst><p:par><p:cTn id="1"><p:childTnLst><p:set><p:cBhvr><p:tgtEl><p:spTgt spid="${spid}"/></p:tgtEl></p:cBhvr></p:set></p:childTnLst></p:cTn></p:par></p:tnLst></p:timing>`;
 const notesBody = (text: string): string =>
   `<p:sp><p:nvSpPr><p:cNvPr id="3" name="Notes Placeholder 2"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr lang="en-US"/><a:t>${text}</a:t></a:r></a:p></p:txBody></p:sp>`;
+/** A foreign `body` placeholder holding two plain paragraphs, on a layout and master that style it. */
+const bodyTxStyles = '<p:txStyles><p:titleStyle><a:lvl1pPr/></p:titleStyle><p:bodyStyle><a:lvl1pPr marL="342900" indent="-342900"><a:spcBef><a:spcPts val="1200"/></a:spcBef><a:buChar char="\u25AA"/><a:defRPr sz="2000"/></a:lvl1pPr></p:bodyStyle><p:otherStyle><a:lvl1pPr/></p:otherStyle></p:txStyles>';
+const bodyLayoutShape = '<p:sp><p:nvSpPr><p:cNvPr id="2" name="Content Placeholder 1"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="914400" y="914400"/><a:ext cx="5486400" cy="2743200"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr><a:normAutofit fontScale="70000"/></a:bodyPr><a:lstStyle/><a:p><a:endParaRPr/></a:p></p:txBody></p:sp>';
+const bodyShape = '<p:sp><p:nvSpPr><p:cNvPr id="2" name="Content 1"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr><p:spPr><a:xfrm><a:off x="914400" y="914400"/><a:ext cx="5486400" cy="2743200"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr/><a:p><a:pPr marL="0" indent="0"><a:buNone/></a:pPr><a:r><a:rPr lang="en-US"/><a:t>Plain first line</a:t></a:r></a:p><a:p><a:pPr marL="0" indent="0"><a:buNone/></a:pPr><a:r><a:rPr lang="en-US"/><a:t>Plain second line</a:t></a:r></a:p></p:txBody></p:sp>';
 
 async function parts(pptx: Uint8Array): Promise<Map<string, string>> {
   const zip = await JSZip.loadAsync(pptx);
@@ -162,6 +166,46 @@ describe.skipIf(!browserAvailable)('PPTX -> HTML -> PPTX round trip', () => {
     const slide1 = Buffer.from((await parts(await readFile(output))).get('ppt/slides/slide1.xml')!, 'base64').toString('utf8');
     expect(slide1).toContain('>Hello again</a:t>');
     expect(slide1).toContain('<p:nvPr><p:ph type="title"/></p:nvPr>');
+  });
+
+  async function bodyFixture(): Promise<{ dir: string; pptx: Buffer; html: string }> {
+    const pptx = await buildPptx({
+      slides: [{ name: 'Content', shapes: bodyShape }],
+      layouts: { 'slideLayout1.xml': { name: 'Content', shapes: bodyLayoutShape } },
+      master: { txStyles: bodyTxStyles },
+    });
+    const dir = await mkdtemp(join(tmpdir(), 'deckflip-body-'));
+    await writeFile(join(dir, 'deck.pptx'), pptx);
+    const { outputPath } = await convertPptxToHtml(join(dir, 'deck.pptx'));
+    return { dir, pptx, html: outputPath };
+  }
+
+  it('keeps a placeholder body of several paragraphs one shape, so an edited paragraph keeps its p:ph', async () => {
+    const { dir, html } = await bodyFixture();
+    const source = await readFile(html, 'utf8');
+    expect(source).toContain('data-placeholder="body:1"');
+    await writeFile(html, source.replace('Plain first line', 'Edited first line'));
+
+    const output = join(dir, 'back.pptx');
+    const result = await convertHtmlToPptx(html, { ...options, browser, output });
+    expect(result.exitCode).toBe(0);
+
+    const slide1 = Buffer.from((await parts(await readFile(output))).get('ppt/slides/slide1.xml')!, 'base64').toString('utf8');
+    // the body stays the layout box: one shape holding both paragraphs, not one text box per paragraph
+    expect(slide1.match(/<p:sp>/g)).toHaveLength(1);
+    expect(slide1).toContain('<p:ph type="body" idx="1"/>');
+    expect(slide1.match(/<a:t xml:space="preserve">[^<]*<\/a:t>/g)).toEqual([
+      '<a:t xml:space="preserve">Edited first line</a:t>',
+      '<a:t xml:space="preserve">Plain second line</a:t>',
+    ]);
+  });
+
+  it('splices a placeholder body of several paragraphs from the source while no paragraph of it changed', async () => {
+    const { dir, pptx, html } = await bodyFixture();
+    const output = join(dir, 'back.pptx');
+    const result = await convertHtmlToPptx(html, { ...options, browser, output });
+    expect(result.exitCode).toBe(0);
+    expect(await parts(await readFile(output))).toEqual(await parts(pptx));
   });
 
   it('warns once and re-emits everything on the built-in master when the Asset directory is gone', async () => {
