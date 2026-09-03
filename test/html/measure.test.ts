@@ -539,4 +539,41 @@ describe.skipIf(!browserAvailable)('measureDeck', () => {
       await browser.close();
     }
   });
+
+  it('reads data-shape-id into shapeId on every element it produces and returns each section as a tree', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'deckflip-shape-id-'));
+    const file = join(dir, 'deck.html');
+    await writeFile(file, [
+      '<!doctype html><html><head><title>Deck</title></head><body>',
+      '<section id="slide-1" data-title="One">',
+      '  <div data-shape-id="1-2" style="position: absolute; left: 10px; top: 10px; width: 100px; height: 50px; background: #ccc"></div>',
+      '  <div data-shape-id="1-3" data-group style="position: absolute; left: 200px; top: 10px; width: 100px; height: 50px">',
+      '    <div data-shape-id="1-4" style="position: absolute; left: 0; top: 0; width: 20px; height: 20px; background: #000"></div>',
+      '  </div>',
+      '  <div style="position: absolute; left: 400px; top: 10px; width: 100px; height: 50px; filter: blur(2px); background: #000"></div>',
+      '  <aside class="notes">Remember</aside>',
+      '</section>',
+      '</body></html>',
+    ].join('\n'), 'utf8');
+    const loaded = await loadDeck(file, {});
+    const browser = await chromium.launch();
+    try {
+      const measured = await measureDeck(loaded, { browser });
+      const [box, group, raster] = measured.deck.slides[0]!.elements;
+      expect(box).toMatchObject({ kind: 'shape', shapeId: '1-2' });
+      expect(group).toMatchObject({ kind: 'group', shapeId: '1-3', children: [{ kind: 'shape', shapeId: '1-4' }] });
+      expect(raster).toMatchObject({ kind: 'picture', source: 'raster' });
+      expect(raster && 'shapeId' in raster).toBe(false);
+
+      expect(measured.sections).toHaveLength(1);
+      const tree = measured.sections[0]!;
+      expect(tree).toMatchObject({ tag: 'section', attrs: { id: 'slide-1', 'data-title': 'One' } });
+      const children = tree.children.filter((child) => typeof child !== 'string');
+      expect(children.map((child) => (typeof child === 'string' ? child : child.attrs['data-shape-id'] ?? child.tag))).toEqual(['1-2', '1-3', 'div', 'aside']);
+      expect(children[1]).toMatchObject({ children: [expect.any(String), { tag: 'div', attrs: { 'data-shape-id': '1-4' } }, expect.any(String)] });
+      expect(children[3]).toEqual({ tag: 'aside', attrs: { class: 'notes' }, children: ['Remember'] });
+    } finally {
+      await browser.close();
+    }
+  });
 });

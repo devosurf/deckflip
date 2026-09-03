@@ -62,6 +62,13 @@ export function el(
   return { name, attrs: record, children: out };
 }
 
+/** Already-serialised XML written verbatim by `serialize` (the round trip's untouched fragments); never produced by `parseXml`. */
+export const RAW_NODE = '#raw';
+
+export function raw(xml: string): XmlNode {
+  return { name: RAW_NODE, attrs: {}, children: [xml] };
+}
+
 export function serialize(root: XmlNode, opts?: { declaration?: boolean }): string {
   const withDeclaration = opts?.declaration ?? true;
   const chunks: string[] = [];
@@ -134,6 +141,9 @@ export function parseXml(text: string): XmlNode {
 }
 
 function serializeNode(node: XmlNode): string {
+  if (node.name === RAW_NODE) {
+    return node.children.map((child) => (typeof child === 'string' ? child : serializeNode(child))).join('');
+  }
   const attrs = serializeAttrs(node.attrs);
   if (!node.children.length) {
     return `<${node.name}${attrs}/>`;

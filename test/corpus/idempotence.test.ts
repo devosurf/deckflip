@@ -1,4 +1,4 @@
-import { mkdtemp, readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import JSZip from 'jszip';
@@ -10,7 +10,9 @@ import { launchChromium } from '../../src/render/chromium.js';
 /**
  * Idempotence gate (spec 10, "HTML -> PPTX -> HTML -> PPTX"): the corpus deck converted to PPTX, back to an
  * HTML Deck with `htmlout`, and converted again must reproduce every slide and media part byte for byte.
- *
+ * The manifest is removed between the two conversions so the second one measures and emits the HTML rather
+ * than splicing the source back (that path is `roundtrip.test.ts`); the `PRESERVE_SOURCE_MISSING` warning
+ * this raises is expected.
  * `KNOWN_FAILURES` name fixtures the round trip cannot reproduce yet, with the reason; they run as `it.fails`
  * so the gate stays complete and flips when the cause is fixed:
  * - `text/lists`: the measurer reads an outside marker's hanging indent as the marker string's text advance
@@ -91,10 +93,12 @@ describe.skipIf(!browserAvailable)('idempotence corpus: HTML -> PPTX -> HTML -> 
       const convert = { embedFonts: false as const, rasterDpi: 192, strict: false, offline: true, browser };
       const firstPath = join(workDir, 'first.pptx');
       await convertHtmlToPptx(deckPath, { ...convert, output: firstPath });
-      const { outputPath: htmlPath } = await convertPptxToHtml(firstPath, { output: join(workDir, 'first.html') });
+      const { outputPath: htmlPath, assetsDir } = await convertPptxToHtml(firstPath, { output: join(workDir, 'first.html') });
+      await rm(join(assetsDir, 'deckflip.json'));
       const secondPath = join(workDir, 'second.pptx');
       const second = await convertHtmlToPptx(htmlPath, { ...convert, output: secondPath });
       expect(second.exitCode, JSON.stringify(second.report.entries, null, 1)).toBe(0);
+      expect(second.report.entries.filter((entry) => entry.code.startsWith('PRESERVE_')).map((entry) => entry.code)).toEqual(['PRESERVE_SOURCE_MISSING']);
 
       const before = await slideAndMediaParts(await readFile(firstPath));
       const after = await slideAndMediaParts(await readFile(secondPath));

@@ -46,6 +46,7 @@ export type Element = ShapeElement | PictureElement | TableElement | GroupElemen
 /** A `data-group` container: `p:grpSp` around its painting descendants (spec 03 rule 4). */
 export interface GroupElement {
   kind: 'group';
+  shapeId?: string;
   selector: string;
   name: string;
   /** placement on the Slide after the container's transform, CSS px -> `a:off`/`a:ext` */
@@ -61,6 +62,7 @@ export interface GroupElement {
 /** A `table`, emitted as `a:tbl` in a `p:graphicFrame`. */
 export interface TableElement {
   kind: 'table';
+  shapeId?: string;
   selector: string;
   name: string;
   /** border box, CSS px */
@@ -102,6 +104,7 @@ export interface PictureElement {
   source?: 'raster';
   /** raster pictures: `true` when the author asked for it with `data-raster` */
   explicit?: boolean;
+  shapeId?: string;
   selector: string;
   name: string;
   /** the visible frame (content box, or the fitted rect for `object-fit: contain`), before rotation, CSS px */
@@ -168,6 +171,8 @@ export interface Line {
 
 export interface ShapeElement {
   kind: 'shape';
+  /** `<slide number>-<p:cNvPr id>`: the `data-shape-id` locator of an element that came from a PPTX shape (spec 02), the key the round-trip manifest uses */
+  shapeId?: string;
   /** CSS selector locating the source element (report locator) */
   selector: string;
   /** `p:cNvPr/@name`: tag plus id/class hint */

@@ -14,6 +14,8 @@ export interface ElementContext {
   /** `<name>.assets/` as referenced from the HTML */
   assetsDir: string;
   assets: Map<string, Uint8Array>;
+  /** the written `data-shape-id` -> every shape id the element stands for, in paint order, when there is more than its own */
+  merged: Map<string, string[]>;
 }
 
 const EXTENSION: Record<Media['contentType'], string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/svg+xml': 'svg' };
@@ -38,6 +40,16 @@ export function nameParts(name: string, extraClass?: string): { tag: string; att
   return { tag, attrs: `${id}${cls}` };
 }
 
+/** `data-shape-id` for an element that came from a PPTX shape (spec 02), the key the round-trip manifest uses. */
+function identityAttr(element: { shapeId?: string }): string {
+  return element.shapeId === undefined ? '' : ` data-shape-id="${attr(element.shapeId)}"`;
+}
+
+function recordMerge(ctx: ElementContext, written: { shapeId?: string }, parts: Array<{ shapeId?: string }>): void {
+  const ids = parts.map((part) => part.shapeId).filter((id): id is string => id !== undefined);
+  if (written.shapeId !== undefined && ids.length > 1) ctx.merged.set(written.shapeId, ids);
+}
+
 export function elementsHtml(elements: Element[], origin: { x: number; y: number }, ctx: ElementContext): string[] {
   const out: string[] = [];
   for (let index = 0; index < elements.length; index += 1) {
@@ -48,13 +60,16 @@ export function elementsHtml(elements: Element[], origin: { x: number; y: number
       const outline = next?.kind === 'shape' && next.name === `${element.name} border` && !next.text ? next : undefined;
       out.push(pictureHtml(element, outline, origin, ctx));
       if (outline) {
+        recordMerge(ctx, element, [element, outline]);
         index += 1;
       }
       continue;
     }
     if (element.kind === 'shape' && element.text && nameParts(element.name).tag === 'caption' && elements[index + 1]?.kind === 'table') {
       // the measurer emits a table's caption as a leading shape and the table box without it (measureTable)
-      out.push(tableHtml(elements[index + 1] as TableElement, origin, ctx, element));
+      const table = elements[index + 1] as TableElement;
+      out.push(tableHtml(table, origin, ctx, element));
+      recordMerge(ctx, table, [element, table]);
       index += 1;
       continue;
     }
@@ -91,7 +106,8 @@ function shapeDecorationCss(shape: ShapeElement, ctx: ElementContext): string[] 
 
 /** The measurer reads a text-bearing block as one shape; a text-free painted block as one shape too. */
 export function shapeHtml(shape: ShapeElement, origin: { x: number; y: number }, ctx: ElementContext): string {
-  const { tag, attrs } = nameParts(shape.name);
+  const { tag, attrs: named } = nameParts(shape.name);
+  const attrs = `${named}${identityAttr(shape)}`;
   const css = [...boxCss(local(shape.box, origin), shape.rotation), 'box-sizing: border-box', 'margin: 0', ...shapeDecorationCss(shape, ctx)];
   if (!shape.text) {
     return `<${tag}${attrs} style="${css.join('; ')}"></${tag}>`;
@@ -102,7 +118,7 @@ export function shapeHtml(shape: ShapeElement, origin: { x: number; y: number },
     const style = firstStyle(text.paragraphs[0]!);
     const pre = nameParts(shape.name, style && ctx.sheet.classFor('t', runCss(style)));
     const lines = text.paragraphs.map((paragraph) => paragraph.runs.map((run) => (run.kind === 'text' ? escape(run.text) : '\n')).join('')).join('\n');
-    return `<pre${pre.attrs} style="${[...css, ...textBlockCss(text).filter((declaration) => !declaration.startsWith('white-space'))].join('; ')}">${lines}</pre>`;
+    return `<pre${pre.attrs}${identityAttr(shape)} style="${[...css, ...textBlockCss(text).filter((declaration) => !declaration.startsWith('white-space'))].join('; ')}">${lines}</pre>`;
   }
   return textBodyHtml(text, { tag, attrs, css: [...css, ...textBlockCss(text)] }, ctx.sheet);
 }
@@ -159,7 +175,9 @@ export function imageSize(media: Media): { w: number; h: number } | undefined {
  * A border (the `<name> border` shape) goes on the picture itself, its box being the border box.
  */
 function pictureHtml(picture: PictureElement, outline: ShapeElement | undefined, origin: { x: number; y: number }, ctx: ElementContext): string {
-  const { tag, attrs } = nameParts(picture.name);
+  const { tag, attrs: named } = nameParts(picture.name);
+  const identity = identityAttr(picture);
+  const attrs = `${named}${identity}`;
   const src = (): string => mediaPath(picture.vector ?? picture.media, ctx);
   const { l, t, r, b } = picture.crop;
   const box = local(picture.box, origin);
@@ -194,12 +212,13 @@ function pictureHtml(picture: PictureElement, outline: ShapeElement | undefined,
     const markup = Buffer.from(picture.vector.data).toString('utf8');
     return markup.replace(/^(\s*<svg)/, `$1${attrs} style="${css.join('; ')}"`);
   }
-  return `<img${tag === 'svg' ? '' : attrs}${raster} src="${attr(src())}" style="${css.join('; ')}">`;
+  return `<img${tag === 'svg' ? identity : attrs}${raster} src="${attr(src())}" style="${css.join('; ')}">`;
 }
 
 /** `div[data-group]` at its box; children are positioned relative to it, in the child coordinate space. */
 function groupHtml(group: GroupElement, origin: { x: number; y: number }, ctx: ElementContext): string {
-  const { tag, attrs } = nameParts(group.name);
+  const { tag, attrs: named } = nameParts(group.name);
+  const attrs = `${named}${identityAttr(group)}`;
   const box = local(group.box, origin);
   const css = boxCss(box, group.rotation);
   const children = elementsHtml(group.children, { x: group.childBox.x, y: group.childBox.y }, ctx);
@@ -221,7 +240,8 @@ function groupHtml(group: GroupElement, origin: { x: number; y: number }, ctx: E
  * grid's (CSS `height` on a table is the grid, not the wrapper).
  */
 function tableHtml(table: TableElement, origin: { x: number; y: number }, ctx: ElementContext, caption?: ShapeElement): string {
-  const { tag, attrs } = nameParts(table.name);
+  const { tag, attrs: named } = nameParts(table.name);
+  const attrs = `${named}${identityAttr(table)}`;
   const box = local(table.box, origin);
   const top = caption ? local(caption.box, origin).y : box.y;
   const outer = outerBorders(table);

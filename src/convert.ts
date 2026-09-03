@@ -7,11 +7,15 @@ import { loadDeck } from './html/load.js';
 import { measureDeck } from './html/measure.js';
 import { emitHtml } from './htmlout/index.js';
 import type { Canvas, Deck } from './model/index.js';
+import { OpcReader } from './ooxml/opc.js';
 import { parsePptx } from './parse/index.js';
 import { chromiumVersion, launchChromium } from './render/chromium.js';
 import { entry as reportEntry } from './report/codes.js';
 import { buildReport, writeSidecar } from './report/index.js';
 import type { Entry, Report } from './report/types.js';
+import { buildManifest, MANIFEST_FILE, sha256, SOURCE_FILE } from './roundtrip/manifest.js';
+import { resolveRoundTrip, type RoundTrip } from './roundtrip/index.js';
+import { indexSource } from './roundtrip/source.js';
 import { VERSION } from './version.js';
 
 export interface ConvertOptions {
@@ -63,9 +67,11 @@ function reportBase(
 interface PipelineRun {
   report: Report;
   deck?: Deck;
+  /** the round trip's findings when the Deck came from a PPTX whose Asset directory is still there */
+  roundTrip?: RoundTrip;
 }
 
-/** load -> measure -> fonts; the report carries every entry, `deck` is present only when no error stopped the run. */
+/** load -> measure -> fonts -> round trip; the report carries every entry, `deck` is present only when no error stopped the run. */
 async function runHtmlPipeline(
   input: string,
   opts: ValidateOptions,
@@ -87,10 +93,11 @@ async function runHtmlPipeline(
     const measured = await measureDeck(loaded, { browser, rasterDpi: opts.rasterDpi });
     const catalog = await FontCatalog.scan({ extraFiles: measured.deck.fontFaces.map((face) => face.file) });
     const fontEntries = resolveDeckFonts(measured.deck, catalog, { embedFonts: opts.embedFonts });
-    const entries = [...baseEntries, ...measured.entries, ...fontEntries];
+    const roundTrip = await resolveRoundTrip(measured.deck, measured.sections, loaded.deckFile);
+    const entries = [...baseEntries, ...measured.entries, ...fontEntries, ...roundTrip.entries];
     const native = measured.deck.slides.reduce((n, slide) => n + slide.elements.length, 0);
     const report = buildReport(reportBase(input, outputPath, loaded.canvas, chromiumVersion(browser), mode), entries, measured.deck.slides.length, native);
-    return hasError(entries) ? { report } : { report, deck: measured.deck };
+    return hasError(entries) ? { report } : { report, deck: measured.deck, roundTrip };
   } finally {
     if (opts.browser === undefined) await browser.close();
   }
@@ -110,7 +117,13 @@ export async function convertHtmlToPptx(
   }
 
   const epoch = process.env.SOURCE_DATE_EPOCH;
-  const pptx = await emitPptx(run.deck, { ...(epoch === undefined ? {} : { created: new Date(Number(epoch) * 1000) }), appVersion: VERSION });
+  const pptx =
+    run.roundTrip?.identical ??
+    (await emitPptx(run.deck, {
+      ...(epoch === undefined ? {} : { created: new Date(Number(epoch) * 1000) }),
+      appVersion: VERSION,
+      ...(run.roundTrip?.preserved === undefined ? {} : { preserved: run.roundTrip.preserved }),
+    }));
 
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, pptx);
@@ -132,22 +145,29 @@ export interface ConvertToHtmlOptions {
 /**
  * PPTX -> HTML Deck + Asset directory (spec 02 "Absolute-positioned form", spec 06 "Attachment"). Fonts are
  * resolved on the parsed Deck first, as they are on the HTML side, so the emitted text carries the same
- * baseline correction the emitter applied. Report entries from font resolution are the report.
+ * baseline correction the emitter applied. Report entries from font resolution are the report. The Asset
+ * directory keeps the input verbatim as `source.pptx` and the manifest the way back splices from.
  */
 export async function convertPptxToHtml(input: string, opts: ConvertToHtmlOptions = {}): Promise<{ report: Report; outputPath: string; assetsDir: string; exitCode: 0 }> {
   const outputPath = opts.output ?? replaceExtension(input, '.html');
   const assetsDir = replaceExtension(outputPath, '.assets');
-  const deck = await parsePptx(new Uint8Array(await readFile(input)));
+  const bytes = new Uint8Array(await readFile(input));
+  const deck = await parsePptx(bytes);
+  const source = await indexSource(await OpcReader.load(bytes));
   const catalog = await FontCatalog.scan({ extraFiles: [] });
   const entries = resolveDeckFonts(deck, catalog, { embedFonts: false });
-  const { html, assets } = emitHtml(deck, { assetsDir: basename(assetsDir) });
+  const { html, assets, slides } = emitHtml(deck, { assetsDir: basename(assetsDir) });
+  const manifest = buildManifest(html, slides, source, sha256(bytes));
 
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, html);
-  for (const [relative, bytes] of assets) {
+  await mkdir(assetsDir, { recursive: true });
+  await writeFile(join(assetsDir, SOURCE_FILE), bytes);
+  await writeFile(join(assetsDir, MANIFEST_FILE), `${JSON.stringify(manifest, null, 2)}\n`);
+  for (const [relative, data] of assets) {
     const path = join(assetsDir, relative);
     await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, bytes);
+    await writeFile(path, data);
   }
   const native = deck.slides.reduce((n, slide) => n + slide.elements.length, 0);
   const base = { ...reportBase(input, outputPath, deck.canvas, undefined, 'convert'), input: { path: input, kind: 'pptx' as const }, output: { path: outputPath, kind: 'html' as const } };

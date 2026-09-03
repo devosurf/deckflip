@@ -4,7 +4,7 @@
 
 import type { Line, TableCell, TableElement, TableRow } from '../model/index.js';
 import { el, type XmlNode } from '../ooxml/xml.js';
-import { readFill, readLine, readTransform, shapeName, shapeSelector, type DrawingContext } from './drawing.js';
+import { readFill, readLine, readTransform, shapeIdentity, shapeName, type DrawingContext } from './drawing.js';
 import { DEFAULT_INSET, readRunStyle, readTextBody, type TextContext } from './text.js';
 import { px } from './units.js';
 import { child, children } from './xml.js';
@@ -28,7 +28,7 @@ export async function readTable(frame: XmlNode, ctx: DrawingContext & TextContex
   }
   return {
     kind: 'table',
-    selector: shapeSelector(nvPr, ctx.slide),
+    ...shapeIdentity(nvPr, ctx.slide),
     name: shapeName(nvPr),
     box: readTransform(child(frame, 'p:xfrm')).frame,
     columns: children(child(tbl, 'a:tblGrid'), 'a:gridCol').map((col) => px(col.attrs.w)),

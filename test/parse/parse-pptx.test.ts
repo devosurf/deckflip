@@ -111,7 +111,7 @@ describe('parsePptx', () => {
     // the locator names the shape by its `p:cNvPr` id, which htmlout writes as `data-shape-id`
     expect(card).toEqual({
       kind: 'shape',
-      selector: '[data-shape-id="1-2"]',
+      shapeId: '1-2', selector: '[data-shape-id="1-2"]',
       name: 'div.card',
       box: { x: 80, y: 20, w: 100, h: 50 },
       rotation: 15,
@@ -178,7 +178,7 @@ describe('parsePptx', () => {
     const [photo, icon, background] = deck.slides[0]!.elements as [PictureElement, PictureElement, ShapeElement];
     expect(photo).toEqual({
       kind: 'picture',
-      selector: '[data-shape-id="1-2"]',
+      shapeId: '1-2', selector: '[data-shape-id="1-2"]',
       name: 'img.photo',
       box: { x: 44, y: 304, w: 152, h: 92 },
       rotation: 90,
@@ -257,21 +257,21 @@ describe('parsePptx', () => {
     expect(deck.slides[0]!.elements).toEqual([
       {
         kind: 'group',
-        selector: '[data-shape-id="1-2"]',
+        shapeId: '1-2', selector: '[data-shape-id="1-2"]',
         name: 'div.cluster',
         box: { x: 100, y: 50, w: 400, h: 200 },
         childBox: { x: 100, y: 50, w: 400, h: 200 },
         rotation: 10,
         children: [
-          { kind: 'shape', selector: '[data-shape-id="1-3"]', name: 'div.a', box: { x: 100, y: 50, w: 150, h: 200 }, rotation: 0, geometry: { preset: 'rect' }, fill: { type: 'solid', color: { hex: '0EA5E9', alpha: 1 } } },
+          { kind: 'shape', shapeId: '1-3', selector: '[data-shape-id="1-3"]', name: 'div.a', box: { x: 100, y: 50, w: 150, h: 200 }, rotation: 0, geometry: { preset: 'rect' }, fill: { type: 'solid', color: { hex: '0EA5E9', alpha: 1 } } },
           {
             kind: 'group',
-            selector: '[data-shape-id="1-4"]',
+            shapeId: '1-4', selector: '[data-shape-id="1-4"]',
             name: 'div.inner',
             box: { x: 300, y: 50, w: 200, h: 200 },
             childBox: { x: 300, y: 50, w: 200, h: 200 },
             rotation: 0,
-            children: [{ kind: 'shape', selector: '[data-shape-id="1-5"]', name: 'div.b', box: { x: 300, y: 50, w: 200, h: 200 }, rotation: 0, geometry: { preset: 'rect' }, borders: { left: line } }],
+            children: [{ kind: 'shape', shapeId: '1-5', selector: '[data-shape-id="1-5"]', name: 'div.b', box: { x: 300, y: 50, w: 200, h: 200 }, rotation: 0, geometry: { preset: 'rect' }, borders: { left: line } }],
           },
         ],
       },
@@ -322,7 +322,7 @@ describe('parsePptx', () => {
     const deck = await roundTrip(source);
     const [table] = deck.slides[0]!.elements as [TableElement];
     const expected = source.slides[0]!.elements[0] as TableElement;
-    expect(table).toMatchObject({ kind: 'table', selector: '[data-shape-id="1-2"]', name: 'table.grid', box: { x: 50, y: 60, w: 300, h: 90 }, columns: [100, 120, 80] });
+    expect(table).toMatchObject({ kind: 'table', shapeId: '1-2', selector: '[data-shape-id="1-2"]', name: 'table.grid', box: { x: 50, y: 60, w: 300, h: 90 }, columns: [100, 120, 80] });
     expect(table.rows.map((row) => row.height)).toEqual([40, 50]);
     expect(table.rows[0]!.cells[0]).toEqual(expected.rows[0]!.cells[0]);
     expect(table.rows[0]!.cells[2]).toEqual(expected.rows[0]!.cells[2]);

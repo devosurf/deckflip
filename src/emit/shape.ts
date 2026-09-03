@@ -1,10 +1,16 @@
-import type { CornerRadius, Geometry, GradientStop, ImageFill, Insets, Line, ShapeElement, TextBody } from '../model/index.js';
+import type { CornerRadius, Element, Geometry, GradientStop, ImageFill, Insets, Line, ShapeElement, TextBody } from '../model/index.js';
 import { pxToEmu } from '../ooxml/emu.js';
 import { el, type XmlNode } from '../ooxml/xml.js';
 import { relateMedia, type MediaEmissionContext } from './media.js';
 import { baselineCorrectionPx, buildTextBody, colorNode, solidFillNode, type TextEmissionContext } from './text.js';
 
-export interface ShapeEmissionContext extends TextEmissionContext, MediaEmissionContext {}
+export interface ShapeEmissionContext extends TextEmissionContext, MediaEmissionContext {
+  /** the round trip's say over each element: verbatim fragments for untouched ones, the ids touched ones keep */
+  splice?: {
+    fragments(element: Element): XmlNode[] | undefined;
+    keepIds(element: Element): number[];
+  };
+}
 
 /** The shape plus one connector line per side when borders differ; ids come from `nextId` in emission order. */
 export function buildShape(shape: ShapeElement, ctx: ShapeEmissionContext, nextId: () => number): XmlNode[] {

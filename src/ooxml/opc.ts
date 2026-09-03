@@ -38,6 +38,7 @@ interface PartRecord {
 }
 
 interface RelationshipRecord {
+  id: string;
   type: string;
   target: string;
   external: boolean;
@@ -48,20 +49,39 @@ const DEFAULT_DATE = new Date('1980-01-01T00:00:00.000Z');
 export class OpcPackage {
   readonly parts = new Map<string, PartRecord>();
   readonly relationships = new Map<string, RelationshipRecord[]>();
+  /** relationship parts written byte for byte (an untouched source part keeps its own) */
+  private readonly rawRelationships = new Map<string, string | Uint8Array>();
 
   addPart(name: string, contentType: string, data: string | Uint8Array): void {
     this.parts.set(normalizePartName(name), { contentType, data });
   }
 
-  addRelationship(source: string, type: string, target: string, opts?: { external?: boolean }): string {
+  /** Registers a relationship and returns its id: `opts.id` when given, else the next `rId<n>` above every id the part has. */
+  addRelationship(source: string, type: string, target: string, opts?: { external?: boolean; id?: string }): string {
     const key = normalizeSource(source);
+    if (this.rawRelationships.has(key)) {
+      throw new Error(`${source} keeps its relationships verbatim`);
+    }
     const list = this.relationships.get(key) ?? [];
     if (!this.relationships.has(key)) {
       this.relationships.set(key, list);
     }
-    const id = `rId${list.length + 1}`;
-    list.push({ type, target, external: opts?.external ?? false });
+    const id = opts?.id ?? `rId${list.reduce((max, rel) => Math.max(max, Number(/^rId(\d+)$/.exec(rel.id)?.[1] ?? 0)), 0) + 1}`;
+    list.push({ id, type, target, external: opts?.external ?? false });
     return id;
+  }
+
+  /** The part's `.rels` as given, instead of one built from `addRelationship` calls. */
+  setRawRelationships(source: string, xml: string | Uint8Array): void {
+    const key = normalizeSource(source);
+    if (this.relationships.has(key)) {
+      throw new Error(`${source} already has built relationships`);
+    }
+    this.rawRelationships.set(key, xml);
+  }
+
+  hasPart(name: string): boolean {
+    return this.parts.has(normalizePartName(name));
   }
 
   async toBuffer(opts?: { compression?: 'DEFLATE' | 'STORE'; date?: Date }): Promise<Buffer> {
@@ -71,15 +91,18 @@ export class OpcPackage {
 
     zip.file('[Content_Types].xml', buildContentTypesXml(this.parts), { date, compression, createFolders: false });
 
-    const rootRelationships = this.relationships.get('/') ?? [];
-    if (rootRelationships.length) {
-      zip.file('_rels/.rels', buildRelationshipsXml(rootRelationships), { date, compression, createFolders: false });
+    const rootRelationships = this.rawRelationships.get('/') ?? (this.relationships.get('/')?.length ? buildRelationshipsXml(this.relationships.get('/')!) : undefined);
+    if (rootRelationships !== undefined) {
+      zip.file('_rels/.rels', rootRelationships, { date, compression, createFolders: false });
     }
 
     for (const [name, part] of this.parts) {
       zip.file(zipPath(name), part.data, { date, compression, createFolders: false });
+      const raw = this.rawRelationships.get(name);
       const rels = this.relationships.get(name) ?? [];
-      if (rels.length) {
+      if (raw !== undefined) {
+        zip.file(relsPath(name), raw, { date, compression, createFolders: false });
+      } else if (rels.length) {
         zip.file(relsPath(name), buildRelationshipsXml(rels), { date, compression, createFolders: false });
       }
     }
@@ -152,6 +175,27 @@ export class OpcReader {
   async related(source: string, type: string): Promise<Relationship | undefined> {
     return (await this.relationships(source)).find((rel) => rel.type === type);
   }
+
+  /** `[Content_Types].xml`: the content type of a part by override, else by extension default; undefined when neither names it. */
+  async contentTypes(): Promise<(partName: string) => string | undefined> {
+    const file = this.zip.file('[Content_Types].xml');
+    const defaults = new Map<string, string>();
+    const overrides = new Map<string, string>();
+    if (file) {
+      for (const child of parseXml(await file.async('string')).children) {
+        if (typeof child === 'string') continue;
+        if (child.name === 'Default' && child.attrs.Extension !== undefined) defaults.set(child.attrs.Extension.toLowerCase(), child.attrs.ContentType ?? '');
+        if (child.name === 'Override' && child.attrs.PartName !== undefined) overrides.set(child.attrs.PartName, child.attrs.ContentType ?? '');
+      }
+    }
+    return (partName) => {
+      const name = normalizePartName(partName);
+      const override = overrides.get(name);
+      if (override !== undefined) return override;
+      const extension = path.posix.extname(name).slice(1).toLowerCase();
+      return this.hasPart(name) ? defaults.get(extension) : undefined;
+    };
+  }
 }
 
 function buildContentTypesXml(parts: Map<string, PartRecord>): string {
@@ -184,9 +228,9 @@ function buildRelationshipsXml(rels: RelationshipRecord[]): string {
     el(
       'Relationships',
       { xmlns: 'http://schemas.openxmlformats.org/package/2006/relationships' },
-      ...rels.map((rel, index) =>
+      ...rels.map((rel) =>
         el('Relationship', {
-          Id: `rId${index + 1}`,
+          Id: rel.id,
           Type: rel.type,
           Target: rel.target,
           TargetMode: rel.external ? 'External' : undefined,

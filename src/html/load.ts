@@ -16,6 +16,8 @@ export interface SlideDocument {
 
 export interface LoadedDeck {
   inputPath: string;
+  /** the Deck file, absolute; absent in the per-file directory form (spec 02). Its `<name>.assets/` sibling is the round trip's Asset directory. */
+  deckFile?: string;
   title: string;
   lang: string;
   canvas: Canvas;
@@ -107,6 +109,7 @@ async function loadDeckFile(file: string, inputPath: string, size?: string): Pro
   const canvas = applyCanvasOverride(source.canvas, size);
   return {
     inputPath,
+    deckFile: file,
     title: source.title,
     lang: source.lang,
     canvas,

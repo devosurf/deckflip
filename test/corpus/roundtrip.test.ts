@@ -4,15 +4,17 @@ import { join } from 'node:path';
 import JSZip from 'jszip';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Browser } from 'playwright-core';
-import { convertHtmlToPptx } from '../../src/convert.js';
+import { convertHtmlToPptx, convertPptxToHtml } from '../../src/convert.js';
 import { emitPptx } from '../../src/emit/index.js';
 import { parsePptx } from '../../src/parse/index.js';
 import { launchChromium } from '../../src/render/chromium.js';
 
 /**
- * Idempotence at the IDM seam (spec 10, "HTML -> PPTX -> HTML -> PPTX"): the corpus deck converted once, read
- * back with `parsePptx` and emitted again must reproduce every slide and media part byte for byte. Until
- * `htmlout` exists this is the PPTX -> IDM -> PPTX half of that gate, over the whole corpus.
+ * Two gates over the whole corpus (spec 10):
+ * - PPTX -> IDM -> PPTX: the corpus deck converted once, read back with `parsePptx` and emitted again must
+ *   reproduce every slide and media part byte for byte (the parser covers everything the emitter wrote).
+ * - PPTX -> HTML -> PPTX untouched: the same PPTX written out as an HTML Deck and converted straight back must
+ *   come out with every zip entry byte-identical, the manifest having found every Slide untouched.
  */
 const FIXTURES: ReadonlyArray<[category: string, name: string]> = [
   ['text', 'spike'],
@@ -95,6 +97,42 @@ describe.skipIf(!browserAvailable)('roundtrip corpus: PPTX -> IDM -> PPTX part i
       for (const [part, content] of before) {
         expect(after.get(part), part).toBe(content);
       }
+    });
+  }
+});
+
+async function allParts(pptx: Uint8Array): Promise<Map<string, string>> {
+  const zip = await JSZip.loadAsync(pptx);
+  const parts = new Map<string, string>();
+  for (const name of Object.keys(zip.files).sort()) {
+    if (!zip.files[name]!.dir) parts.set(name, await zip.file(name)!.async('base64'));
+  }
+  return parts;
+}
+
+describe.skipIf(!browserAvailable)('roundtrip corpus: PPTX -> HTML -> PPTX untouched part identity', () => {
+  let browser: Browser;
+
+  beforeAll(async () => {
+    browser = await launchChromium({ offline: true });
+  });
+
+  afterAll(async () => {
+    await browser.close();
+  });
+
+  for (const [category, name] of FIXTURES) {
+    it(`${category}/${name}`, async () => {
+      const deckPath = join('fixtures', 'corpus', category, name, 'deck.html');
+      const workDir = await mkdtemp(join(tmpdir(), `deckflip-untouched-${name}-`));
+      const convert = { embedFonts: false as const, rasterDpi: 192, strict: false, offline: true, browser };
+      const firstPath = join(workDir, 'first.pptx');
+      await convertHtmlToPptx(deckPath, { ...convert, output: firstPath });
+      const { outputPath: htmlPath } = await convertPptxToHtml(firstPath, { output: join(workDir, 'first.html') });
+      const backPath = join(workDir, 'back.pptx');
+      const back = await convertHtmlToPptx(htmlPath, { ...convert, output: backPath });
+      expect(back.report.entries.filter((entry) => entry.code.startsWith('PRESERVE_') || entry.code.startsWith('DROPPED_')), JSON.stringify(back.report.entries, null, 1)).toEqual([]);
+      expect(await allParts(await readFile(backPath))).toEqual(await allParts(await readFile(firstPath)));
     });
   }
 });

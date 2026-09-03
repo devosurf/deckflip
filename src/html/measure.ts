@@ -12,6 +12,7 @@ import { loadMedia, reencodeToPng } from './media.js';
 import { FREEZE_ATTR, measureSlideDocument, preloadBackgroundImages } from './browser-script.js';
 import type { LoadedDeck, SlideDocument } from './load.js';
 import { captureRaster } from './raster.js';
+import type { HtmlNode } from '../roundtrip/fingerprint.js';
 
 export interface MeasureOptions {
   browser: Browser;
@@ -32,6 +33,8 @@ interface PageContext {
 export interface MeasuredDeckResult {
   deck: Deck;
   entries: Entry[];
+  /** each Slide's section as parsed, in Slide order: what the round trip fingerprints against the manifest */
+  sections: HtmlNode[];
 }
 
 const SLIDE_SIZE_HINT = 'Do not set width/height on sections, or match {W}x{H} exactly';
@@ -42,6 +45,7 @@ export async function measureDeck(loaded: LoadedDeck, opts: MeasureOptions): Pro
   const context = await opts.browser.newContext({ viewport: { width: loaded.canvas.width, height: loaded.canvas.height }, deviceScaleFactor: 1 });
   const entries: Entry[] = [...loaded.entries];
   const slides: Slide[] = [];
+  const sections: HtmlNode[] = [];
   const fontFaces = new Map<string, { family: string; file: string; weight?: number; italic?: boolean }>();
 
   try {
@@ -75,6 +79,7 @@ export async function measureDeck(loaded: LoadedDeck, opts: MeasureOptions): Pro
           ...(result.meta.section ? { section: result.meta.section } : {}),
         };
         slides.push(slide);
+        sections.push(result.tree);
       } finally {
         await page.close();
       }
@@ -94,6 +99,7 @@ export async function measureDeck(loaded: LoadedDeck, opts: MeasureOptions): Pro
       fontFaces: Array.from(fontFaces.values()),
     },
     entries,
+    sections,
   };
 }
 
@@ -250,6 +256,7 @@ async function resolveRaster(ctx: PageContext, raster: BrowserRaster, entries: E
     kind: 'picture',
     source: 'raster',
     explicit: raster.trigger === undefined,
+    ...(raster.shapeId === undefined ? {} : { shapeId: raster.shapeId }),
     selector: raster.selector,
     name: raster.name,
     box,

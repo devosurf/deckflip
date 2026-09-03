@@ -1,4 +1,5 @@
 import type { Align, AutonumScheme, Box, Bullet, Color, CornerRadius, Fill, GroupElement, ImageFill, ImagePlacement, Insets, Line, Paragraph, PictureElement, Run, RunStyle, ShapeElement, TableCell, TableElement, TableRow, TextBody } from '../model/index.js';
+import type { HtmlChild, HtmlNode } from '../roundtrip/fingerprint.js';
 
 export interface BrowserFontFace {
   family: string;
@@ -42,6 +43,7 @@ export interface RasterTrigger {
  */
 export interface BrowserRaster {
   kind: 'raster';
+  shapeId?: string;
   selector: string;
   name: string;
   box: Box;
@@ -60,6 +62,8 @@ export interface BrowserMeasureResult {
     docTitle: string;
   };
   sectionBox: Box;
+  /** the section as parsed, before measuring touched anything: what the round trip fingerprints */
+  tree: HtmlNode;
   shapes: BrowserElement[];
   entries: BrowserEntry[];
   fontFaces: BrowserFontFace[];
@@ -104,11 +108,14 @@ export function measureSlideDocument(): BrowserMeasureResult {
     return {
       meta: { id: '', title: docTitle, layout: 'Blank', section: undefined, heading: undefined, docTitle },
       sectionBox: { x: 0, y: 0, w: 0, h: 0 },
+      tree: { tag: 'section', attrs: {}, children: [] },
       shapes: [],
       entries: [],
       fontFaces: collectFontFaces(document.baseURI),
     };
   }
+
+  const tree = htmlTree(section);
 
   const sectionRect = section.getBoundingClientRect();
   const sectionBox: Box = { x: round(sectionRect.left), y: round(sectionRect.top), w: round(sectionRect.width), h: round(sectionRect.height) };
@@ -136,6 +143,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
   return {
     meta,
     sectionBox,
+    tree,
     shapes,
     entries,
     fontFaces: collectFontFaces(document.baseURI),
@@ -316,7 +324,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
     const selector = cssPath(el);
     const name = elementName(el);
     if (el.hasAttribute('data-raster')) {
-      return { kind: 'raster', selector, name, box: paintedExtent(el) };
+      return { kind: 'raster', ...shapeIdOf(el), selector, name, box: paintedExtent(el) };
     }
     const cs = getComputedStyle(el);
     const trigger = rasterTrigger(el, cs);
@@ -327,7 +335,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
       entries.push({ code: `FLATTEN_${trigger.suffix}`, selector, reason: `${trigger.decl} on ${name} cannot be applied to editable text`, params: { decl: trigger.decl } });
       return undefined;
     }
-    return { kind: 'raster', selector, name, box: paintedExtent(el), trigger };
+    return { kind: 'raster', ...shapeIdOf(el), selector, name, box: paintedExtent(el), trigger };
   }
 
   /** Whether any rendered text lives in the subtree: hidden branches and speaker notes do not count. */
@@ -518,6 +526,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
     const containerBox = withoutTransform(el, () => measuredBox(el));
     return [{
       kind: 'group',
+      ...shapeIdOf(el),
       selector: cssPath(el),
       name: elementName(el),
       box: transform ? transformedBoxAround(cs, containerBox, childBox, transform) : childBox,
@@ -920,12 +929,13 @@ export function measureSlideDocument(): BrowserMeasureResult {
     return factor >= 1 ? color : { hex: color.hex, alpha: round(color.alpha * factor) };
   }
 
-  type Frame = Pick<ShapeElement, 'selector' | 'name' | 'box' | 'rotation' | 'geometry' | 'line' | 'borders' | 'shadow'> & { scale: number };
+  type Frame = Pick<ShapeElement, 'shapeId' | 'selector' | 'name' | 'box' | 'rotation' | 'geometry' | 'line' | 'borders' | 'shadow'> & { scale: number };
 
   /** What shapes and pictures share: identity, transformed box, geometry, stroke and shadow. `box` is the untransformed border box. */
   function measureFrame(el: HTMLElement, cs: CSSStyleDeclaration, box: Box, transformValue: string): Frame {
     const transform = decomposeTransform(transformValue);
     const frame: Frame = {
+      ...shapeIdOf(el),
       selector: cssPath(el),
       name: elementName(el),
       box: transform ? transformedBox(cs, box, transform) : box,
@@ -1033,8 +1043,10 @@ export function measureSlideDocument(): BrowserMeasureResult {
       if (!svg.getAttribute('xmlns')) {
         svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
       }
+      // the payload is the drawing, not its place in the Deck: the box, class and round-trip locator stay in the HTML
       svg.removeAttribute('class');
       svg.removeAttribute('style');
+      svg.removeAttribute('data-shape-id');
       source = { kind: 'inline-svg', svg: new XMLSerializer().serializeToString(svg) };
       entries.push({ code: 'SUBSTITUTE_SVG_PICTURE', selector: frame.selector, reason: `inline svg ${frame.name} is emitted as a vector picture` });
     }
@@ -1274,6 +1286,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
 
     out.push({
       kind: 'table',
+      ...shapeIdOf(table),
       selector: cssPath(table),
       name: elementName(table),
       box: { x: round(tableRect.left - sectionRect.left), y: round(gridTop - sectionRect.top), w: round(tableRect.width), h: round(gridBottom - gridTop) },
@@ -2363,6 +2376,24 @@ export function measureSlideDocument(): BrowserMeasureResult {
     }
     const className = el.classList[0];
     return className ? `${tag}.${className}` : tag;
+  }
+
+  /** `data-shape-id` (spec 02): the identity of an element that came from a PPTX shape, carried to the round trip. */
+  function shapeIdOf(el: HTMLElement): { shapeId?: string } {
+    const id = el.getAttribute('data-shape-id');
+    return id ? { shapeId: id } : {};
+  }
+
+  /** The DOM as the round trip fingerprints it (roundtrip/fingerprint.ts): element names, attributes and text; comments dropped. */
+  function htmlTree(el: Element): HtmlNode {
+    const children: HtmlChild[] = [];
+    for (const node of Array.from(el.childNodes)) {
+      if (node.nodeType === Node.ELEMENT_NODE) children.push(htmlTree(node as Element));
+      else if (node.nodeType === Node.TEXT_NODE) children.push(node.textContent ?? '');
+    }
+    const attrs: Record<string, string> = {};
+    for (const attribute of Array.from(el.attributes)) attrs[attribute.name] = attribute.value;
+    return { tag: el.localName, attrs, children };
   }
 
   function cssPath(el: HTMLElement): string {

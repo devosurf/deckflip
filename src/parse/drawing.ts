@@ -35,9 +35,10 @@ export interface DrawingContext {
   media(rId: string): Promise<{ media: Media; raster: boolean } | undefined>;
 }
 
-/** The locator htmlout writes for a shape: `data-shape-id="<slide number>-<p:cNvPr id>"` (spec 02). */
-export function shapeSelector(nvPr: XmlNode | undefined, slide: number): string {
-  return `[data-shape-id="${slide}-${child(nvPr, 'p:cNvPr')?.attrs.id ?? ''}"]`;
+/** The locator htmlout writes for a shape, `data-shape-id="<slide number>-<p:cNvPr id>"` (spec 02), and the report selector matching it. */
+export function shapeIdentity(nvPr: XmlNode | undefined, slide: number): { shapeId: string; selector: string } {
+  const shapeId = `${slide}-${child(nvPr, 'p:cNvPr')?.attrs.id ?? ''}`;
+  return { shapeId, selector: `[data-shape-id="${shapeId}"]` };
 }
 
 export function shapeName(nvPr: XmlNode | undefined): string {

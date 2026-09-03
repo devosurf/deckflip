@@ -13,6 +13,17 @@ export interface HtmlDeck {
   html: string;
   /** `<name>.assets/`-relative path -> bytes */
   assets: Map<string, Uint8Array>;
+  /** what the written elements stand for beyond their own `data-shape-id`, per Slide (the manifest's `spids`) */
+  slides: HtmlSlide[];
+}
+
+export interface HtmlSlide {
+  /** the section id */
+  id: string;
+  /** the shape id of the background shape the section itself carries */
+  background?: string;
+  /** written `data-shape-id` -> every shape id the element stands for, in paint order */
+  merged: Record<string, string[]>;
 }
 
 export interface EmitHtmlOptions {
@@ -22,8 +33,13 @@ export interface EmitHtmlOptions {
 
 export function emitHtml(deck: Deck, opts: EmitHtmlOptions = {}): HtmlDeck {
   const ids = new Map(deck.slides.map((slide) => [slide.id, sectionId(slide)] as const));
-  const ctx: ElementContext = { sheet: new Stylesheet(ids), assetsDir: opts.assetsDir ?? 'deck.assets', assets: new Map() };
-  const sections = deck.slides.map((slide) => emitSlide(slide, ids.get(slide.id)!, ctx));
+  const ctx: Omit<ElementContext, 'merged'> = { sheet: new Stylesheet(ids), assetsDir: opts.assetsDir ?? 'deck.assets', assets: new Map() };
+  const slides: HtmlSlide[] = [];
+  const sections = deck.slides.map((slide) => {
+    const emitted = emitSlide(slide, ids.get(slide.id)!, { ...ctx, merged: new Map() });
+    slides.push(emitted.record);
+    return emitted.html;
+  });
   const html = [
     '<!doctype html>',
     `<html lang="${attr(deck.lang)}">`,
@@ -42,7 +58,7 @@ export function emitHtml(deck: Deck, opts: EmitHtmlOptions = {}): HtmlDeck {
     '</html>',
     '',
   ].join('\n');
-  return { html, assets: ctx.assets };
+  return { html, assets: ctx.assets, slides };
 }
 
 /**
@@ -64,7 +80,7 @@ function sectionId(slide: Slide): string {
   return id ?? slide.id;
 }
 
-function emitSlide(slide: Slide, id: string, ctx: ElementContext): string {
+function emitSlide(slide: Slide, id: string, ctx: ElementContext): { html: string; record: HtmlSlide } {
   const { shape, rest } = sectionBackground(slide);
   const attrs = [`id="${attr(id)}"`, `data-title="${attr(slide.name)}"`, `data-layout="${attr(slide.layout)}"`];
   if (slide.section !== undefined) {
@@ -75,5 +91,7 @@ function emitSlide(slide: Slide, id: string, ctx: ElementContext): string {
     attrs.push(`style="${css.join('; ')}"`);
   }
   const elements = elementsHtml(rest, { x: 0, y: 0 }, ctx);
-  return [`<section ${attrs.join(' ')}>`, ...elements, '</section>'].join('\n');
+  const html = [`<section ${attrs.join(' ')}>`, ...elements, '</section>'].join('\n');
+  const record: HtmlSlide = { id, ...(shape?.shapeId === undefined ? {} : { background: shape.shapeId }), merged: Object.fromEntries(ctx.merged) };
+  return { html, record };
 }

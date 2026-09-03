@@ -3,11 +3,14 @@ import { pxToEmu } from '../ooxml/emu.js';
 import { CT, REL, OpcPackage } from '../ooxml/opc.js';
 import { parseXml, el, serialize, type XmlNode } from '../ooxml/xml.js';
 import { MediaStore } from './media.js';
+import { emitPreservedPptx, type PreservedSource } from './preserved.js';
 import { emitSlide, slidePartName } from './slide.js';
 
 export interface EmitOptions {
   created?: Date;
   appVersion: string;
+  /** the round trip's source package and plan: the deck is emitted over it instead of the built-in master */
+  preserved?: PreservedSource;
 }
 
 const DEFAULT_DATE = new Date('1980-01-01T00:00:00.000Z');
@@ -65,8 +68,11 @@ const THEME_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 </a:theme>`;
 
 export async function emitPptx(deck: Deck, opts: EmitOptions): Promise<Buffer> {
-  const pkg = new OpcPackage();
   const created = opts.created ?? DEFAULT_DATE;
+  if (opts.preserved) {
+    return emitPreservedPptx(deck, opts.preserved, created);
+  }
+  const pkg = new OpcPackage();
   const slidePartById = new Map(deck.slides.map((slide) => [slide.id, slidePartName(slide.index)] as const));
 
   pkg.addRelationship('/', REL.officeDocument, 'ppt/presentation.xml');

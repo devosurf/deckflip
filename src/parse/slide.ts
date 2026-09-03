@@ -4,7 +4,7 @@
 
 import type { Element, GroupElement, Insets, Line, PictureElement, ShapeElement, Slide } from '../model/index.js';
 import type { XmlNode } from '../ooxml/xml.js';
-import { readFill, readGeometry, readLine, readShadow, readSrcRect, readTransform, shapeName, shapeSelector, type ColorScheme, type DrawingContext } from './drawing.js';
+import { readFill, readGeometry, readLine, readShadow, readSrcRect, readTransform, shapeIdentity, shapeName, type ColorScheme, type DrawingContext } from './drawing.js';
 import { readTable } from './table.js';
 import { readTextBody, type TextContext } from './text.js';
 import { exact, px } from './units.js';
@@ -98,7 +98,7 @@ async function readShape(sp: XmlNode, borders: ShapeElement['borders'], ctx: Sli
   const geometry = readGeometry(spPr, box, half);
   const shape: ShapeElement = {
     kind: 'shape',
-    selector: shapeSelector(nvSpPr, ctx.slide),
+    ...shapeIdentity(nvSpPr, ctx.slide),
     name: shapeName(nvSpPr),
     box,
     rotation,
@@ -147,7 +147,7 @@ async function readGroup(grpSp: XmlNode, ctx: SlideContext): Promise<GroupElemen
   const chExt = child(xfrm, 'a:chExt');
   return {
     kind: 'group',
-    selector: shapeSelector(nvGrpSpPr, ctx.slide),
+    ...shapeIdentity(nvGrpSpPr, ctx.slide),
     name: shapeName(nvGrpSpPr),
     box: frame,
     childBox: { x: px(chOff?.attrs.x), y: px(chOff?.attrs.y), w: px(chExt?.attrs.cx), h: px(chExt?.attrs.cy) },
@@ -170,7 +170,7 @@ async function readPicture(pic: XmlNode, ctx: SlideContext): Promise<PictureElem
   const picture: PictureElement = {
     kind: 'picture',
     ...(loaded.raster ? { source: 'raster' as const } : {}),
-    selector: shapeSelector(nvPicPr, ctx.slide),
+    ...shapeIdentity(nvPicPr, ctx.slide),
     name: shapeName(nvPicPr),
     box: frame,
     rotation,
