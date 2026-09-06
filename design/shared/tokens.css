@@ -15,6 +15,13 @@
 	--color-line: #24292f;
 	--color-line-strong: #333a43;
 
+	/* Light surfaces, for the paper-side iteration. Warm, printed, not blue. */
+	--color-sheet-50: #fbfaf7;
+	--color-sheet-100: #f4f2ec;
+	--color-sheet-200: #e9e6dd;
+	--color-rule: #ddd9cf;
+	--color-rule-strong: #c2bdb0;
+
 	/* Type */
 	--color-paper: #f4f6f8;
 	--color-mist-200: #c3cad3;
