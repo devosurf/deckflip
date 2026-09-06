@@ -363,10 +363,10 @@ function Hero() {
 					</h1>
 
 					<p className="mt-7 max-w-[660px] text-[17.5px] leading-[1.65] text-mist-400">
-						deckflip turns HTML slides into real PowerPoint shapes, text, pictures, tables and
-						groups — never screenshots. Convert a{" "}
-						<span className="text-mist-200">.pptx</span> the other way, edit the HTML, convert it
-						home: everything you didn't touch comes through byte for byte.
+						Slides come out as shapes and text boxes you can click into, not pictures of slides.
+						It goes the other way too: a <span className="text-mist-200">.pptx</span> becomes
+						HTML you can edit, and when you convert it back, whatever you left alone is
+						unchanged, byte for byte.
 					</p>
 
 					<div className="mt-9 w-full max-w-[560px]">
