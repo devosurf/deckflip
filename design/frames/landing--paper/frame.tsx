@@ -172,34 +172,32 @@ function Nav() {
 
 function Masthead() {
 	return (
-		<Shell className="pb-16 pt-24">
-			<div className="grid grid-cols-[1fr_300px] items-end gap-16">
-				<div>
-					<Label className="text-ember-600">Bidirectional HTML ↔ PPTX</Label>
-					<h1 className="mt-6 max-w-[900px] font-display text-[78px] font-semibold leading-[0.98] tracking-[-0.042em] text-ink-950">
-						HTML in.
-						<br />
-						Editable PowerPoint out.
-						<br />
-						<span className="text-ember-600">And back.</span>
-					</h1>
-					<p className="mt-8 max-w-[620px] text-[18px] leading-[1.6] text-[#4a5058]">
-						deckflip turns HTML slides into real PowerPoint shapes, text, pictures, tables and
-						groups — never screenshots. Convert a <span className="text-ink-950">.pptx</span> the
-						other way, edit the HTML, convert it home: everything you didn't touch comes through
-						byte for byte.
-					</p>
-				</div>
+		<Shell className="pb-16 pt-20">
+			<Label className="text-ember-600">Bidirectional HTML ↔ PPTX</Label>
+			<h1 className="mt-7 font-display text-[80px] font-semibold leading-[0.98] tracking-[-0.045em] text-ink-950">
+				HTML in.
+				<br />
+				Editable PowerPoint out.
+				<br />
+				<span className="text-ember-600">And back.</span>
+			</h1>
+
+			<div className="mt-12 grid grid-cols-[1fr_300px] items-start gap-20 border-t border-rule pt-8">
+				<p className="max-w-[640px] text-[18px] leading-[1.6] text-[#4a5058]">
+					deckflip turns HTML slides into real PowerPoint shapes, text, pictures, tables and groups —
+					never screenshots. Convert a <span className="text-ink-950">.pptx</span> the other way,
+					edit the HTML, convert it home: everything you didn't touch comes through byte for byte.
+				</p>
 
 				{/* the colophon — this is a spec sheet, so it has one */}
-				<dl className="pb-3">
+				<dl className="-mt-1">
 					{[
 						["Version", "0.1.0"],
 						["Runtime", "Node 20.16+"],
 						["Licence", "MIT"],
 						["Service", "None. Local only."],
 					].map(([k, v]) => (
-						<div key={k} className="flex justify-between border-b border-rule py-2.5">
+						<div key={k} className="flex justify-between border-b border-rule py-2.5 first:pt-0">
 							<dt className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-mist-600">
 								{k}
 							</dt>
@@ -209,7 +207,7 @@ function Masthead() {
 				</dl>
 			</div>
 
-			<div className="mt-11 flex items-center gap-4">
+			<div className="mt-10 flex items-center gap-4">
 				<Command className="w-[520px]" value="npx deckflip@latest convert deck.html -o deck.pptx" />
 				<span className="rounded-[10px] border border-rule-strong px-5 py-3.5 text-[13.5px] font-medium text-ink-950">
 					Read the docs
