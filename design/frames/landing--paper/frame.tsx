@@ -174,7 +174,7 @@ function Masthead() {
 	return (
 		<Shell className="pb-16 pt-20">
 			<Label className="text-ember-600">Bidirectional HTML ↔ PPTX</Label>
-			<h1 className="mt-7 font-display text-[80px] font-semibold leading-[0.98] tracking-[-0.045em] text-ink-950">
+			<h1 className="mt-7 font-display text-[80px] font-semibold leading-[0.98] tracking-[-0.045em] text-ink-950 text-left">
 				HTML in.
 				<br />
 				Editable PowerPoint out.
