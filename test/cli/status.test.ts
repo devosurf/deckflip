@@ -140,9 +140,12 @@ describe('CLI severity and strict-mode status', () => {
       <section><p style="filter: blur(1px)">Editable</p><div data-raster style="width: 20px; height: 20px; background: red"></div></section>
       </body></html>`);
     for (const [flags, expected] of [[[], 0], [['--strict'], 4]] as const) {
-      const output = join(dir, expected === 4 ? 'strict.pptx' : 'ordinary.pptx');
-      const converted = cli('convert', input, '-o', output, '--json', ...flags);
-      const report = await reportAt(`${output}.report.json`);
+      const mode = flags.length ? 'strict' : 'ordinary';
+      const output = join(dir, `${mode}.pptx`);
+      const destination = join(dir, mode, 'reports', 'conversion.json');
+      const converted = cli('convert', input, '-o', output, '--report', destination, '--json', ...flags);
+      const report = await reportAt(destination);
+      await expect(stat(`${output}.report.json`)).rejects.toMatchObject({ code: 'ENOENT' });
       expect(report.entries).toEqual(expect.arrayContaining([
         expect.objectContaining({ code: 'FLATTEN_CSS_FILTER', severity: 'warning' }),
         expect.objectContaining({ code: 'RASTER_EXPLICIT', severity: 'info' }),
@@ -162,11 +165,14 @@ describe('CLI severity and strict-mode status', () => {
     const input = join(dir, 'clean.html');
     await writeFile(input, '<!doctype html><html><body><section></section></body></html>');
     for (const flags of [[], ['--strict']]) {
-      const output = join(dir, 'clean.pptx');
-      const converted = cli('convert', input, '-o', output, '--json', ...flags);
+      const mode = flags.length ? 'strict' : 'ordinary';
+      const output = join(dir, `${mode}.pptx`);
+      const destination = join(dir, mode, 'reports', 'conversion.json');
+      const converted = cli('convert', input, '-o', output, '--report', destination, '--json', ...flags);
       expect(converted.status, converted.stderr).toBe(0);
       expect(JSON.parse(converted.stdout).entries).toEqual([]);
-      expect((await reportAt(`${output}.report.json`)).entries).toEqual([]);
+      expect(await reportAt(destination)).toEqual(JSON.parse(converted.stdout));
+      await expect(stat(`${output}.report.json`)).rejects.toMatchObject({ code: 'ENOENT' });
       expect((await readFile(output)).subarray(0, 4)).toEqual(Buffer.from([0x50, 0x4b, 0x03, 0x04]));
       const validated = cli('validate', input, '--json', ...flags);
       expect(validated.status, validated.stderr).toBe(0);
@@ -180,7 +186,13 @@ describe('CLI severity and strict-mode status', () => {
     await writeFile(input, '<!doctype html><html><body><section><iframe></iframe></section></body></html>');
     for (const flags of [[], ['--strict']]) {
       const output = join(dir, flags.length ? 'strict.pptx' : 'ordinary.pptx');
-      expect(cli('convert', input, '-o', output, ...flags).status).toBe(2);
+      const destination = join(dir, flags.length ? 'strict' : 'ordinary', 'reports', 'conversion.json');
+      const converted = cli('convert', input, '-o', output, '--report', destination, '--json', ...flags);
+      expect(converted.status, converted.stderr).toBe(2);
+      const report = await reportAt(destination);
+      expect(report.entries).toContainEqual(expect.objectContaining({ code: 'VALIDATE_ELEMENT', severity: 'error' }));
+      expect(JSON.parse(converted.stdout)).toEqual(report);
+      await expect(stat(`${output}.report.json`)).rejects.toMatchObject({ code: 'ENOENT' });
       await expect(stat(output)).rejects.toMatchObject({ code: 'ENOENT' });
       await writeFile(output, 'Existing Deck');
       expect(cli('convert', input, '-o', output, ...flags).status).toBe(2);
@@ -204,5 +216,41 @@ describe('CLI severity and strict-mode status', () => {
       }
     }
     expect((await readdir(dir)).sort()).toEqual(['malformed.pptx']);
+  });
+});
+
+describe('CLI conversion report destinations', () => {
+  it('writes the missing-font Conversion report to the requested nested destination in ordinary and strict mode', async () => {
+    const dir = await workspace();
+    const input = await missingFontPptx(dir);
+    for (const flags of [[], ['--strict']]) {
+      const mode = flags.length ? 'strict' : 'ordinary';
+      const output = join(dir, `${mode}.html`);
+      const destination = join(dir, mode, 'reports', 'conversion.json');
+      const result = cli('convert', input, '-o', output, '--report', destination, '--json', ...flags);
+      expect(result.status, result.stderr).toBe(2);
+      const report = await reportAt(destination);
+      expect(report.entries).toContainEqual(expect.objectContaining({ code: 'FONT_UNRESOLVED', severity: 'error' }));
+      expect(JSON.parse(result.stdout)).toEqual(report);
+      await expect(stat(`${output}.report.json`)).rejects.toMatchObject({ code: 'ENOENT' });
+    }
+  });
+
+  it('selects the requested report for successful PPTX conversion and strict nonfatal failure', async () => {
+    const dir = await workspace();
+    const input = join(dir, 'source.pptx');
+    await writeFile(input, await buildPptx());
+    for (const [flags, expected] of [[[], 0], [['--strict'], 4]] as const) {
+      const mode = flags.length ? 'strict' : 'ordinary';
+      const output = join(dir, `${mode}.html`);
+      const destination = join(dir, mode, 'reports', 'conversion.json');
+      const result = cli('convert', input, '-o', output, '--report', destination, '--json', ...flags);
+      expect(result.status, result.stderr).toBe(expected);
+      const report = await reportAt(destination);
+      expect(report.entries).toContainEqual(expect.objectContaining({ code: 'PRESERVE_OPAQUE_MASTER', severity: 'info' }));
+      expect(report.summary.errors).toBe(0);
+      expect(JSON.parse(result.stdout)).toEqual(report);
+      await expect(stat(`${output}.report.json`)).rejects.toMatchObject({ code: 'ENOENT' });
+    }
   });
 });

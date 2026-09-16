@@ -148,6 +148,7 @@ export async function validateHtml(input: string, opts: ValidateOptions): Promis
 
 export interface ConvertToHtmlOptions {
   output?: string;
+  report?: string;
   strict?: boolean;
 }
 
@@ -159,6 +160,7 @@ export interface ConvertToHtmlOptions {
  */
 export async function convertPptxToHtml(input: string, opts: ConvertToHtmlOptions = {}): Promise<{ report: Report; outputPath: string; assetsDir: string; exitCode: 0 | 2 | 4 }> {
   const outputPath = opts.output ?? replaceExtension(input, '.html');
+  const reportPath = opts.report ?? `${outputPath}.report.json`;
   const assetsDir = replaceExtension(outputPath, '.assets');
   const bytes = new Uint8Array(await readFile(input));
   const deck = await parsePptx(bytes);
@@ -169,7 +171,7 @@ export async function convertPptxToHtml(input: string, opts: ConvertToHtmlOption
   const base = { ...reportBase(input, outputPath, deck.canvas, undefined, 'convert'), input: { path: input, kind: 'pptx' as const }, output: { path: outputPath, kind: 'html' as const } };
   const report = buildReport(base, entries, deck.slides.length, native);
   if (hasError(entries)) {
-    await writeSidecar(report, `${outputPath}.report.json`);
+    await writeSidecar(report, reportPath);
     return { report, outputPath, assetsDir, exitCode: 2 };
   }
   const { html, assets, slides } = emitHtml(deck, { assetsDir: basename(assetsDir) });
@@ -185,7 +187,7 @@ export async function convertPptxToHtml(input: string, opts: ConvertToHtmlOption
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, data);
   }
-  await writeSidecar(report, `${outputPath}.report.json`);
+  await writeSidecar(report, reportPath);
   return { report, outputPath, assetsDir, exitCode: opts.strict && report.entries.length > 0 ? 4 : 0 };
 }
 

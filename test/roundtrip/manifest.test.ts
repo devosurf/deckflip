@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -72,5 +72,22 @@ describe('convertPptxToHtml round-trip attachment', () => {
     // the slide fingerprint covers the section shell (title, layout, section, style, notes), not its children
     expect(manifest.slides[0].fingerprint).toBe(manifest.slides[2].fingerprint);
     expect(manifest.slides[0].fingerprint).not.toBe(manifest.slides[1].fingerprint);
+  });
+
+  it('honors a report destination without overwriting or removing an existing default sidecar', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'deckflip-report-'));
+    try {
+      const input = join(dir, 'deck.pptx');
+      const output = join(dir, 'deck.html');
+      const destination = join(dir, 'reports', 'nested', 'conversion.json');
+      await writeFile(input, await buildPptx());
+      await writeFile(`${output}.report.json`, 'Existing unrelated report');
+      const result = await convertPptxToHtml(input, { output, report: destination });
+      expect(result.exitCode).toBe(0);
+      expect(JSON.parse(await readFile(destination, 'utf8'))).toEqual(result.report);
+      expect(await readFile(`${output}.report.json`, 'utf8')).toBe('Existing unrelated report');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

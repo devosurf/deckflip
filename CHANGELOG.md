@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Honor `--report` for PPTX-to-HTML conversion, including nested destinations and validation failures, without also writing the default sidecar (#28).
 - Honor validation errors before Strict mode for both input kinds: exit 2 with a diagnostic report and no converted Deck or new Asset directory, preserving existing destinations. PPTX-to-HTML now honors Strict mode for nonfatal reports, retaining output and returning 4 (#26).
 - Preserve visible inline text before and after block children as editable native text, in source order, with measured placement and run styling (#24).
 - Exclude hidden descendants from native text runs and line metrics, including inside pure inline Text blocks.

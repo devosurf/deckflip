@@ -26,7 +26,7 @@ Run-scoped settings are flags; Deck-intrinsic settings live in deck metadata. No
 Validation errors take precedence over Strict mode for both input kinds and both `convert` and `validate`: exit 2, with a diagnostic report available. Failed conversion does not create a converted Deck or Asset directory and leaves any existing destination Deck/assets unchanged. Otherwise, a nonempty report returns 4 under Strict mode and 0 without it; successful conversion output remains available. Clean operations return 0 in either mode.
 
 ## Conversion report
-Always written as a sidecar `<output>.report.json`; `--json` puts the same document on stdout; human summary on stderr (one line per Slide with counts, then one line per entry). Schema:
+Always written as a sidecar `<output>.report.json` unless `--report <path>` selects another destination. Both conversion directions honor the selected destination on success, Strict-mode failure, and validation failure, creating missing parent directories. An override does not also write the default sidecar or remove pre-existing unrelated files. `--json` puts the same document on stdout; human summary on stderr (one line per Slide with counts, then one line per entry). Schema:
 
 ```json
 {

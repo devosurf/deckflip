@@ -131,6 +131,7 @@ async function handleConvert(input: string, options: ConvertCliOptions): Promise
     inputKind === 'pptx'
       ? await convertPptxToHtml(input, {
           ...(options.output === undefined ? {} : { output: options.output }),
+          ...(options.report === undefined ? {} : { report: options.report }),
           strict: options.strict,
         })
       : await convertHtmlToPptx(input, {
