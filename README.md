@@ -48,7 +48,8 @@ The skill documents the `validate -> convert --strict -> render -> inspect` loop
 - Text, shapes, pictures, lists, tables, and groups are emitted as native PowerPoint elements when representable.
 - Unsupported visual effects on text-free elements are rasterised; unsupported effects on text are flattened so the text remains editable.
 - Every rasterised, flattened, substituted, dropped, preserved, or overridden construct is recorded in a machine-readable Conversion report.
-- Strict mode returns a non-zero exit code when the report is non-empty while still writing the output.
+- Validation errors return exit 2 with a diagnostic report, without creating or replacing the converted Deck or its Asset directory.
+- Otherwise, Strict mode returns exit 4 when the report is non-empty while retaining the output; successful non-strict operations return 0.
 - Part ordering, relationship IDs, media names, timestamps, and capture paths are deterministic.
 
 See [`skills/deckflip/SKILL.md`](skills/deckflip/SKILL.md) for authoring guidance and [`docs/spec`](docs/spec) for the format and architecture specifications.

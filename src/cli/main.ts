@@ -129,7 +129,10 @@ async function handleConvert(input: string, options: ConvertCliOptions): Promise
   }
   const result =
     inputKind === 'pptx'
-      ? await convertPptxToHtml(input, options.output === undefined ? {} : { output: options.output })
+      ? await convertPptxToHtml(input, {
+          ...(options.output === undefined ? {} : { output: options.output }),
+          strict: options.strict,
+        })
       : await convertHtmlToPptx(input, {
           ...(options.output === undefined ? {} : { output: options.output }),
           ...(options.size === undefined ? {} : { size: options.size }),
@@ -168,7 +171,7 @@ async function handleValidate(input: string, options: ValidateCliOptions): Promi
   if (!options.quiet) {
     await printSummary(result.report, options.color !== false);
   }
-  return options.strict && result.report.entries.length > 0 ? 4 : result.exitCode;
+  return result.exitCode === 0 && options.strict && result.report.entries.length > 0 ? 4 : result.exitCode;
 }
 
 async function handleRender(input: string, options: RenderCliOptions): Promise<number> {

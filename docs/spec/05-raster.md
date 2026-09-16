@@ -18,7 +18,7 @@ Decided in [#13](https://github.com/devosurf/deckflip/issues/13).
 
 ## Text inside a rasterised region
 
-Not by the tool's choice: #11 makes any implicit raster text-free. The author can opt in with **`data-raster`** on any element, which rasterises that subtree text and all, entry `RASTER_EXPLICIT` (kind `rasterised`, severity `info`, so `--strict` does not fail on a deliberate choice). Use cases: an HTML-built chart, a diagram with effects, a logo lock-up. `inspect` marks such pictures `source: "raster"`, `explicit: true`.
+Not by the tool's choice: #11 makes any implicit raster text-free. The author can opt in with **`data-raster`** on any element, which rasterises that subtree text and all, entry `RASTER_EXPLICIT` (kind `rasterised`, severity `info`; like every Report entry, it makes `--strict` return 4 while retaining output). Use cases: an HTML-built chart, a diagram with effects, a logo lock-up. `inspect` marks such pictures `source: "raster"`, `explicit: true`.
 
 `validate` refuses `data-raster` on a `section` (`VALIDATE_RASTER_SLIDE`, error): a fully rasterised Slide is a screenshot, which is what this tool exists to avoid; the hint points at `render` if a PNG is what the user wants.
 

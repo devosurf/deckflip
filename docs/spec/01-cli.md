@@ -23,6 +23,8 @@ Run-scoped settings are flags; Deck-intrinsic settings live in deck metadata. No
 ## Exit codes
 `0` success (report entries allowed) · `1` no output produced (internal/renderer/Chromium failure, unreadable PPTX) · `2` validation failed, nothing converted · `3` bad invocation · `4` Strict mode: output and report written but the report is non-empty.
 
+Validation errors take precedence over Strict mode for both input kinds and both `convert` and `validate`: exit 2, with a diagnostic report available. Failed conversion does not create a converted Deck or Asset directory and leaves any existing destination Deck/assets unchanged. Otherwise, a nonempty report returns 4 under Strict mode and 0 without it; successful conversion output remains available. Clean operations return 0 in either mode.
+
 ## Conversion report
 Always written as a sidecar `<output>.report.json`; `--json` puts the same document on stdout; human summary on stderr (one line per Slide with counts, then one line per entry). Schema:
 

@@ -148,6 +148,7 @@ export async function validateHtml(input: string, opts: ValidateOptions): Promis
 
 export interface ConvertToHtmlOptions {
   output?: string;
+  strict?: boolean;
 }
 
 /**
@@ -156,7 +157,7 @@ export interface ConvertToHtmlOptions {
  * baseline correction the emitter applied. Report entries from font resolution are the report. The Asset
  * directory keeps the input verbatim as `source.pptx` and the manifest the way back splices from.
  */
-export async function convertPptxToHtml(input: string, opts: ConvertToHtmlOptions = {}): Promise<{ report: Report; outputPath: string; assetsDir: string; exitCode: 0 }> {
+export async function convertPptxToHtml(input: string, opts: ConvertToHtmlOptions = {}): Promise<{ report: Report; outputPath: string; assetsDir: string; exitCode: 0 | 2 | 4 }> {
   const outputPath = opts.output ?? replaceExtension(input, '.html');
   const assetsDir = replaceExtension(outputPath, '.assets');
   const bytes = new Uint8Array(await readFile(input));
@@ -164,6 +165,13 @@ export async function convertPptxToHtml(input: string, opts: ConvertToHtmlOption
   const source = await indexSource(await OpcReader.load(bytes));
   const catalog = await FontCatalog.scan({ extraFiles: [] });
   const entries = [...resolveDeckFonts(deck, catalog, { embedFonts: false }), ...sourceEntries(deck, source)];
+  const native = deck.slides.reduce((n, slide) => n + slide.elements.length, 0);
+  const base = { ...reportBase(input, outputPath, deck.canvas, undefined, 'convert'), input: { path: input, kind: 'pptx' as const }, output: { path: outputPath, kind: 'html' as const } };
+  const report = buildReport(base, entries, deck.slides.length, native);
+  if (hasError(entries)) {
+    await writeSidecar(report, `${outputPath}.report.json`);
+    return { report, outputPath, assetsDir, exitCode: 2 };
+  }
   const { html, assets, slides } = emitHtml(deck, { assetsDir: basename(assetsDir) });
   const manifest = buildManifest(html, slides, source, sha256(bytes));
 
@@ -177,15 +185,12 @@ export async function convertPptxToHtml(input: string, opts: ConvertToHtmlOption
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, data);
   }
-  const native = deck.slides.reduce((n, slide) => n + slide.elements.length, 0);
-  const base = { ...reportBase(input, outputPath, deck.canvas, undefined, 'convert'), input: { path: input, kind: 'pptx' as const }, output: { path: outputPath, kind: 'html' as const } };
-  const report = buildReport(base, entries, deck.slides.length, native);
   await writeSidecar(report, `${outputPath}.report.json`);
-  return { report, outputPath, assetsDir, exitCode: 0 };
+  return { report, outputPath, assetsDir, exitCode: opts.strict && report.entries.length > 0 ? 4 : 0 };
 }
 
 /** `validate deck.pptx` (spec 01): the package parses, and the report lists what a round trip would carry opaquely. */
-export async function validatePptx(input: string, opts: { report?: string } = {}): Promise<{ report: Report; exitCode: 0 }> {
+export async function validatePptx(input: string, opts: { report?: string } = {}): Promise<{ report: Report; exitCode: 0 | 2 }> {
   const bytes = new Uint8Array(await readFile(input));
   const deck = await parsePptx(bytes);
   const source = await indexSource(await OpcReader.load(bytes));
@@ -195,5 +200,5 @@ export async function validatePptx(input: string, opts: { report?: string } = {}
   const base = { ...reportBase(input, undefined, deck.canvas, undefined, 'validate'), input: { path: input, kind: 'pptx' as const } };
   const report = buildReport(base, entries, deck.slides.length, native);
   if (opts.report !== undefined) await writeSidecar(report, opts.report);
-  return { report, exitCode: 0 };
+  return { report, exitCode: hasError(entries) ? 2 : 0 };
 }

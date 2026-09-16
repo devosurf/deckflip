@@ -37,7 +37,7 @@ One item in the Conversion report: a stable code, what happened (rasterised, fla
 _Avoid_: Warning, issue, finding
 
 **Strict mode**:
-A conversion run that treats any Report entry as a failure while still producing the output and the report.
+A conversion or validation run that treats any Report entry as a failure. Successful conversion output and the Conversion report remain available for nonfatal entries; validation errors prevent conversion regardless of mode.
 _Avoid_: Fail-on-warning, pedantic mode
 
 **Deck file**:
