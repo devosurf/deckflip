@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="deckflip:canvas" content="1280x720">
+<title>Mixed inline and block text</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font: 24px/32px Arial; color: #172033; }
+  section { padding: 48px; background: #fff; }
+  .card { width: 520px; padding: 20px; background: #f1f5f9; }
+  p { margin: 16px 0; }
+  b { color: #2459a9; }
+  .nested { padding: 12px 20px; background: #e0e7ef; }
+  .right { position: absolute; left: 640px; top: 48px; width: 520px; text-align: right; }
+  .center { margin-top: 28px; width: 700px; text-align: center; }
+  .flex { display: flex; align-items: center; gap: 28px; height: 120px; }
+  .grid { display: grid; grid-template-columns: 260px 260px 260px; align-items: center; gap: 28px; height: 200px; }
+  .continuation { position: relative; margin-top: 40px; height: 180px; }
+  .continuation p { position: absolute; left: 80px; top: 64px; }
+</style>
+</head>
+<body>
+<section>
+  <div class="card">Leading text and <b>bold inline words wrap together</b> before the first block. The next sentence makes another measured line.<p>A separate paragraph stays editable and keeps its margins.</p><i>Trailing inline text</i> wraps onto another line without being lost or duplicated.<div class="nested">Nested leading text with <b>its own styling</b>.<p>Nested paragraph.</p>Nested trailing text.</div>Final direct text.</div>
+  <div class="right"><span>Right aligned inline content wraps at the container edge, not at an ink-sized box.</span><p>Right aligned paragraph.</p><span>Trailing words remain right aligned too.</span></div>
+</section>
+<section>
+  <div><span>INLINE_SENTINEL</span><p>BODY_SENTINEL</p></div>
+  <div class="center">Centered leading text and <b>styled words</b> wrap as one anonymous Text block before the paragraph.<p>Centered block content.</p>Centered trailing text retains its line placement and wrapping width.</div>
+</section>
+<section>
+  <div class="flex">Leading flex text<p>Flex block</p>Trailing flex text</div>
+  <div class="grid">Leading grid text wraps within its anonymous item without adding grid cells.<p>Grid block</p>Trailing grid text stays in the third column and keeps its measured line breaks.</div>
+  <div class="continuation">Before the out-of-flow block. <p>Positioned block.</p>After the out-of-flow block.</div>
+</section>
+</body>
+</html>

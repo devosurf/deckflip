@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Preserve visible inline text before and after block children as editable native text, in source order, with measured placement and run styling (#24).
+- Exclude hidden descendants from native text runs and line metrics, including inside pure inline Text blocks.
+
 ## 0.1.1 - 2026-09-03
 
 ### Fixed

@@ -136,13 +136,11 @@ export function measureSlideDocument(): BrowserMeasureResult {
   const entries: BrowserEntry[] = [];
   validateDocument(section);
   // Spec 03 rule 3 applies to the Slide too: a section with a background, border or shadow paints a full-Canvas
-  // shape behind everything else. Its text always belongs to descendants, so the shape is text-free.
+  // shape behind everything else. Anonymous inline content is measured separately from that background.
   if (paintsBox(section)) {
     shapes.push(makeShape(section, measuredBox(section)));
   }
-  for (const child of Array.from(section.children) as HTMLElement[]) {
-    shapes.push(...walkElement(child));
-  }
+  shapes.push(...walkContents(section));
   return {
     meta,
     sectionBox,
@@ -368,7 +366,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
   /** Whether any rendered text lives in the subtree: hidden branches and speaker notes do not count. */
   function bearsText(el: HTMLElement): boolean {
     for (const node of Array.from(el.childNodes)) {
-      if (node.nodeType === Node.TEXT_NODE && (node.textContent ?? '').replace(/[\s\u00AD\u200B\u200C\u200D]/g, '') !== '') {
+      if (node.nodeType === Node.TEXT_NODE && hasVisibleText(node.textContent ?? '')) {
         return true;
       }
       if (node.nodeType === Node.ELEMENT_NODE && !isSkipped(node as HTMLElement) && bearsText(node as HTMLElement)) {
@@ -376,6 +374,10 @@ export function measureSlideDocument(): BrowserMeasureResult {
       }
     }
     return false;
+  }
+
+  function hasVisibleText(text: string): boolean {
+    return text.replace(/[\s\u00AD\u200B\u200C\u200D]/g, '') !== '';
   }
 
   /** The first trigger in spec order (08-report-codes.md, RASTER_*), or undefined when everything maps natively. */
@@ -591,11 +593,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
     }
     const info = analyze(el);
     if (!info.selfPaint) {
-      const nested: BrowserElement[] = [];
-      for (const child of Array.from(el.children) as HTMLElement[]) {
-        nested.push(...walkElement(child));
-      }
-      return nested;
+      return walkContents(el);
     }
 
     // The element's own transform is disabled while it is measured: DrawingML wants the untransformed box plus
@@ -612,20 +610,10 @@ export function measureSlideDocument(): BrowserMeasureResult {
 
     if (info.selfTextBlock) {
       const measured = withoutTransform(el, () => measureTextBlock(el));
-      // PowerPoint has no inline pictures: an img inside a Text block is emitted on top of the text at its own box.
-      const inlinePictures: BrowserElement[] = [];
-      for (const img of Array.from(el.querySelectorAll('img')) as HTMLElement[]) {
-        if (!isSkipped(img)) {
-          const picture = measurePictureUntransformed(img);
-          if (picture) {
-            inlinePictures.push(picture);
-          }
-        }
-      }
-      return [makeShape(el, measured.box, measured.text), ...inlinePictures];
+      return [makeShape(el, measured.box, measured.text), ...measureInlinePictures(el)];
     }
 
-    if (info.textBlockDescendants === 1 && info.paintableDescendants === 1) {
+    if (!info.hasInlineText && info.textBlockDescendants === 1 && info.paintableDescendants === 1) {
       const textEl = findUniqueTextBlockDescendant(el);
       if (textEl) {
         const measured = withoutTransform(el, () => {
@@ -637,11 +625,69 @@ export function measureSlideDocument(): BrowserMeasureResult {
     }
 
     const box = withoutTransform(el, () => measuredBox(el));
-    const nested: BrowserElement[] = [];
-    for (const child of Array.from(el.children) as HTMLElement[]) {
-      nested.push(...walkElement(child));
+    return [makeShape(el, box), ...walkContents(el)];
+  }
+
+  /** Anonymous inline sequences own their text; block children keep their own painting/identity paths. */
+  function walkContents(el: HTMLElement): BrowserElement[] {
+    const out: BrowserElement[] = [];
+    let first: ChildNode | undefined;
+    let last: ChildNode | undefined;
+    function flush(): void {
+      if (!first || !last) return;
+      const range = document.createRange();
+      range.setStartBefore(first);
+      range.setEndAfter(last);
+      const cs = getComputedStyle(el);
+      const transform = decomposeTransform(cs.transform);
+      const measured = withoutTransform(el, () => ({ ...measureTextBlock(el, range), origin: measuredBox(el) }));
+      if (measured.text?.paragraphs.some((paragraph) => paragraph.runs.some((run) => run.kind === 'text' && hasVisibleText(run.text)))) {
+        const shape: BrowserShape = {
+          kind: 'shape', selector: cssPath(el), name: elementName(el),
+          box: transform ? transformedBoxAround(cs, measured.origin, measured.box, transform) : measured.box,
+          rotation: transform?.rotation ?? 0, geometry: { preset: 'rect' }, text: measured.text,
+        };
+        finishShape(el, shape, transform?.scale ?? 1);
+        out.push(shape);
+      }
+      out.push(...measureInlinePictures(el, range));
+      first = last = undefined;
     }
-    return [makeShape(el, box), ...nested];
+    for (const node of Array.from(el.childNodes)) {
+      if (node.nodeType === Node.ELEMENT_NODE && isSkipped(node as HTMLElement)) continue;
+      if (node.nodeType === Node.TEXT_NODE || (node.nodeType === Node.ELEMENT_NODE && isInlineContent(node as HTMLElement))) {
+        first ??= node;
+        last = node;
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        flush();
+        out.push(...walkElement(node as HTMLElement));
+      }
+    }
+    flush();
+    return out;
+  }
+
+  function isInlineContent(el: HTMLElement): boolean {
+    if ((isPictureElement(el) && el.tagName !== 'IMG') || el.tagName === 'VIDEO' || el.tagName === 'AUDIO') return false;
+    if (!isInlineRendered(el) || el.hasAttribute('data-raster') || el.hasAttribute('data-preserve')) return false;
+    // Effects need walkElement's raster/flatten decision and located Report entry.
+    if (rasterTrigger(el, getComputedStyle(el))) return false;
+    return Array.from(el.children).every((child) => isSkipped(child as HTMLElement) || isInlineContent(child as HTMLElement));
+  }
+
+  /** Inline pictures stay separate from the native text body, at their own measured boxes. */
+  function measureInlinePictures(el: HTMLElement, range?: Range): BrowserElement[] {
+    const pictures: BrowserElement[] = [];
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_ELEMENT, textFilter(el, false, range));
+    let node = walker.nextNode();
+    while (node) {
+      if ((node as HTMLElement).tagName === 'IMG') {
+        const picture = measurePictureUntransformed(node as HTMLElement);
+        if (picture) pictures.push(picture);
+      }
+      node = walker.nextNode();
+    }
+    return pictures;
   }
 
   function withoutTransform<T>(el: HTMLElement, measure: () => T): T {
@@ -659,24 +705,30 @@ export function measureSlideDocument(): BrowserMeasureResult {
     }
   }
 
-  function analyze(el: HTMLElement): { selfPaint: boolean; selfTextBlock: boolean; paintableDescendants: number; textBlockDescendants: number } {
+  function analyze(el: HTMLElement): { selfPaint: boolean; selfTextBlock: boolean; paintableDescendants: number; textBlockDescendants: number; hasInlineText: boolean } {
     if (isSkipped(el)) {
-      return { selfPaint: false, selfTextBlock: false, paintableDescendants: 0, textBlockDescendants: 0 };
+      return { selfPaint: false, selfTextBlock: false, paintableDescendants: 0, textBlockDescendants: 0, hasInlineText: false };
     }
     const picture = isPictureElement(el);
     const selfTextBlock = !picture && isTextBlock(el);
     const selfPaint = picture || selfTextBlock || paints(el);
     let paintableDescendants = 0;
     let textBlockDescendants = 0;
+    let hasInlineText = false;
     // Text blocks and pictures are leaves of the shape tree: their descendants never emit shapes.
     if (!selfTextBlock && !picture) {
+      // Text outside a recognized block prevents adoption, including text owned by a nested container.
+      hasInlineText = Array.from(el.childNodes).some((node) =>
+        node.nodeType === Node.TEXT_NODE ? hasVisibleText(node.textContent ?? '')
+          : node.nodeType === Node.ELEMENT_NODE && !isSkipped(node as HTMLElement) && isInlineContent(node as HTMLElement) && bearsText(node as HTMLElement));
       for (const child of Array.from(el.children) as HTMLElement[]) {
         const childInfo = analyze(child);
         paintableDescendants += childInfo.paintableDescendants + (childInfo.selfPaint ? 1 : 0);
         textBlockDescendants += childInfo.textBlockDescendants + (childInfo.selfTextBlock ? 1 : 0);
+        hasInlineText ||= childInfo.hasInlineText;
       }
     }
-    return { selfPaint, selfTextBlock, paintableDescendants, textBlockDescendants };
+    return { selfPaint, selfTextBlock, paintableDescendants, textBlockDescendants, hasInlineText };
   }
 
   /** `img`, or an inline `svg` root (whose tagName is lower-case in an HTML document). */
@@ -1013,13 +1065,17 @@ export function measureSlideDocument(): BrowserMeasureResult {
     if (el.getAttribute('data-preserve') === 'text-effects') {
       shape.preserve = 'text-effects';
     }
+    finishShape(el, shape, scale);
+    return shape;
+  }
+
+  function finishShape(el: HTMLElement, shape: BrowserShape, scale: number): void {
     scaleShape(shape, scale);
     const opacity = effectiveOpacity(el);
     if (opacity < 1) {
       applyOpacity(shape, opacity);
       entries.push({ code: 'SUBSTITUTE_OPACITY', selector: shape.selector, reason: `opacity ${round(opacity)} on ${shape.name} folded into fill, line and text alpha` });
     }
-    return shape;
   }
 
   /**
@@ -1575,8 +1631,8 @@ export function measureSlideDocument(): BrowserMeasureResult {
     }
   }
 
-  function measureTextBlock(el: HTMLElement): { box: Box; text: TextBody | undefined } {
-    if (el.tagName === 'UL' || el.tagName === 'OL') {
+  function measureTextBlock(el: HTMLElement, range?: Range): { box: Box; text: TextBody | undefined } {
+    if (!range && (el.tagName === 'UL' || el.tagName === 'OL')) {
       return measureListBlock(el);
     }
     const cs = getComputedStyle(el);
@@ -1587,14 +1643,19 @@ export function measureSlideDocument(): BrowserMeasureResult {
     const wrap = whiteSpace !== 'nowrap' && whiteSpace !== 'pre';
     const align = resolveAlign(cs.textAlign, rtl);
     const indent = px(cs.textIndent);
-    const runs = mergeRuns(collectRuns(el, whiteSpace));
+    const runs = mergeRuns(collectRuns(el, whiteSpace, false, range));
     const paragraphs = buildParagraphs(el, runs, align, indent);
-    const lineGroups = measureLineGroups(el);
-    const lineBox = measureLineBox(el);
+    const lineGroups = measureLineGroups(el, false, range);
+    // Direct text in flex/grid is an anonymous item: inline probes would become extra layout items.
+    const item = range && /^(inline-)?(flex|grid)$/.test(cs.display) && lineGroups.length > 0;
+    const lineBox = item ? measureItemLines(el, lineGroups) : measureLineBox(el, null, range);
     const rect = el.getBoundingClientRect();
     const contentTop = rect.top + px(cs.borderTopWidth) + padding.t;
     const contentBottom = rect.bottom - px(cs.borderBottomWidth) - padding.b;
-    const availWidth = rect.width - px(cs.borderLeftWidth) - px(cs.borderRightWidth) - padding.l - padding.r;
+    const contentLeft = item ? Math.min(...lineGroups.map((line) => line.left)) : rect.left + px(cs.borderLeftWidth) + padding.l;
+    const availWidth = item
+      ? Math.max(...lineGroups.map((line) => line.right)) - contentLeft
+      : rect.width - px(cs.borderLeftWidth) - px(cs.borderRightWidth) - padding.l - padding.r;
 
     const text: TextBody = {
       padding,
@@ -1603,7 +1664,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
       wrap,
       rtl,
       // a block that never wraps has no wrap width to guard; PowerPoint's `wrap="none"` lays the line out regardless
-      trailingGuard: wrap ? resolveTrailingGuard(lineGroups, availWidth, align, { el, skipNestedLists: false }) : 0,
+      trailingGuard: wrap ? resolveTrailingGuard(lineGroups, availWidth, align, item ? undefined : { el, skipNestedLists: false, ...(range ? { range } : {}) }) : 0,
       paragraphs: paragraphs.length ? paragraphs : [{ align, lineHeight: 0, spaceBefore: 0, spaceAfter: 0, indent, marginLeft: 0, level: 0, runs: runs.length ? runs : [{ kind: 'text', text: '', style: styleFromElement(el) }] }],
     };
 
@@ -1611,8 +1672,46 @@ export function measureSlideDocument(): BrowserMeasureResult {
     for (const paragraph of text.paragraphs) {
       paragraph.lineHeight = lineHeight;
     }
+    if (range && lineBox) {
+      box.x = round(contentLeft - sectionRect.left);
+      box.y = round(lineBox.firstTop - sectionRect.top);
+      box.w = round(availWidth);
+      box.h = round(lineBox.lastBottom - lineBox.firstTop);
+      text.padding = { l: 0, t: 0, r: 0, b: 0 };
+      text.firstParagraphGap = text.lastParagraphGap = 0;
+      const firstLine = lineGroups[0];
+      if (firstLine && !item) {
+        if (align === 'l' || align === 'just') {
+          text.paragraphs[0]!.indent = round(firstLine.left - contentLeft);
+        } else if (lineGroups.length === 1) {
+          // A fragment can share a line with text on the other side of an out-of-flow child.
+          box.w = round(align === 'r' ? firstLine.right - contentLeft : firstLine.left + firstLine.right - 2 * contentLeft);
+        }
+      }
+    }
 
     return { box, text };
+  }
+
+  /** Measure the inherited line strut out of flow, without inserting flex/grid items or moving the text. */
+  function measureItemLines(el: HTMLElement, lines: LineGroup[]): { firstTop: number; height: number; lastBottom: number } {
+    const probe = document.createElement('span');
+    probe.style.cssText = 'all:initial;position:absolute;display:block;font:inherit;line-height:inherit;white-space:pre;';
+    probe.textContent = 'M';
+    el.append(probe);
+    let height: number;
+    try {
+      height = probe.getBoundingClientRect().height;
+    } finally {
+      probe.remove();
+    }
+    const first = lines[0]!;
+    const last = lines[lines.length - 1]!;
+    return {
+      firstTop: first.top - (height - first.height) / 2,
+      height,
+      lastBottom: last.bottom + (height - last.height) / 2,
+    };
   }
 
   /**
@@ -1860,7 +1959,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
   }
 
   function firstTextLeft(root: HTMLElement): number | undefined {
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, nestedListFilter(root));
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, textFilter(root, true));
     let node = walker.nextNode();
     while (node) {
       const range = document.createRange();
@@ -1875,27 +1974,15 @@ export function measureSlideDocument(): BrowserMeasureResult {
     return undefined;
   }
 
-  /** TreeWalker filter that leaves nested lists to their own paragraphs. */
-  function nestedListFilter(root: HTMLElement): NodeFilter {
-    return {
-      acceptNode(node: Node): number {
-        for (let current: Node | null = node; current && current !== root; current = current.parentNode) {
-          if (current.nodeType === Node.ELEMENT_NODE && ((current as Element).tagName === 'UL' || (current as Element).tagName === 'OL')) {
-            return NodeFilter.FILTER_REJECT;
-          }
-        }
-        return NodeFilter.FILTER_ACCEPT;
-      },
-    };
-  }
 
   /**
    * Line-box geometry of the first and last line, measured with zero-size inline-block probes:
    * `vertical-align: top|bottom` pins a probe to the line box edges, which text-node rects
    * (content area only) cannot give. Probes are zero-width so they never change wrapping.
    * `endBefore` places the last-line probe in front of that child (a nested list) instead of at the end.
+   * A range, when supplied, has both boundaries between direct children of `el`.
    */
-  function measureLineBox(el: HTMLElement, endBefore: Node | null = null): { firstTop: number; height: number; lastBottom: number } | undefined {
+  function measureLineBox(el: HTMLElement, endBefore: Node | null = null, range?: Range): { firstTop: number; height: number; lastBottom: number } | undefined {
     if (!el.firstChild) {
       return undefined;
     }
@@ -1908,9 +1995,11 @@ export function measureSlideDocument(): BrowserMeasureResult {
     const startTop = probe('top');
     const startBottom = probe('bottom');
     const endBottom = probe('bottom');
-    el.insertBefore(startBottom, el.firstChild);
-    el.insertBefore(startTop, el.firstChild);
-    el.insertBefore(endBottom, endBefore);
+    const start = range ? el.childNodes[range.startOffset] ?? null : el.firstChild;
+    const end = range ? el.childNodes[range.endOffset] ?? null : endBefore;
+    el.insertBefore(startBottom, start);
+    el.insertBefore(startTop, start);
+    el.insertBefore(endBottom, end);
     const firstTop = startTop.getBoundingClientRect().top;
     const firstBottom = startBottom.getBoundingClientRect().bottom;
     const lastBottom = endBottom.getBoundingClientRect().bottom;
@@ -1929,9 +2018,9 @@ export function measureSlideDocument(): BrowserMeasureResult {
   }
 
   /** Ink extents per line: text-node rects merged when they overlap vertically (mixed sizes share a line). */
-  function measureLineGroups(root: HTMLElement, skipNestedLists = false): LineGroup[] {
+  function measureLineGroups(root: HTMLElement, skipNestedLists = false, range?: Range): LineGroup[] {
     const rects: DOMRect[] = [];
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, skipNestedLists ? nestedListFilter(root) : null);
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, textFilter(root, skipNestedLists, range));
     let node = walker.nextNode();
     while (node) {
       const range = document.createRange();
@@ -1965,10 +2054,10 @@ export function measureSlideDocument(): BrowserMeasureResult {
    * gets 1 px more (0.5 per side when centred) in case its advances come out wider. Negative: the block's breaks
    * change when Chromium gets 0.5 px more, so PowerPoint (whose advances may come out narrower) gets 1 px less.
    */
-  function resolveTrailingGuard(groups: LineGroup[], availWidth: number, align: Align, block?: { el: HTMLElement; skipNestedLists: boolean }): number {
+  function resolveTrailingGuard(groups: LineGroup[], availWidth: number, align: Align, block?: { el: HTMLElement; skipNestedLists: boolean; range?: Range }): number {
     if (align === 'just' && block) {
       // justification stretches every line but the last to the full width; the guard is about the natural width
-      return withNaturalAlignment(block.el, () => resolveTrailingGuard(measureLineGroups(block.el, block.skipNestedLists), availWidth, 'l', block));
+      return withNaturalAlignment(block.el, () => resolveTrailingGuard(measureLineGroups(block.el, block.skipNestedLists, block.range), availWidth, 'l', block));
     }
     let guard = 0;
     for (const group of groups) {
@@ -1976,7 +2065,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
         guard = Math.max(guard, align === 'ctr' ? 0.5 : 1);
       }
     }
-    if (guard === 0 && block && groups.length > 1 && breaksChangeWhenWidened(block.el, 0.5, groups, block.skipNestedLists)) {
+    if (guard === 0 && block && groups.length > 1 && breaksChangeWhenWidened(block.el, 0.5, groups, block.skipNestedLists, block.range)) {
       guard = align === 'ctr' ? -0.5 : -1;
     }
     return guard;
@@ -1995,7 +2084,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
     }
   }
 
-  function breaksChangeWhenWidened(el: HTMLElement, delta: number, before: LineGroup[], skipNestedLists: boolean): boolean {
+  function breaksChangeWhenWidened(el: HTMLElement, delta: number, before: LineGroup[], skipNestedLists: boolean, range?: Range): boolean {
     const rect = el.getBoundingClientRect();
     const style = el.style;
     const prior = { width: style.getPropertyValue('width'), widthPriority: style.getPropertyPriority('width'), minWidth: style.getPropertyValue('min-width'), minWidthPriority: style.getPropertyPriority('min-width'), maxWidth: style.getPropertyValue('max-width'), maxWidthPriority: style.getPropertyPriority('max-width'), sizing: style.getPropertyValue('box-sizing'), sizingPriority: style.getPropertyPriority('box-sizing'), flex: style.getPropertyValue('flex'), flexPriority: style.getPropertyPriority('flex') };
@@ -2008,7 +2097,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
     let changed = false;
     try {
       if (Math.abs(el.getBoundingClientRect().width - rect.width - delta) < 0.01) {
-        const after = measureLineGroups(el, skipNestedLists);
+        const after = measureLineGroups(el, skipNestedLists, range);
         changed = after.length !== before.length || after.some((group, index) => Math.abs((group.right - group.left) - (before[index]!.right - before[index]!.left)) > 0.01);
       }
     } finally {
@@ -2100,10 +2189,10 @@ export function measureSlideDocument(): BrowserMeasureResult {
     return trimmed;
   }
 
-  function collectRuns(root: HTMLElement, whiteSpace: string, skipNestedLists = false): Run[] {
+  function collectRuns(root: HTMLElement, whiteSpace: string, skipNestedLists = false, range?: Range): Run[] {
     const preserve = whiteSpace === 'pre' || whiteSpace === 'pre-wrap';
     const runs: Run[] = [];
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, skipNestedLists ? nestedListFilter(root) : null);
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, textFilter(root, skipNestedLists, range));
     let node = walker.firstChild();
     while (node) {
       if (node.nodeType === Node.TEXT_NODE) {
@@ -2120,6 +2209,20 @@ export function measureSlideDocument(): BrowserMeasureResult {
       node = walker.nextNode();
     }
     return runs;
+  }
+
+  function textFilter(root: HTMLElement, skipNestedLists: boolean, range?: Range): NodeFilter {
+    return {
+      acceptNode(node: Node): number {
+        if (range && !range.intersectsNode(node)) return NodeFilter.FILTER_REJECT;
+        for (let current: Node | null = node; current && current !== root; current = current.parentNode) {
+          if (current.nodeType !== Node.ELEMENT_NODE) continue;
+          const el = current as HTMLElement;
+          if (isSkipped(el) || (skipNestedLists && (el.tagName === 'UL' || el.tagName === 'OL'))) return NodeFilter.FILTER_REJECT;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    };
   }
 
   function styleFromElement(el: Element): RunStyle {

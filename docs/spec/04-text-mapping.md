@@ -14,6 +14,7 @@ Decided in [#12](https://github.com/devosurf/deckflip/issues/12).
 ## Paragraphs
 
 - One `a:p` per paragraph: the Text block itself, or each `li`, or each line-group in `pre`. Consecutive Text blocks are never merged (settled: one text box per HTML block).
+- Mixed-content containers give each consecutive inline sequence before, between, or after block children its own native text body. Chromium measures its line-box top/bottom and available width without inserting layout wrappers; block children retain their own text bodies. Anonymous flex/grid items use their text extents and an out-of-flow font-metric probe, not additional layout items. Inline continuations retain their measured first-line offset. These text bodies do not duplicate the container's fill, border, or source identity. Source-identified multi-paragraph wrappers keep their existing single-shape mapping.
 - `a:lnSpc` = `a:spcPts` from the measured line-box height of that paragraph (`round(px * 75)`), always; never `spcPct` (the spike measured a +6 px/line error with it). Mixed sizes inside a line are already inside the measured line box.
 - `a:spcBef`/`a:spcAft` = `spcPts` from the measured gap between consecutive paragraphs in the same text body (li margins), always, `0` included. The first paragraph's top gap and the last paragraph's bottom gap are folded into `tIns`/`bIns` instead, so `spcFirstLastPara` is never needed and PowerPoint's edge rule cannot bite.
 - `algn` from `text-align` (`l`, `ctr`, `r`, `just`; `start`/`end` resolved by direction). `indent` from `text-indent`.
@@ -51,6 +52,7 @@ Inline elements flatten to `a:r` runs with `a:rPr` from computed style:
 | `code`, `kbd` | only the font family they compute to |
 
 Text content is the rendered text: whitespace collapsed per `white-space`, soft hyphens removed, `&nbsp;` preserved as U+00A0, `xml:space="preserve"` on every `a:t`. Emoji and non-Latin scripts are passed through; the font slot is the resolved family, PowerPoint substitutes per script.
+Hidden subtrees (`display: none`, `visibility: hidden`, and speaker notes) contribute no Slide text runs or line metrics, including inside otherwise visible Text blocks.
 
 Any text-affecting CSS not in the table is flattened with a `FLATTEN_TEXT_*` warning (`-webkit-text-stroke`, `background-clip: text`, `text-decoration-style` other than solid, `font-variant-*` other than small-caps, `text-shadow` with multiple shadows -> first kept).
 
