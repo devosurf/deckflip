@@ -823,6 +823,7 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
     if (unreportedImages.size === 0 || isSkipped(el)) return;
     const urls: string[] = [];
     if (el instanceof HTMLImageElement) urls.push(el.currentSrc || el.src);
+    if (el instanceof HTMLVideoElement && el.poster) urls.push(el.poster);
     if (el instanceof SVGImageElement && URL.canParse(el.href.baseVal, el.baseURI)) {
       urls.push(new URL(el.href.baseVal, el.baseURI).href);
     }

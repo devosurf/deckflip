@@ -173,12 +173,14 @@ describe.skipIf(!browserAvailable)('embedded image conversion', () => {
     await writeFile(input, deckHtml([
       `<div data-raster style="width: 200px; height: 200px"><img id="remote" src="https://deckflip.invalid/remote.png"></div>`,
       `<img id="missing">`,
+      `<div data-raster style="width: 200px; height: 200px"><video id="poster" width="160" height="100" poster="https://deckflip.invalid/poster.png"></video></div>`,
     ]));
     const result = await convertHtmlToPptx(input, { ...options, browser });
     expect(result.exitCode).toBe(2);
     expect(result.report.entries.filter((entry) => entry.severity === 'error')).toEqual([
       expect.objectContaining({ code: 'VALIDATE_REMOTE_ASSET', slide: 1, locator: { selector: '#remote' } }),
       expect.objectContaining({ code: 'VALIDATE_MISSING_ASSET', slide: 2, locator: { selector: '#missing' } }),
+      expect.objectContaining({ code: 'VALIDATE_REMOTE_ASSET', slide: 3, locator: { selector: '#poster' } }),
     ]);
     await expect(stat(result.outputPath)).rejects.toMatchObject({ code: 'ENOENT' });
   });
