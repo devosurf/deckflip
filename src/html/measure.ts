@@ -51,6 +51,14 @@ export async function measureDeck(loaded: LoadedDeck, opts: MeasureOptions): Pro
   const fontFaces = new Map<string, { family: string; file: string; weight?: number; italic?: boolean }>();
 
   try {
+    // Image assets are local-only even while Chromium measures them. Do not fetch a remote image
+    // just to reject it later; file and data URLs still follow the same decoding/format pipeline.
+    await context.route('**/*', (route) => {
+      const request = route.request();
+      return request.resourceType() === 'image' && !/^(file|data):/.test(request.url())
+        ? route.abort()
+        : route.continue();
+    });
     for (const document of loaded.documents) {
       const page = await context.newPage();
       try {
@@ -216,7 +224,8 @@ async function resolveElements(ctx: PageContext, measured: BrowserElement[], ent
     }
     if (element.kind === 'shape') {
       const { fill, ...shape } = element;
-      out.push(fill === undefined ? shape : { ...shape, fill: fill.type === 'image' ? await resolveImageFill(fill, element, slide, entries) : fill });
+      const resolvedFill = fill?.type === 'image' ? await resolveImageFill(fill, element, slide, entries) : fill;
+      out.push(resolvedFill === undefined ? shape : { ...shape, fill: resolvedFill });
       continue;
     }
     if (element.kind === 'opaque') {
@@ -270,15 +279,19 @@ function transformedBounds(box: Box, rotation: number, transform: Matrix2d): Box
 }
 
 /** Loads an image fill's bytes: PNG/JPEG as they are; GIF, WebP and SVG re-encoded to PNG (`SUBSTITUTE_IMAGE_FORMAT`), since `a:blipFill` on a shape takes no vector. */
-async function resolveImageFill(fill: BrowserImageFill, shape: { selector: string; name: string }, slide: number, entries: Entry[]): Promise<ImageFill> {
+async function resolveImageFill(fill: BrowserImageFill, shape: { selector: string; name: string }, slide: number, entries: Entry[]): Promise<ImageFill | undefined> {
   const { url, ...rest } = fill;
-  const path = fileURLToPath(url);
-  const loaded = await loadMedia(path);
-  const media = loaded.kind === 'vector' ? { data: await reencodeToPng(loaded.vector.data), contentType: 'image/png' as const } : loaded.media;
-  if (loaded.kind === 'vector' || loaded.reencoded) {
-    entries.push(reportEntry('SUBSTITUTE_IMAGE_FORMAT', { slide, locator: { selector: shape.selector }, reason: `background-image on ${shape.name} (${basename(path)}) is not PNG or JPEG` }));
+  try {
+    const loaded = await loadMedia(url);
+    const media = loaded.kind === 'vector' ? { data: await reencodeToPng(loaded.vector.data), contentType: 'image/png' as const } : loaded.media;
+    if (loaded.kind === 'vector' || loaded.reencoded) {
+      entries.push(reportEntry('SUBSTITUTE_IMAGE_FORMAT', { slide, locator: { selector: shape.selector }, reason: `background-image on ${shape.name} (${imageSourceName(url)}) is not PNG or JPEG` }));
+    }
+    return { ...rest, media };
+  } catch {
+    reportInvalidImage(shape, slide, entries);
+    return undefined;
   }
-  return { ...rest, media };
 }
 
 /**
@@ -331,16 +344,33 @@ async function resolvePicture(page: Page, measured: BrowserPicture, slide: numbe
     const fallback = await captureElement(page, picture.selector);
     return { ...picture, media: { data: fallback, contentType: 'image/png' }, vector: { data: Buffer.from(source.svg, 'utf8'), contentType: 'image/svg+xml' } };
   }
-  const path = fileURLToPath(source.url);
-  const loaded = await loadMedia(path);
+  let loaded;
+  try {
+    loaded = await loadMedia(source.url);
+  } catch {
+    reportInvalidImage(picture, slide, entries);
+    return undefined;
+  }
   if (loaded.kind === 'vector') {
     const fallback = await captureElement(page, picture.selector);
     return { ...picture, media: { data: fallback, contentType: 'image/png' }, vector: loaded.vector };
   }
   if (loaded.reencoded) {
-    entries.push(reportEntry('SUBSTITUTE_IMAGE_FORMAT', { slide, locator: { selector: picture.selector }, reason: `${picture.name} (${basename(path)}) is not PNG or JPEG` }));
+    entries.push(reportEntry('SUBSTITUTE_IMAGE_FORMAT', { slide, locator: { selector: picture.selector }, reason: `${picture.name} (${imageSourceName(source.url)}) is not PNG or JPEG` }));
   }
   return { ...picture, media: loaded.media };
+}
+
+function imageSourceName(url: string): string {
+  return url.startsWith('data:') ? 'embedded image' : basename(fileURLToPath(url));
+}
+
+function reportInvalidImage(element: { selector: string; name: string }, slide: number, entries: Entry[]): void {
+  // Decoder and URL exceptions may contain the entire input. Never forward them into diagnostics.
+  entries.push(reportEntry('VALIDATE_IMAGE_ASSET', {
+    slide, locator: { selector: element.selector },
+    reason: `Image on ${element.name} could not be decoded as a supported image format`,
+  }));
 }
 
 async function captureElement(page: Page, selector: string): Promise<Uint8Array> {

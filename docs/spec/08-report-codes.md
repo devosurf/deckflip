@@ -18,6 +18,7 @@ Two rules hold across families:
 | `VALIDATE_SLIDE_SIZE` | a section's border box is not the Canvas | Do not set width/height on sections, or match `{W}x{H}` exactly |
 | `VALIDATE_REMOTE_ASSET` | `http(s):` or other non-local URL | Save the file into the Deck's asset directory and reference it relatively |
 | `VALIDATE_MISSING_ASSET` | local asset not found | Check the path relative to `{file}` |
+| `VALIDATE_IMAGE_ASSET` | invalid embedded image data, unsupported image format, or image decoding failure | Use a valid PNG, JPEG, GIF, WebP or SVG image; check the data URI encoding for embedded images |
 | `VALIDATE_ELEMENT` | `script`, `iframe`, `object`, `embed`, `canvas`, form controls, `details`, `dialog`, `marquee` | Replace `{el}` with static HTML; scripts are never run |
 | `VALIDATE_TEXT_CSS` | `hyphens: auto`, `text-wrap: balance\|pretty`, vertical `writing-mode`, `column-*`, `text-orientation`, `font-size-adjust`, `font-stretch` | Remove `{decl}`: PowerPoint cannot reproduce its line breaks |
 | `VALIDATE_POSITION` | `position: fixed\|sticky`, `zoom`, `@page` | Use `absolute` or flow layout inside the section |

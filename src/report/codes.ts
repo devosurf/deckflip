@@ -46,6 +46,11 @@ export const CODES = {
     severity: 'error',
     hint: 'Check the path relative to {file}',
   },
+  VALIDATE_IMAGE_ASSET: {
+    kind: 'error',
+    severity: 'error',
+    hint: 'Use a valid PNG, JPEG, GIF, WebP or SVG image; check the data URI encoding for embedded images',
+  },
   VALIDATE_ELEMENT: {
     kind: 'error',
     severity: 'error',

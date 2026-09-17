@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Accept embedded image data URIs throughout HTML-to-PPTX conversion with the same format policy as local images, bounded validation diagnostics, and no remote image fetching (#27).
 - Preserve PPTX group scaling, nested child coordinate spaces, rotation and flips in HTML and edited round trips, while retaining Untouched source parts and native text/pictures (#25).
 - Honor `--report` for PPTX-to-HTML conversion, including nested destinations and validation failures, without also writing the default sidecar (#28).
 - Honor validation errors before Strict mode for both input kinds: exit 2 with a diagnostic report and no converted Deck or new Asset directory, preserving existing destinations. PPTX-to-HTML now honors Strict mode for nonfatal reports, retaining output and returning 4 (#26).

@@ -40,6 +40,8 @@ A Slide may live in its own file: `<section data-src="slides/01-intro.html"></se
 
 `img[src]`, `video[src|poster]`, `audio[src]`, `source[src]`, CSS `url()` (backgrounds, `@font-face`) and `link[href]` resolve relative to the file that references them (the Deck file, or the per-file Slide document). `data:` URIs are allowed. `http(s)` and any other scheme is `VALIDATE_REMOTE_ASSET` (error; hint: save the file into the Deck's asset directory). A missing local file is `VALIDATE_MISSING_ASSET` (error).
 
+For pictures and image fills, base64 and percent-encoded image data URIs use the same content-based format policy as local images: PNG/JPEG bytes are preserved, GIF/WebP are re-encoded to PNG, and SVG pictures retain their vector payload with a PNG fallback (SVG fills become PNG). Invalid embedded data or unsupported image formats produce `VALIDATE_IMAGE_ASSET` with an element locator. Reports omit embedded payloads, including in CSS fallback diagnostics. Remote image requests are blocked during conversion measurement.
+
 ## Injected base stylesheet
 
 Before author CSS, the tool injects, into every rendered document:

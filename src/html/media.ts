@@ -27,9 +27,18 @@ export async function reencodeToPng(bytes: Uint8Array): Promise<Uint8Array> {
   return canvas.toBuffer('image/png');
 }
 
-/** Reads an image file and classifies it by content, not extension. Unknown formats throw. */
-export async function loadMedia(path: string): Promise<LoadedMedia> {
-  const bytes = new Uint8Array(await readFile(path));
+/** Reads a local or embedded image and classifies it by content, not extension or declared MIME type. */
+export async function loadMedia(url: string): Promise<LoadedMedia> {
+  const source = new URL(url);
+  let bytes: Uint8Array;
+  if (source.protocol === 'data:') {
+    const response = await fetch(source);
+    bytes = new Uint8Array(await response.arrayBuffer());
+  } else if (source.protocol === 'file:') {
+    bytes = await readFile(source);
+  } else {
+    throw new Error('Remote image assets are not allowed');
+  }
   const format = sniff(bytes);
   switch (format) {
     case 'png':
@@ -42,6 +51,6 @@ export async function loadMedia(path: string): Promise<LoadedMedia> {
     case 'svg':
       return { kind: 'vector', vector: { data: bytes, contentType: 'image/svg+xml' } };
     default:
-      throw new Error(`Unsupported image format: ${path}`);
+      throw new Error('Unsupported image format; use PNG, JPEG, GIF, WebP or SVG');
   }
 }
