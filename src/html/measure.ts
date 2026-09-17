@@ -344,10 +344,8 @@ async function resolvePicture(page: Page, measured: BrowserPicture, slide: numbe
     const fallback = await captureElement(page, picture.selector);
     return { ...picture, media: { data: fallback, contentType: 'image/png' }, vector: { data: Buffer.from(source.svg, 'utf8'), contentType: 'image/svg+xml' } };
   }
-  let loaded;
-  try {
-    loaded = await loadMedia(source.url);
-  } catch {
+  const loaded = await loadMedia(source.url).catch(() => undefined);
+  if (!loaded) {
     reportInvalidImage(picture, slide, entries);
     return undefined;
   }
@@ -366,7 +364,7 @@ function imageSourceName(url: string): string {
 }
 
 function reportInvalidImage(element: { selector: string; name: string }, slide: number, entries: Entry[]): void {
-  // Decoder and URL exceptions may contain the entire input. Never forward them into diagnostics.
+  // Decoder and URL exceptions may contain the entire input. Never forward them into Report entries.
   entries.push(reportEntry('VALIDATE_IMAGE_ASSET', {
     slide, locator: { selector: element.selector },
     reason: `Image on ${element.name} could not be decoded as a supported image format`,

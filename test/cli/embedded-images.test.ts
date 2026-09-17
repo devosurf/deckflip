@@ -167,7 +167,7 @@ describe.skipIf(!browserAvailable)('embedded image conversion', () => {
     }
   });
 
-  it('omits embedded payloads from CSS fallback diagnostics', async () => {
+  it('omits embedded payloads from CSS fallback Report entries', async () => {
     const dir = await workspace();
     const bytes = await readFile('test/html/fixtures/assets/quad.png');
     const payload = bytes.toString('base64');
@@ -178,9 +178,9 @@ describe.skipIf(!browserAvailable)('embedded image conversion', () => {
     const result = await convertHtmlToPptx(input, { ...options, browser });
     expect(result.exitCode).toBe(4);
     expect(result.report.entries.map((entry) => entry.code)).toEqual(['RASTER_GRADIENT']);
-    const diagnostics = JSON.stringify(result.report);
-    expect(diagnostics).not.toContain(payload);
-    expect(diagnostics.length).toBeLessThan(2000);
+    const reportText = JSON.stringify(result.report);
+    expect(reportText).not.toContain(payload);
+    expect(reportText.length).toBeLessThan(2000);
   });
 
   it('rejects invalid embedded content with bounded CLI reports and element locators', async () => {
@@ -222,10 +222,10 @@ describe.skipIf(!browserAvailable)('embedded image conversion', () => {
         expect(['#picture', '#fill']).toContain(entry.locator.selector);
         expect(entry.hint).toMatch(/PNG.*JPEG/);
       }
-      const diagnostics = result.stdout + result.stderr + JSON.stringify(report);
-      expect(diagnostics).not.toContain('PAYLOAD_SENTINEL');
-      expect(diagnostics).not.toContain(bmp.toString('base64'));
-      expect(diagnostics.length).toBeLessThan(12_000);
+      const outputText = result.stdout + result.stderr + JSON.stringify(report);
+      expect(outputText).not.toContain('PAYLOAD_SENTINEL');
+      expect(outputText).not.toContain(bmp.toString('base64'));
+      expect(outputText.length).toBeLessThan(12_000);
       await expect(stat(output)).rejects.toMatchObject({ code: 'ENOENT' });
     }
   });

@@ -387,25 +387,25 @@ export function measureSlideDocument(): BrowserMeasureResult {
   /** The first trigger in spec order (08-report-codes.md, RASTER_*), or undefined when everything maps natively. */
   function rasterTrigger(el: HTMLElement, cs: CSSStyleDeclaration): RasterTrigger | undefined {
     if (cs.filter !== 'none') {
-      return { suffix: 'CSS_FILTER', decl: `filter: ${imageDiagnostic(cs.filter)}` };
+      return { suffix: 'CSS_FILTER', decl: `filter: ${redactEmbeddedUrls(cs.filter)}` };
     }
     const backdrop = cs.getPropertyValue('backdrop-filter');
     if (backdrop && backdrop !== 'none') {
-      return { suffix: 'BACKDROP_FILTER', decl: `backdrop-filter: ${imageDiagnostic(backdrop)}` };
+      return { suffix: 'BACKDROP_FILTER', decl: `backdrop-filter: ${redactEmbeddedUrls(backdrop)}` };
     }
     if (cs.mixBlendMode !== 'normal') {
       return { suffix: 'BLEND_MODE', decl: `mix-blend-mode: ${cs.mixBlendMode}` };
     }
     const mask = cs.getPropertyValue('mask-image') || cs.getPropertyValue('-webkit-mask-image');
     if (mask && mask !== 'none') {
-      return { suffix: 'MASK', decl: `mask-image: ${imageDiagnostic(mask)}` };
+      return { suffix: 'MASK', decl: `mask-image: ${redactEmbeddedUrls(mask)}` };
     }
     if (cs.clipPath !== 'none' && !(el.tagName === 'IMG' && parseClipInset(cs.clipPath, 1, 1))) {
-      return { suffix: 'CLIP_PATH', decl: `clip-path: ${imageDiagnostic(cs.clipPath)}` };
+      return { suffix: 'CLIP_PATH', decl: `clip-path: ${redactEmbeddedUrls(cs.clipPath)}` };
     }
     const gradient = unsupportedGradient(cs.backgroundImage);
     if (gradient) {
-      return { suffix: 'GRADIENT', decl: `background-image: ${imageDiagnostic(gradient)}` };
+      return { suffix: 'GRADIENT', decl: `background-image: ${redactEmbeddedUrls(gradient)}` };
     }
     if (cs.boxShadow !== 'none' && !parseShadow(cs.boxShadow) && shadowLayers(cs.boxShadow).some((layer) => layer.color.alpha > 0)) {
       return { suffix: 'SHADOW', decl: `box-shadow: ${cs.boxShadow}` };
@@ -415,7 +415,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
       return { suffix: 'BORDER_STYLE', decl: borderStyle };
     }
     if (cs.borderImageSource !== 'none') {
-      return { suffix: 'BORDER_IMAGE', decl: `border-image: ${imageDiagnostic(cs.borderImageSource)}` };
+      return { suffix: 'BORDER_IMAGE', decl: `border-image: ${redactEmbeddedUrls(cs.borderImageSource)}` };
     }
     if (cs.transform !== 'none' && !decomposeTransform(cs.transform, isGroup(el))) {
       return { suffix: 'TRANSFORM', decl: `transform: ${cs.transform}` };
@@ -428,7 +428,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
   }
 
   /** Computed CSS serialises URLs in double quotes. Keep image payloads out of reasons and hints. */
-  function imageDiagnostic(value: string): string {
+  function redactEmbeddedUrls(value: string): string {
     return value.replace(/url\("data:(?:\\[\s\S]|[^"\\])*"\)/gi, 'url("embedded image")');
   }
 
@@ -799,6 +799,22 @@ export function measureSlideDocument(): BrowserMeasureResult {
     return { type: 'solid', color: parsed };
   }
 
+  function validateImageAsset(url: string, loaded: boolean, selector: string, name: string): boolean {
+    const embedded = url.startsWith('data:');
+    if (!embedded && !url.startsWith('file:')) {
+      entries.push({ code: 'VALIDATE_REMOTE_ASSET', selector, reason: `${name} loads ${url}` });
+      return false;
+    }
+    if (!loaded) {
+      entries.push({
+        code: embedded ? 'VALIDATE_IMAGE_ASSET' : 'VALIDATE_MISSING_ASSET', selector,
+        reason: `${name} did not load: ${embedded ? 'embedded image' : url}`,
+      });
+      return false;
+    }
+    return true;
+  }
+
   /**
    * A single `url()` layer (spec 03): the image rect follows `background-size`, `background-position` and
    * `background-origin` on the padding box, clipped by the border box `box`. A rect covering the box, or one the
@@ -813,12 +829,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
     const url = match[1]!;
     const sizes = (window as unknown as { __deckflipBackgroundImages?: BackgroundImageSizes }).__deckflipBackgroundImages ?? {};
     const natural = sizes[url];
-    if (!url.startsWith('file:') && !url.startsWith('data:')) {
-      entries.push({ code: 'VALIDATE_REMOTE_ASSET', selector: cssPath(el), reason: `${elementName(el)} loads ${url}` });
-      return undefined;
-    }
-    if (!natural || natural.width === 0 || natural.height === 0) {
-      entries.push({ code: url.startsWith('data:') ? 'VALIDATE_IMAGE_ASSET' : 'VALIDATE_MISSING_ASSET', selector: cssPath(el), reason: `background-image on ${elementName(el)} did not load: ${url.startsWith('data:') ? 'embedded image' : url}` });
+    if (!validateImageAsset(url, !!natural && natural.width > 0 && natural.height > 0, cssPath(el), `background-image on ${elementName(el)}`) || !natural) {
       return undefined;
     }
     return { type: 'image', url, ...placeBackground(cs, box, natural) };
@@ -1119,12 +1130,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
     if (el.tagName === 'IMG') {
       const img = el as HTMLImageElement;
       const url = img.currentSrc || img.src;
-      if (!url.startsWith('file:') && !url.startsWith('data:')) {
-        entries.push({ code: 'VALIDATE_REMOTE_ASSET', selector: frame.selector, reason: `${frame.name} loads ${url}` });
-        return undefined;
-      }
-      if (!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) {
-        entries.push({ code: url.startsWith('data:') ? 'VALIDATE_IMAGE_ASSET' : 'VALIDATE_MISSING_ASSET', selector: frame.selector, reason: `${frame.name} did not load: ${url.startsWith('data:') ? 'embedded image' : url}` });
+      if (!validateImageAsset(url, img.complete && img.naturalWidth > 0 && img.naturalHeight > 0, frame.selector, frame.name)) {
         return undefined;
       }
       source = { kind: 'url', url };
