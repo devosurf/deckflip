@@ -142,11 +142,8 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
     shapes.push(makeShape(section, measuredBox(section)));
   }
   shapes.push(...walkContents(section));
-  // The native measurement walk does not descend into rasterised subtrees or SVG drawings.
-  // A blocked image there must still fail validation rather than silently disappear from the capture.
-  for (const url of unreportedImages) {
-    entries.push({ code: 'VALIDATE_REMOTE_ASSET', selector: 'body > section', reason: `Slide contains a blocked remote image: ${url}` });
-  }
+  // The native walk skips rasterised subtrees and SVG drawings, but their visible images still count.
+  reportBlockedImages(section);
   return {
     meta,
     sectionBox,
@@ -820,6 +817,24 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
       return false;
     }
     return true;
+  }
+
+  function reportBlockedImages(el: HTMLElement): void {
+    if (unreportedImages.size === 0 || isSkipped(el)) return;
+    const urls: string[] = [];
+    if (el instanceof HTMLImageElement) urls.push(el.currentSrc || el.src);
+    if (el instanceof SVGImageElement && URL.canParse(el.href.baseVal, el.baseURI)) {
+      urls.push(new URL(el.href.baseVal, el.baseURI).href);
+    }
+    const cs = getComputedStyle(el);
+    for (const value of [cs.backgroundImage, cs.maskImage, cs.borderImageSource, cs.filter, cs.clipPath]) {
+      for (const match of value.matchAll(/url\("([^"]*)"\)/g)) urls.push(match[1]!);
+    }
+    for (const url of urls) {
+      if (!unreportedImages.delete(url)) continue;
+      entries.push({ code: 'VALIDATE_REMOTE_ASSET', selector: cssPath(el), reason: `${elementName(el)} contains a blocked remote image: ${url}` });
+    }
+    for (const child of Array.from(el.children) as HTMLElement[]) reportBlockedImages(child);
   }
 
   /**
