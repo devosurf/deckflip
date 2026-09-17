@@ -11,6 +11,7 @@ Every entry carries `code`, `kind`, `severity`, `slide`, `locator`, `reason` and
 | `VALIDATE_SLIDE_SIZE` | a section's border box is not the Canvas | Set no width/height on sections |
 | `VALIDATE_REMOTE_ASSET` | `http(s):` or other non-local URL | Save the file next to the deck and reference it relatively |
 | `VALIDATE_MISSING_ASSET` | local asset not found | Check the path relative to the deck file |
+| `VALIDATE_IMAGE_ASSET` | invalid embedded data, unsupported image format, or decoding failure | Use a valid PNG, JPEG, GIF, WebP or SVG image; check embedded data URI encoding |
 | `VALIDATE_ELEMENT` | `script`, `iframe`, `object`, `embed`, `canvas`, form controls, `details`, `dialog`, `marquee` | Replace with static HTML |
 | `VALIDATE_TEXT_CSS` | `hyphens: auto`, `text-wrap: balance\|pretty`, vertical `writing-mode`, `column-*`, `text-orientation`, `font-size-adjust`, `font-stretch` | Remove the declaration |
 | `VALIDATE_POSITION` | `position: fixed\|sticky`, `zoom`, `@page` | Use `absolute` or flow layout inside the section |
