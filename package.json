@@ -1,6 +1,6 @@
 {
   "name": "deckflip",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Bidirectional converter between HTML slides and PowerPoint (PPTX), built for coding agents",
   "type": "module",
   "license": "MIT",

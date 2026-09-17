@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.2 - 2026-09-17
+
 ### Changed
 
 - Limit supported CLI hosts and CI to macOS for now, retaining the full rendering, determinism, build and packaging checks on the macOS job.
