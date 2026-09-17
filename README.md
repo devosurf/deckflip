@@ -66,6 +66,11 @@ npm run build
 
 The distributable CLI is written to `dist/cli.js`.
 
+`npm run prepublishOnly` runs the production dependency audit, typecheck, and tests.
+The audit command removes npm's lifecycle-exported `npm_config_allow_scripts` variable
+to work around [npm/cli#9913](https://github.com/npm/cli/pull/9913); npm still reads the
+persistent script policy from `.npmrc`.
+
 ## License
 
 MIT

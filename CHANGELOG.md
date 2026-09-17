@@ -10,6 +10,7 @@
 
 ### Fixed
 
+- Allow prepublish checks to run with a persistent `.npmrc` `allow-scripts` policy despite npm's lifecycle configuration-export bug, without changing the policy.
 - Accept embedded image data URIs throughout HTML-to-PPTX conversion with the same format policy as local images, bounded validation Report entries, and no remote image fetching (#27).
 - Preserve PPTX group scaling, nested child coordinate spaces, rotation and flips in HTML and edited round trips, while retaining Untouched source parts and native text/pictures (#25).
 - Honor `--report` for PPTX-to-HTML conversion, including nested destinations and validation failures, without also writing the default sidecar (#28).
