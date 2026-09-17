@@ -229,12 +229,19 @@ function pictureHtml(picture: PictureElement, outline: ShapeElement | undefined,
   return `<img${tag === 'svg' ? identity : attrs}${raster} src="${attr(src())}" style="${css.join('; ')}">`;
 }
 
-/** `div[data-group]` at its box; children are positioned relative to it, in the child coordinate space. */
+/** Keep layout in child coordinates; the transform maps that space into the group's placement. */
 function groupHtml(group: GroupElement, origin: { x: number; y: number }, ctx: ElementContext): string {
   const { tag, attrs: named } = nameParts(group.name);
   const attrs = `${named}${identityAttr(group)}`;
-  const box = local(group.box, origin);
-  const css = boxCss(box, group.rotation);
+  const { box, childBox } = group;
+  const css = boxCss(local(childBox, origin), 0);
+  const sx = childBox.w === 0 ? 1 : box.w / childBox.w;
+  const sy = childBox.h === 0 ? 1 : box.h / childBox.h;
+  const dx = box.x + box.w / 2 - childBox.x - childBox.w / 2;
+  const dy = box.y + box.h / 2 - childBox.y - childBox.h / 2;
+  if (dx !== 0 || dy !== 0 || group.rotation !== 0 || sx !== 1 || sy !== 1 || group.flipH || group.flipV) {
+    css.push(`transform: translate(${pxv(dx)}, ${pxv(dy)}) rotate(${num(group.rotation)}deg) scale(${group.flipH ? -sx : sx}, ${group.flipV ? -sy : sy})`);
+  }
   const children = elementsHtml(group.children, { x: group.childBox.x, y: group.childBox.y }, ctx);
   return `<${tag}${attrs} data-group style="${css.join('; ')}">${children.join('')}</${tag}>`;
 }

@@ -479,7 +479,7 @@ describe.skipIf(!browserAvailable)('measureDeck', () => {
       expect(rotated.childBox).toEqual({ x: 800, y: 40, w: 100, h: 100 });
       expect(rotated.box.x).toBeCloseTo(803.02, 1);
       expect(rotated.box.y).toBeCloseTo(72.9 - 50, 1);
-      expect(rotated.box.w).toBe(100);
+      expect(rotated.box.w).toBeCloseTo(100, 3);
       expect(rotated.children[0]!.box).toEqual({ x: 800, y: 40, w: 100, h: 100 });
     } finally {
       await browser.close();

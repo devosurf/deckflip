@@ -216,6 +216,8 @@ async function readGroup(grpSp: XmlNode, ctx: SlideContext): Promise<GroupElemen
     box: frame,
     childBox: { x: px(chOff?.attrs.x), y: px(chOff?.attrs.y), w: px(chExt?.attrs.cx), h: px(chExt?.attrs.cy) },
     rotation,
+    ...(xfrm?.attrs.flipH === '1' || xfrm?.attrs.flipH === 'true' ? { flipH: true } : {}),
+    ...(xfrm?.attrs.flipV === '1' || xfrm?.attrs.flipV === 'true' ? { flipV: true } : {}),
     children: await readElements(children(grpSp), ctx),
   };
 }

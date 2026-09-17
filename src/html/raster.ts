@@ -10,6 +10,8 @@ export interface RasterCapture {
   selector: string;
   /** clip rectangle in page coordinates, CSS px */
   clip: Box;
+  /** Capture in measured child coordinates with ancestor group transforms disabled, then restore them. */
+  groupSpace?: boolean;
   /** raster density: `deviceScaleFactor = dpi / 96` */
   dpi: number;
   /** viewport in CSS px, needed to re-assert the metrics override */
@@ -62,13 +64,13 @@ export async function captureRaster(page: Page, capture: RasterCapture): Promise
   const cdp = await page.context().newCDPSession(page);
   const metrics = { width: capture.viewport.width, height: capture.viewport.height, mobile: false };
   try {
-    await page.evaluate(isolate, { selector: capture.selector, attr: ISOLATE_ATTR });
+    await page.evaluate(isolate, { selector: capture.selector, attr: ISOLATE_ATTR, groupClip: capture.groupSpace ? capture.clip : undefined });
     await cdp.send('Emulation.setDeviceMetricsOverride', { ...metrics, deviceScaleFactor: scale });
     await cdp.send('Emulation.setDefaultBackgroundColorOverride', { color: { r: 0, g: 0, b: 0, a: 0 } });
     return await captureStablePng(page, async () => {
       const { data } = await cdp.send('Page.captureScreenshot', {
         format: 'png',
-        clip: { x: capture.clip.x, y: capture.clip.y, width: capture.clip.w, height: capture.clip.h, scale: 1 },
+        clip: { x: capture.groupSpace ? 0 : capture.clip.x, y: capture.groupSpace ? 0 : capture.clip.y, width: capture.clip.w, height: capture.clip.h, scale: 1 },
         captureBeyondViewport: true,
       });
       return data;
@@ -81,12 +83,27 @@ export async function captureRaster(page: Page, capture: RasterCapture): Promise
   }
 }
 
-function isolate({ selector, attr }: { selector: string; attr: string }): void {
+function isolate({ selector, attr, groupClip }: { selector: string; attr: string; groupClip: Box | undefined }): void {
   const style = document.createElement('style');
   style.setAttribute(attr, '');
-  style.textContent = `html, body { visibility: hidden !important; background: transparent !important; } [${attr}] { visibility: visible !important; }`;
+  style.textContent = `html, body { visibility: hidden !important; background: transparent !important; } [${attr}="target"] { visibility: visible !important; }`;
+  const target = document.querySelector(selector);
+  target?.setAttribute(attr, 'target');
+  if (groupClip) {
+    // Child coordinates may lie outside the Canvas (even at negative positions). Move the capture to the
+    // origin rather than baking ancestor transforms into a picture that the native group will transform again.
+    for (let parent = target?.parentElement; parent; parent = parent.parentElement) {
+      if (parent.tagName === 'SECTION') {
+        parent.setAttribute(attr, 'origin');
+        break;
+      }
+      parent.setAttribute(attr, parent.hasAttribute('data-group') ? 'group' : 'ancestor');
+    }
+    style.textContent += ` [${attr}="group"] { transform: none !important; }
+      [${attr}="group"], [${attr}="ancestor"], [${attr}="origin"] { overflow: visible !important; }
+      [${attr}="origin"] { transform: translate(${-groupClip.x}px, ${-groupClip.y}px) !important; }`;
+  }
   document.head.appendChild(style);
-  document.querySelector(selector)?.setAttribute(attr, '');
 }
 
 function restore(attr: string): void {

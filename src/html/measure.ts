@@ -7,7 +7,7 @@ import { textBodiesOf } from '../model/index.js';
 import type { Box, Canvas, Deck, Element, ImageFill, PictureElement, Slide, TextBody } from '../model/index.js';
 import { entry as reportEntry } from '../report/codes.js';
 import type { Entry } from '../report/types.js';
-import type { BrowserElement, BrowserImageFill, BrowserMeasureResult, BrowserPicture, BrowserRaster } from './browser-script.js';
+import type { BrowserElement, BrowserGroup, BrowserImageFill, BrowserMeasureResult, BrowserPicture, BrowserRaster } from './browser-script.js';
 import { loadMedia, reencodeToPng } from './media.js';
 import { FREEZE_ATTR, measureSlideDocument, preloadBackgroundImages } from './browser-script.js';
 import type { LoadedDeck, SlideDocument } from './load.js';
@@ -166,12 +166,13 @@ async function measureDocumentPage(page: Page, slideDoc: SlideDocument): Promise
 }
 
 
-/** Off-canvas classification, picture byte loading and raster capture, recursing into groups (whose children are already inside the group's box). */
-async function resolveElements(ctx: PageContext, measured: BrowserElement[], entries: Entry[]): Promise<Element[]> {
+/** Classify in Canvas coordinates, but retain group child coordinates for native emission/source splicing. */
+async function resolveElements(ctx: PageContext, measured: BrowserElement[], entries: Entry[], toCanvas?: Matrix2d): Promise<Element[]> {
   const { slide, canvas } = ctx;
   const out: Element[] = [];
   for (const element of measured) {
-    const offcanvas = classifyOffcanvas(element.box, canvas.width, canvas.height);
+    const bounds = toCanvas ? transformedBounds(element.box, 'rotation' in element ? element.rotation : 0, toCanvas) : element.box;
+    const offcanvas = classifyOffcanvas(bounds, canvas.width, canvas.height);
     if (offcanvas === 'dropped') {
       entries.push({
         code: 'DROPPED_OFFCANVAS',
@@ -185,7 +186,7 @@ async function resolveElements(ctx: PageContext, measured: BrowserElement[], ent
       continue;
     }
     if (element.kind === 'raster') {
-      out.push(await resolveRaster(ctx, element, entries));
+      out.push(await resolveRaster(ctx, element, entries, toCanvas));
       continue;
     }
     if (offcanvas === 'flattened') {
@@ -207,7 +208,7 @@ async function resolveElements(ctx: PageContext, measured: BrowserElement[], ent
       continue;
     }
     if (element.kind === 'group') {
-      const children = await resolveElements(ctx, element.children, entries);
+      const children = await resolveElements(ctx, element.children, entries, groupToCanvas(element, toCanvas));
       if (children.length > 0) {
         out.push({ ...element, children });
       }
@@ -231,6 +232,43 @@ async function resolveElements(ctx: PageContext, measured: BrowserElement[], ent
   return out;
 }
 
+type Matrix2d = { a: number; b: number; c: number; d: number; e: number; f: number };
+
+/** Compose the group's child-to-parent mapping with its ancestors, including axis reflections. */
+function groupToCanvas(group: BrowserGroup, parent?: Matrix2d): Matrix2d {
+  const { box, childBox } = group;
+  const angle = group.rotation * Math.PI / 180;
+  const sx = (childBox.w === 0 ? 1 : box.w / childBox.w) * (group.flipH ? -1 : 1);
+  const sy = (childBox.h === 0 ? 1 : box.h / childBox.h) * (group.flipV ? -1 : 1);
+  const a = Math.cos(angle) * sx;
+  const b = Math.sin(angle) * sx;
+  const c = -Math.sin(angle) * sy;
+  const d = Math.cos(angle) * sy;
+  const cx = childBox.x + childBox.w / 2;
+  const cy = childBox.y + childBox.h / 2;
+  const e = box.x + box.w / 2 - a * cx - c * cy;
+  const f = box.y + box.h / 2 - b * cx - d * cy;
+  if (!parent) return { a, b, c, d, e, f };
+  return {
+    a: parent.a * a + parent.c * b, b: parent.b * a + parent.d * b,
+    c: parent.a * c + parent.c * d, d: parent.b * c + parent.d * d,
+    e: parent.a * e + parent.c * f + parent.e, f: parent.b * e + parent.d * f + parent.f,
+  };
+}
+
+/** Axis-aligned Canvas bounds of a rotated child rectangle under all ancestor transforms. */
+function transformedBounds(box: Box, rotation: number, transform: Matrix2d): Box {
+  const { a, b, c, d, e, f } = transform;
+  const angle = rotation * Math.PI / 180;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const cx = a * (box.x + box.w / 2) + c * (box.y + box.h / 2) + e;
+  const cy = b * (box.x + box.w / 2) + d * (box.y + box.h / 2) + f;
+  const w = Math.abs(a * cos + c * sin) * box.w + Math.abs(c * cos - a * sin) * box.h;
+  const h = Math.abs(b * cos + d * sin) * box.w + Math.abs(d * cos - b * sin) * box.h;
+  return { x: cx - w / 2, y: cy - h / 2, w, h };
+}
+
 /** Loads an image fill's bytes: PNG/JPEG as they are; GIF, WebP and SVG re-encoded to PNG (`SUBSTITUTE_IMAGE_FORMAT`), since `a:blipFill` on a shape takes no vector. */
 async function resolveImageFill(fill: BrowserImageFill, shape: { selector: string; name: string }, slide: number, entries: Entry[]): Promise<ImageFill> {
   const { url, ...rest } = fill;
@@ -245,13 +283,16 @@ async function resolveImageFill(fill: BrowserImageFill, shape: { selector: strin
 
 /**
  * One `RASTER_*` entry and one PNG picture per rasterised subtree (spec 05): the clip is the painted extent
- * intersected with the Canvas, so a partly off-canvas raster is simply cropped rather than flattened.
+ * intersected with the Canvas. Grouped rasters stay in child space; the group and Slide clip them on output.
  */
-async function resolveRaster(ctx: PageContext, raster: BrowserRaster, entries: Entry[]): Promise<PictureElement> {
+async function resolveRaster(ctx: PageContext, raster: BrowserRaster, entries: Entry[], toCanvas?: Matrix2d): Promise<PictureElement> {
   const { canvas, slide } = ctx;
+  const groupSpace = toCanvas !== undefined;
+  // The largest singular value covers both axes, including shear composed by nested rotated groups.
+  const groupScale = toCanvas ? (Math.hypot(toCanvas.a + toCanvas.d, toCanvas.b - toCanvas.c) + Math.hypot(toCanvas.a - toCanvas.d, toCanvas.b + toCanvas.c)) / 2 : 1;
   const left = Math.max(0, raster.box.x);
   const top = Math.max(0, raster.box.y);
-  const box: Box = { x: left, y: top, w: Math.min(canvas.width, raster.box.x + raster.box.w) - left, h: Math.min(canvas.height, raster.box.y + raster.box.h) - top };
+  const box: Box = groupSpace ? raster.box : { x: left, y: top, w: Math.min(canvas.width, raster.box.x + raster.box.w) - left, h: Math.min(canvas.height, raster.box.y + raster.box.h) - top };
   const locator = { selector: raster.selector };
   if (raster.trigger) {
     entries.push(reportEntry(`RASTER_${raster.trigger.suffix}`, { slide, locator, reason: `${raster.trigger.decl} on ${raster.name} has no DrawingML equivalent`, params: { decl: raster.trigger.decl } }));
@@ -261,7 +302,8 @@ async function resolveRaster(ctx: PageContext, raster: BrowserRaster, entries: E
   const data = await captureRaster(ctx.page, {
     selector: raster.selector,
     clip: { x: box.x + ctx.origin.x, y: box.y + ctx.origin.y, w: box.w, h: box.h },
-    dpi: ctx.rasterDpi,
+    groupSpace,
+    dpi: ctx.rasterDpi * Math.max(1, groupScale),
     viewport: { width: canvas.width, height: canvas.height },
   });
   return {

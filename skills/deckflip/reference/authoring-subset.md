@@ -24,7 +24,7 @@ Elements: `section`; block containers (`div`, `header`, `footer`, `main`, `artic
 | `border-radius` uniform / per-corner / elliptical | rounded rectangle / custom geometry |
 | single outer `box-shadow` without spread; single `inset` shadow | outer / inner shadow |
 | `opacity` | folded into fill, line and text alpha (`SUBSTITUTE_OPACITY` info) |
-| `transform: rotate()`, `translate()`, `scale()` | rotation, position, size (scale folds into font size) |
+| `transform: rotate()`, `translate()`, `scale()` | rotation, position, size (uniform scale folds into font size); `data-group` containers also support nonuniform scale and flips without changing child geometry |
 | `object-fit`, `object-position`, `clip-path: inset()` on `img` | picture crop |
 | `overflow: hidden` | no-op; children fully outside the Canvas are dropped (`DROPPED_OFFCANVAS` info), partly outside are clipped by PowerPoint (`FLATTEN_OFFCANVAS` warning) |
 | `visibility: hidden`, `display: none` | not emitted |
@@ -35,6 +35,7 @@ Elements: `section`; block containers (`div`, `header`, `footer`, `main`, `artic
 `filter`; `backdrop-filter`; `mix-blend-mode`; `mask*`; `clip-path` other than `inset()` on `img`; `conic-gradient`, `repeating-*-gradient`, layered backgrounds; `box-shadow` with spread or multiple shadows; `border-style` `double`/`groove`/`ridge`/`inset`/`outset`; `border-image`; `transform` other than rotate/scale/translate; `outline` that is non-solid/dashed/dotted, offset, or doubles a border.
 
 A rasterised element becomes one PNG covering its painted extent (shadow and blur included), captured in isolation at `--raster-dpi` (default 192 = 2x). Descendants are inside the picture; nested triggers add no entries. `data-raster` does the same on purpose (`RASTER_EXPLICIT`, info) and includes text.
+Inside a native group, the raster picture retains child coordinates; ancestor group transforms are applied once by the group, and the Slide clips the result to the Canvas.
 
 ## Text effects flattened (`FLATTEN_TEXT_*` warning)
 

@@ -35,7 +35,7 @@ Picture notes: an `img` inside a Text block is emitted as its own picture on top
 | `box-shadow` single `inset`, no spread | `a:innerShdw` |
 | `opacity` | multiplied into fill/line/text alpha; pictures via `a:alphaModFix` (`substituted` info `SUBSTITUTE_OPACITY`) |
 | `transform: rotate(<angle>)` (alone, or with translate) | `a:xfrm/@rot`; translate folded into position |
-| `transform: scale()` | folded into size (text: into font size) |
+| `transform: scale()` | uniform scale folded into size (text: into font size); `data-group` containers retain independent axis scales and flips in the group transform, leaving child geometry and text native |
 | `object-fit: cover/contain`, `object-position` | `a:srcRect` |
 | `clip-path: inset(...)` on `img` | `a:srcRect` |
 | `overflow: hidden` on a container | no-op (children outside are clipped by their own measured boxes; children fully outside are dropped with `DROPPED_OFFCANVAS` info) |

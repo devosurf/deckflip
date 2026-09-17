@@ -8,11 +8,13 @@ Decided in [#13](https://github.com/devosurf/deckflip/issues/13).
 - Region-level merging is not done: two overlapping rasterised siblings stay two pictures in paint order. Simpler, and each picture keeps its own locator and hint.
 - Capture is **isolated**: during the raster pass the tool sets `visibility: hidden` on `body` and `visibility: visible` on the target subtree only, so ancestors' backgrounds and overlapping siblings do not bleed into the picture, then screenshots the clip rectangle with `omitBackground: true`. Fonts and images are already loaded (measurement pass ran first); `animation`/`transition` are frozen with `animation-play-state: paused` after `load`.
 - The clip rectangle is the border box expanded by the element's painted overflow (`box-shadow` extent, `filter: blur/drop-shadow` radius) and intersected with the Canvas. The picture is positioned at that rectangle. Elements fully outside the Canvas are not captured (`DROPPED_OFFCANVAS`).
+  - Within a native group, capture the painted extent in child coordinates with ancestor group transforms temporarily disabled. Keep that child-space picture box and let the native group apply its transform once; the Slide clips it to the Canvas on output. Off-canvas classification still uses the composed Canvas bounds.
 
 ## Quality
 
 - Format: PNG with alpha, always. JPEG is never produced by the tool; photographic content arrives via `img`, which is copied through as a native picture in its source format (WebP/AVIF re-encoded to PNG, `SUBSTITUTE_IMAGE_FORMAT` info).
 - Scale: `--raster-dpi` (#9), default `192` = 2x the Canvas (Chromium `deviceScaleFactor = dpi / 96`). Allowed 96-384. The picture's `a:ext` is the CSS box in EMU regardless of DPI; DPI only sets pixel density.
+  - Grouped captures increase pixel density by the largest composed ancestor scale when it exceeds one, so enlargement does not undersample the requested Canvas DPI; nonuniform scales may oversample the other axis.
 - Deduplication by content hash: identical captures share one media part (`media/raster-<hash>.png`); filenames are deterministic so repeated conversions are byte-stable.
 - Alpha and `opacity` are baked into the pixels (no `alphaModFix` on rasters).
 

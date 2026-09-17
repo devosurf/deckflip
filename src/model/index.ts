@@ -71,10 +71,13 @@ export interface GroupElement {
   name: string;
   /** placement on the Slide after the container's transform, CSS px -> `a:off`/`a:ext` */
   box: Box;
-  /** union of the children's boxes in their own (untransformed) coordinates -> `a:chOff`/`a:chExt` */
+  /** child coordinate space -> `a:chOff`/`a:chExt`; authored HTML uses the union of the children's boxes */
   childBox: Box;
   /** degrees clockwise */
   rotation: number;
+  /** reflections in the group's axes, before rotation */
+  flipH?: boolean;
+  flipV?: boolean;
   /** paint order; a painting container's own shape comes first */
   children: Element[];
 }

@@ -11,6 +11,7 @@ Availability: `deckflip convert deck.pptx` writes the HTML Deck and its Asset di
 ## What the HTML looks like
 
 - One `<section id="slide-<n>" data-title data-layout>` per Slide; each shape a direct child with `style="position:absolute; left..; top..; width..; height.."` and `transform: rotate()` when rotated. Groups are `<div data-group>` with absolutely positioned children.
+  - Group layout boxes describe child coordinates, not Canvas bounds. Their transforms carry placement, rotation, scale and flips; keep those transforms when editing a child. Nested transforms compose.
 - Text bodies are `<div>` with `<p>` and `<span>` runs; lists `ul`/`ol`; pictures `img`; tables `table`; media `video`/`audio`; content HTML cannot show is an empty `div[data-preserve="<class>"]` box labelled by its `title`.
 - Every element from a shape carries `data-shape-id`. Leave it alone: it is how the tool knows which shape you edited. Inventing or duplicating ids is ignored (`PRESERVE_UNKNOWN_ID`).
 - Theme tokens are CSS custom properties (`--theme-accent1`, `--theme-major-font`, ...), run/paragraph styles are classes (`.t1`, `.t2`, ...). Geometry is never in the stylesheet.

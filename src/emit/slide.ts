@@ -105,7 +105,7 @@ function buildGroup(group: GroupElement, ctx: ShapeEmissionContext, nextId: () =
       {},
       el(
         'a:xfrm',
-        { rot: Math.round(group.rotation * 60000) },
+        { rot: Math.round(group.rotation * 60000), ...(group.flipH ? { flipH: 1 } : {}), ...(group.flipV ? { flipV: 1 } : {}) },
         el('a:off', { x: pxToEmu(group.box.x), y: pxToEmu(group.box.y) }),
         el('a:ext', { cx: pxToEmu(group.box.w), cy: pxToEmu(group.box.h) }),
         el('a:chOff', { x: pxToEmu(group.childBox.x), y: pxToEmu(group.childBox.y) }),

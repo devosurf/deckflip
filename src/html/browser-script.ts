@@ -314,10 +314,14 @@ export function measureSlideDocument(): BrowserMeasureResult {
     if (raster) {
       return [raster];
     }
-    if (el.hasAttribute('data-group') && !isPictureElement(el) && el.tagName !== 'TABLE' && !isTextBlock(el)) {
+    if (isGroup(el)) {
       return measureGroup(el);
     }
     return walkPainting(el);
+  }
+
+  function isGroup(el: HTMLElement): boolean {
+    return el.hasAttribute('data-group') && !isPictureElement(el) && el.tagName !== 'TABLE' && !isTextBlock(el);
   }
 
 
@@ -413,7 +417,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
     if (cs.borderImageSource !== 'none') {
       return { suffix: 'BORDER_IMAGE', decl: `border-image: ${cs.borderImageSource}` };
     }
-    if (cs.transform !== 'none' && !decomposeTransform(cs.transform)) {
+    if (cs.transform !== 'none' && !decomposeTransform(cs.transform, isGroup(el))) {
       return { suffix: 'TRANSFORM', decl: `transform: ${cs.transform}` };
     }
     const outline = unsupportedOutline(cs);
@@ -551,7 +555,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
       return [];
     }
     const childBox = unionBox(children.map((child) => child.box));
-    const transform = decomposeTransform(transformValue);
+    const transform = decomposeTransform(transformValue, true);
     const containerBox = withoutTransform(el, () => measuredBox(el));
     return [{
       kind: 'group',
@@ -561,6 +565,8 @@ export function measureSlideDocument(): BrowserMeasureResult {
       box: transform ? transformedBoxAround(cs, containerBox, childBox, transform) : childBox,
       childBox,
       rotation: transform?.rotation ?? 0,
+      // The first matrix column sets rotation; a negative determinant is the remaining vertical reflection.
+      ...(transform && transform.a * transform.d - transform.b * transform.c < 0 ? { flipV: true } : {}),
       children,
     }];
   }
@@ -647,7 +653,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
           box: transform ? transformedBoxAround(cs, measured.origin, measured.box, transform) : measured.box,
           rotation: transform?.rotation ?? 0, geometry: { preset: 'rect' }, text: measured.text,
         };
-        finishShape(el, shape, transform?.scale ?? 1);
+        finishShape(el, shape, transform?.scaleX ?? 1);
         out.push(shape);
       }
       out.push(...measureInlinePictures(el, range));
@@ -1031,7 +1037,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
       box: transform ? transformedBox(cs, box, transform) : box,
       rotation: transform?.rotation ?? 0,
       geometry: classifyGeometry(box, cs),
-      scale: transform?.scale ?? 1,
+      scale: transform?.scaleX ?? 1,
     };
     const sides = parseBorderSides(cs);
     const line = parseLine(cs);
@@ -2430,10 +2436,10 @@ export function measureSlideDocument(): BrowserMeasureResult {
     return px(trimmed);
   }
 
-  type Transform2d = { rotation: number; scale: number; a: number; b: number; c: number; d: number; e: number; f: number };
+  type Transform2d = { rotation: number; scaleX: number; scaleY: number; a: number; b: number; c: number; d: number; e: number; f: number };
 
-  /** Rotation + uniform scale + translate from the computed 2-D matrix; anything else (skew, 3-D, non-uniform scale) is undefined. */
-  function decomposeTransform(transform: string): Transform2d | undefined {
+  /** Groups retain separate axes; leaf elements can only fold uniform scale into their native styling. */
+  function decomposeTransform(transform: string, group = false): Transform2d | undefined {
     if (!transform || transform === 'none') {
       return undefined;
     }
@@ -2448,19 +2454,19 @@ export function measureSlideDocument(): BrowserMeasureResult {
     const [a, b, c, d, e, f] = parts as [number, number, number, number, number, number];
     const sx = Math.hypot(a, b);
     const sy = Math.hypot(c, d);
-    if (sx <= 0 || !nearlyEqual(sx, sy) || !nearlyEqual(a * c + b * d, 0)) {
+    if (sx <= 0 || sy <= 0 || (!group && !nearlyEqual(sx, sy)) || !nearlyEqual(a * c + b * d, 0)) {
       return undefined;
     }
     const degrees = (Math.atan2(b, a) * 180) / Math.PI;
     // decomposed from a float matrix, not layout: 3 decimals absorb its noise (1e-5 deg would flip a 1/60000 deg `rot`)
     const round3 = (value: number): number => Math.round(value * 1000) / 1000;
-    return { rotation: round3(((degrees % 360) + 360) % 360) % 360, scale: round3(sx), a, b, c, d, e, f };
+    return { rotation: round3(((degrees % 360) + 360) % 360) % 360, scaleX: group ? sx : round3(sx), scaleY: group ? sy : round3(sx), a, b, c, d, e, f };
   }
 
   /**
    * Applies the element's transform to an untransformed box: the box centre goes through the matrix about
-   * `transform-origin` (resolved against `originBox`, the element's border box), the size takes the uniform
-   * scale, and the rotation goes to `rotation`.
+   * `transform-origin` (resolved against `originBox`, the element's border box), the size takes the axis
+   * scales, and the rotation goes to `rotation`.
    */
   function transformedBoxAround(cs: CSSStyleDeclaration, originBox: Box, box: Box, transform: Transform2d): Box {
     const origin = cs.transformOrigin.split(/\s+/).map((part) => px(part));
@@ -2470,8 +2476,8 @@ export function measureSlideDocument(): BrowserMeasureResult {
     const cy = box.y + box.h / 2 - oy;
     const centreX = ox + transform.a * cx + transform.c * cy + transform.e;
     const centreY = oy + transform.b * cx + transform.d * cy + transform.f;
-    const w = box.w * transform.scale;
-    const h = box.h * transform.scale;
+    const w = box.w * transform.scaleX;
+    const h = box.h * transform.scaleY;
     return { x: round(centreX - w / 2), y: round(centreY - h / 2), w: round(w), h: round(h) };
   }
 
