@@ -51,14 +51,6 @@ export async function measureDeck(loaded: LoadedDeck, opts: MeasureOptions): Pro
   const fontFaces = new Map<string, { family: string; file: string; weight?: number; italic?: boolean }>();
 
   try {
-    // Image assets are local-only even while Chromium measures them. Do not fetch a remote image
-    // just to reject it later; file and data URLs still follow the same decoding/format pipeline.
-    await context.route('**/*', (route) => {
-      const request = route.request();
-      return request.resourceType() === 'image' && !/^(file|data):/.test(request.url())
-        ? route.abort()
-        : route.continue();
-    });
     for (const document of loaded.documents) {
       const page = await context.newPage();
       try {
@@ -150,6 +142,16 @@ async function measureDocumentPage(page: Page, slideDoc: SlideDocument): Promise
   const tempPath = join(dirname(slideDoc.sourceFile), `.deckflip-${slideDoc.index}-${randomUUID().slice(0, 8)}.html`);
   await writeFile(tempPath, slideDoc.html, 'utf8');
   try {
+    const blockedImages = new Set<string>();
+    // Enforce the image policy before fetching, including inside rasterised subtrees.
+    await page.route('**/*', (route) => {
+      const request = route.request();
+      if (request.resourceType() === 'image' && !/^(file|data):/.test(request.url())) {
+        blockedImages.add(request.url());
+        return route.abort();
+      }
+      return route.continue();
+    });
     await page.goto(pathToFileURL(tempPath).href, { waitUntil: 'load' });
     await page.emulateMedia({ reducedMotion: 'reduce' });
     // Tagged so the page script can lift it while reading `transition` (see `validateDocument`). Animations are
@@ -167,7 +169,7 @@ async function measureDocumentPage(page: Page, slideDoc: SlideDocument): Promise
     // exists in the Node bundle; the serialised page script needs an identity shim for it.
     await page.evaluate('globalThis.__name = globalThis.__name || ((fn) => fn)');
     await page.evaluate(preloadBackgroundImages);
-    return await page.evaluate(measureSlideDocument);
+    return await page.evaluate(measureSlideDocument, [...blockedImages]);
   } finally {
     await unlink(tempPath).catch(() => {});
   }

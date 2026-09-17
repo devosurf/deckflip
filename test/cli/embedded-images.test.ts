@@ -167,6 +167,22 @@ describe.skipIf(!browserAvailable)('embedded image conversion', () => {
     }
   });
 
+  it('reports blocked images inside rasterised subtrees and keeps absent sources on the missing-asset path', async () => {
+    const dir = await workspace();
+    const input = join(dir, 'nested.html');
+    await writeFile(input, deckHtml([
+      `<div data-raster style="width: 200px; height: 200px"><img src="https://deckflip.invalid/remote.png"></div>`,
+      `<img id="missing">`,
+    ]));
+    const result = await convertHtmlToPptx(input, { ...options, browser });
+    expect(result.exitCode).toBe(2);
+    expect(result.report.entries.filter((entry) => entry.severity === 'error')).toEqual([
+      expect.objectContaining({ code: 'VALIDATE_REMOTE_ASSET', slide: 1, locator: { selector: 'body > section' } }),
+      expect.objectContaining({ code: 'VALIDATE_MISSING_ASSET', slide: 2, locator: { selector: '#missing' } }),
+    ]);
+    await expect(stat(result.outputPath)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
   it('omits embedded payloads from CSS fallback Report entries', async () => {
     const dir = await workspace();
     const bytes = await readFile('test/html/fixtures/assets/quad.png');

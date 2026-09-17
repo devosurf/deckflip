@@ -101,7 +101,7 @@ export async function preloadBackgroundImages(): Promise<void> {
   (window as unknown as { __deckflipBackgroundImages: BackgroundImageSizes }).__deckflipBackgroundImages = sizes;
 }
 
-export function measureSlideDocument(): BrowserMeasureResult {
+export function measureSlideDocument(blockedImages: string[]): BrowserMeasureResult {
   type LineGroup = { top: number; left: number; right: number; bottom: number; height: number };
 
   const section = document.querySelector('body > section') as HTMLElement | null;
@@ -134,6 +134,7 @@ export function measureSlideDocument(): BrowserMeasureResult {
 
   const shapes: BrowserElement[] = [];
   const entries: BrowserEntry[] = [];
+  const unreportedImages = new Set(blockedImages);
   validateDocument(section);
   // Spec 03 rule 3 applies to the Slide too: a section with a background, border or shadow paints a full-Canvas
   // shape behind everything else. Anonymous inline content is measured separately from that background.
@@ -141,6 +142,11 @@ export function measureSlideDocument(): BrowserMeasureResult {
     shapes.push(makeShape(section, measuredBox(section)));
   }
   shapes.push(...walkContents(section));
+  // The native measurement walk does not descend into rasterised subtrees or SVG drawings.
+  // A blocked image there must still fail validation rather than silently disappear from the capture.
+  for (const url of unreportedImages) {
+    entries.push({ code: 'VALIDATE_REMOTE_ASSET', selector: 'body > section', reason: `Slide contains a blocked remote image: ${url}` });
+  }
   return {
     meta,
     sectionBox,
@@ -801,8 +807,9 @@ export function measureSlideDocument(): BrowserMeasureResult {
 
   function validateImageAsset(url: string, loaded: boolean, selector: string, name: string): boolean {
     const embedded = url.startsWith('data:');
-    if (!embedded && !url.startsWith('file:')) {
+    if (url && !embedded && !url.startsWith('file:')) {
       entries.push({ code: 'VALIDATE_REMOTE_ASSET', selector, reason: `${name} loads ${url}` });
+      unreportedImages.delete(url);
       return false;
     }
     if (!loaded) {
