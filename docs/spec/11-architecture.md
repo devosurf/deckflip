@@ -59,6 +59,6 @@ Part names and rel ids are assigned in emission order; media are content-hash na
 2. **Shapes, pictures, tables, lists, groups**: full native table from [03](03-authoring-subset.md) and [04](04-text-mapping.md). Accept: `shapes`, `pictures`, `tables`, `layout` corpus gates.
 3. **validate, report, raster, skill**: complete code list, isolated raster capture, `--strict`, `skills/deckflip/` with templates passing at zero warnings. Accept: `raster` and `templates` corpus; an agent session producing a deck from the skill alone.
 4. **Parser, PPTX -> HTML, round trip**: `parse`, `htmlout`, manifest, fingerprints, opaque handling. Accept: `roundtrip` corpus part-identity and idempotence gates; foreign decks list every opaque element.
-5. **Fonts embedding, render, inspect polish**: EOT embedding verified in PowerPoint for Windows and Mac; LibreOffice/PowerPoint renderers; `inspect` schema frozen. Accept: `fonts` corpus; embedded font opens on both platforms.
+5. **Fonts embedding, render, inspect polish**: EOT embedding verified in PowerPoint for Mac; LibreOffice/PowerPoint renderers; `inspect` schema frozen. Accept: `fonts` corpus; embedded font opens on Mac. Windows verification is deferred until Windows support resumes under the [supported-host policy](10-rendering-and-verification.md#supported-host).
 
 The initial `0.1.0` release includes milestones 1-4: bidirectional conversion and round-trip preservation. Publish `1.0.0` after milestone 5 and the report schema is declared stable.

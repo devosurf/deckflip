@@ -15,7 +15,7 @@ Build-ready spec for `deckflip`: a bidirectional HTML <-> PPTX CLI and agent ski
 | 07 | [Font policy](07-fonts.md) | resolution, safe set, warnings, embedding, PPTX -> HTML fonts |
 | 08 | [Report codes](08-report-codes.md) | every code with kind, severity, trigger and hint |
 | 09 | [`inspect` output](09-inspect.md) | the JSON shape |
-| 10 | [Rendering, verification and environment](10-rendering-and-verification.md) | renderers, Chromium policy, comparator gates, corpus, CI, Windows |
+| 10 | [Rendering, verification and environment](10-rendering-and-verification.md) | supported host, renderers, Chromium policy, comparator gates, corpus, CI |
 | 11 | [Architecture and build plan](11-architecture.md) | dependencies, modules, IDM seam, pipelines, determinism, milestones |
 | 12 | [Agent skill](12-skill.md) | skill scope, format, distribution, SKILL.md outline |
 

@@ -66,6 +66,6 @@ Never implicitly. `data-raster` on it or an ancestor rasterises it (#13); the re
 
 ## Known residuals (documented in the spec, not decisions)
 
-- PowerPoint on Windows may place the exact-spacing baseline differently from the Mac fit above; recalibration on Windows (the same `(f, L)` grid, `scripts/`-style ink-row comparison) is a build-phase acceptance check.
+- PowerPoint on Windows may place the exact-spacing baseline differently from the Mac fit above. Windows recalibration (the same `(f, L)` grid, `scripts/`-style ink-row comparison) is deferred until Windows support resumes under the [supported-host policy](10-rendering-and-verification.md#supported-host); it is not a current build-phase acceptance check.
 - Justified text distributes space differently; breaks are unaffected.
 - LibreOffice restarts an `a:buAutoNum` sequence on every paragraph that carries an explicit `startAt`, so an `ol[start]` list renders as `3. 3. 3.` in the CI proxy while PowerPoint renders `3. 4. 5.`; the digits are inside the 2.0 % LibreOffice gate.

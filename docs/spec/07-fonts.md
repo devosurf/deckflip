@@ -25,7 +25,7 @@ The Office-bundled families are safe for the viewer (PowerPoint) but not for the
 - `--embed-fonts` embeds every Resolved font of class deck-provided or other-installed; `--embed-fonts=<name,...>` embeds exactly the named families (safe ones included, for pixel parity on machines without Office). Default off.
 - Permission: embed only when `OS/2.fsType` is `0` (installable) or `8` (editable). `4` (preview/print) and `2` (restricted) are not embedded: `FONT_EMBED_RESTRICTED` (warning) and the font stays a `FONT_NOT_SAFE` warning. No read-only downgrade: editability outranks fidelity.
 - Payload: `p:embeddedFontLst/p:embeddedFont` with `regular`/`bold`/`italic`/`boldItalic` entries for each face actually used, each a part `ppt/fonts/font<n>.fntdata` of content type `application/x-fontdata`, containing the face wrapped as **uncompressed EOT** (EOT header + sfnt, no MTX, no XOR). No subsetting in v1 ("embed all characters"). Accepted source formats: TTF, OTF, WOFF (inflated to sfnt); WOFF2 and TTC faces are `FONT_EMBED_FORMAT` (warning, not embedded). Variable fonts embed the whole file (PowerPoint picks the default instance; `SUBSTITUTE_FONT_WEIGHT` info when a non-default weight was used).
-- Verification: the EOT-wrapped payload opening in PowerPoint for Windows and Mac is the first acceptance test of the embedding milestone; the flag is off by default so nothing else depends on it.
+- Verification: the EOT-wrapped payload opening in PowerPoint for Mac is the first acceptance test of the embedding milestone; the flag is off by default so nothing else depends on it. Windows verification is deferred under the [supported-host policy](10-rendering-and-verification.md#supported-host).
 
 ## PPTX -> HTML
 
