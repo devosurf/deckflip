@@ -4,6 +4,7 @@ Bidirectional conversion between HTML slides and PowerPoint (`.pptx`), built for
 
 ## Requirements
 
+- macOS; Windows and Linux hosts are unsupported for now
 - Node.js 20.16 or newer
 - Chromium, installed automatically on first use unless `--offline` is set
 - LibreOffice for the default `render` command, or PowerPoint with `--renderer powerpoint`

@@ -12,9 +12,9 @@ env:
   SOURCE_DATE_EPOCH: '1704164645'
 
 jobs:
-  ubuntu:
-    # Unit tests, LibreOffice corpus gates, determinism (docs/spec/10-rendering-and-verification.md "CI shape").
-    runs-on: ubuntu-latest
+  macos:
+    # macOS is the supported host; keep all automated gates here. PowerPoint remains a manual oracle.
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,13 +24,9 @@ jobs:
       - run: npm ci
       - run: npm audit --omit=dev
       - name: Install LibreOffice and PowerPoint-compatible fonts
-        run: |
-          echo 'ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true' | sudo debconf-set-selections
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libreoffice-impress fonts-liberation fonts-crosextra-carlito fonts-crosextra-caladea ttf-mscorefonts-installer
-          sudo fc-cache -f
+        run: brew install --cask libreoffice font-liberation font-carlito font-caladea
       - name: Install managed Chromium
-        run: node node_modules/playwright-core/cli.js install --with-deps chromium
+        run: node node_modules/playwright-core/cli.js install chromium
       - run: npm run typecheck
       - run: npm test
       - name: 'Determinism: two conversions of the skill template are byte-identical'
@@ -40,31 +36,3 @@ jobs:
           cmp /tmp/first.pptx /tmp/second.pptx
       - run: npm run build
       - run: npm pack --dry-run
-
-  windows:
-    # Unit tests and the Windows font scan; no LibreOffice, so image gates skip themselves.
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - name: Install managed Chromium
-        run: node node_modules/playwright-core/cli.js install chromium
-      - run: npm test
-
-  macos:
-    # Unit tests and the CoreText font scan; the PowerPoint oracle is a manual step and never runs here.
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - name: Install managed Chromium
-        run: node node_modules/playwright-core/cli.js install chromium
-      - run: npm test

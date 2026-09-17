@@ -2,6 +2,10 @@
 
 Consolidates the renderer research ([#5](https://github.com/devosurf/deckflip/issues/5)), the spike ([#8](https://github.com/devosurf/deckflip/issues/8)) and the environment questions the map carried as fog.
 
+## Supported host
+
+macOS is the only supported CLI host for now. Windows and Linux implementation paths are retained but are not supported or CI-gated. Cross-platform notes elsewhere in the specs describe retained implementation details or future work, not current release acceptance criteria. This does not change the PPTX format or Safe font policy.
+
 ## Renderers
 
 | Input | Renderer | Selection |
@@ -25,7 +29,7 @@ Resolution order: `--browser <path>` > `DECKFLIP_BROWSER` > the managed build if
 | Comparison | Gate (initial, calibrated on the corpus) |
 | --- | --- |
 | Chromium screenshot of the HTML vs PowerPoint render of the converted PPTX (oracle, Mac, manual) | <= 0.5 % |
-| Chromium screenshot vs LibreOffice render (CI) | <= 2.6 %, calibrated against the deterministic Ubuntu results for the text corpus, with `RENDER_FONT_SUBSTITUTED` fixtures excluded |
+| Chromium screenshot vs LibreOffice render (CI) | <= 2.6 %, originally calibrated on Ubuntu and retained unchanged for macOS, with `RENDER_FONT_SUBSTITUTED` fixtures excluded |
 | PPTX -> HTML -> PPTX (untouched) | every part byte-identical; no image gate needed |
 | HTML -> PPTX -> HTML -> PPTX | second PPTX part-identical to the first (idempotence) |
 
@@ -49,12 +53,14 @@ Renewal: adding a fixture means adding `deck.html` and running `corpus:oracle` o
 
 ## CI shape
 
-GitHub Actions, three jobs:
+GitHub Actions has one required job, `macos`:
 
-- `ubuntu`: unit tests; LibreOffice + Liberation, Carlito, Caladea and Microsoft Core Fonts; the corpus gates above; round-trip identity; idempotence; determinism (two runs, identical bytes with `SOURCE_DATE_EPOCH`).
-- `windows`: unit tests; font scan on `%WINDIR%\Fonts` and the per-user directory; path handling; HTML -> PPTX for the `text` and `fonts` categories with `expected/report.json` comparison (no image gate: no LibreOffice on this job).
-- `macos`: unit tests; font scan on CoreText directories. The PowerPoint oracle is never run in CI (Microsoft does not support unattended Office); it is a documented manual step on the maintainer's machine.
+- Install LibreOffice, Liberation, Carlito and Caladea, plus the pinned managed Chromium.
+- Audit production dependencies, typecheck, and run the full test suite, including the LibreOffice corpus gates, font scan, round-trip identity and idempotence.
+- Check determinism with two byte-identical conversions under `SOURCE_DATE_EPOCH`, then build and verify the npm package contents.
 
-## Windows notes
+The PowerPoint oracle is never run in CI (Microsoft does not support unattended Office); it remains a manual step on the maintainer's Mac. Windows and Ubuntu jobs are deferred until those hosts are supported.
+
+## Windows notes (unsupported host)
 
 Font directories as in [07-fonts.md](07-fonts.md); `\\?\` long-path prefix when a path exceeds 260 characters; asset URLs are resolved with `file:` URLs, never string-joined paths; `SOURCE_DATE_EPOCH` honoured the same way; PowerShell 5.1 is enough for the PowerPoint oracle. LibreOffice default location `C:\Program Files\LibreOffice\program\soffice.exe`.

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- Limit supported CLI hosts and CI to macOS for now, retaining the full rendering, determinism, build and packaging checks on the macOS job.
+
 ### Fixed
 
 - Accept embedded image data URIs throughout HTML-to-PPTX conversion with the same format policy as local images, bounded validation Report entries, and no remote image fetching (#27).

@@ -7,6 +7,8 @@ description: Create, convert, or edit PowerPoint decks by writing HTML slides an
 
 Author slides as HTML, convert with `npx deckflip@latest`, and let the Conversion report drive the fix-it loop. The CLI is the source of truth: when this file and `deckflip <cmd> --help` or the report's `tool.version` disagree, trust the CLI. Run every command in a shell.
 
+Run the CLI on macOS. Windows and Linux hosts are unsupported for now.
+
 Vocabulary: a **Deck** is one HTML file (or a directory of them); a **Slide** is one `<section>` laid out on a fixed **Canvas**; a **native** element is a real, editable PowerPoint object; a **rasterised** element is a picture; a **flattened** effect was dropped to keep text editable; a **Report entry** records each of those with a stable code, where, why, and a `hint` that is an edit to the HTML.
 
 ## The loop
