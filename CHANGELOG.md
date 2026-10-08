@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.2.0 - 2026-10-08
+
 ### Added
 
 - Verification: every conversion compares what its source shows with what its output contains (Visible text, speaker notes, element geometry, stacking) and reports a mismatch as `VERIFY_TEXT_MISSING`, `VERIFY_TEXT_EXTRA`, `VERIFY_GEOMETRY` or `VERIFY_STACKING` with the new exit code 5, keeping the output. PPTX-to-HTML conversion now lays the written Deck out in Chromium to verify it.
