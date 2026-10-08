@@ -5,7 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Browser, Page } from 'playwright-core';
 import { textBodiesOf } from '../model/index.js';
 import { groupToCanvas, transformedBounds, type Matrix2d } from '../model/geometry.js';
-import type { Box, Canvas, Deck, Element, ImageFill, PictureElement, Slide, TextBody } from '../model/index.js';
+import type { Box, Canvas, Deck, Element, ImageFill, PictureElement, ShapeElement, Slide, TextBody } from '../model/index.js';
 import { entry as reportEntry } from '../report/codes.js';
 import type { Entry } from '../report/types.js';
 import type { BrowserCensus, BrowserElement, BrowserImageFill, BrowserMeasureResult, BrowserPicture, BrowserRaster } from './browser-script.js';
@@ -233,7 +233,9 @@ async function resolveElements(ctx: PageContext, measured: BrowserElement[], ent
     if (element.kind === 'shape') {
       const { fill, ...shape } = element;
       const resolvedFill = fill?.type === 'image' ? await resolveImageFill(fill, element, slide, entries) : fill;
-      out.push(resolvedFill === undefined ? shape : { ...shape, fill: resolvedFill });
+      const resolved: ShapeElement = resolvedFill === undefined ? shape : { ...shape, fill: resolvedFill };
+      capPaintedGuard(resolved, slide, entries);
+      out.push(resolved);
       continue;
     }
     if (element.kind === 'opaque') {
@@ -247,6 +249,27 @@ async function resolveElements(ctx: PageContext, measured: BrowserElement[], ent
     out.push(element);
   }
   return out;
+}
+
+/**
+ * The wrap-width guard may widen a painted shape by at most 1 px (spec 04): what the trailing insets cannot absorb
+ * moves its fill or border. Beyond that the guard is capped and the block flagged `LAYOUT_WRAP_RISK`, since
+ * PowerPoint may then break it elsewhere. A shape that paints nothing widens unseen and keeps its whole guard.
+ * The trailing side follows emit/shape.ts `planGuard`: the right, the left when right-aligned or RTL, half of
+ * each when centred.
+ */
+function capPaintedGuard(shape: ShapeElement, slide: number, entries: Entry[]): void {
+  const text = shape.text;
+  const paints = (shape.fill !== undefined && !(shape.fill.type === 'solid' && shape.fill.color.alpha === 0)) || shape.line !== undefined || shape.borders !== undefined || shape.shadow !== undefined;
+  if (!text || text.trailingGuard <= 0 || !paints) return;
+  const absorbs = (side: 'l' | 'r'): number => text.padding[side] + (shape.line ? shape.line.width / 2 : (shape.borders?.[side === 'l' ? 'left' : 'right']?.width ?? 0));
+  const align = text.paragraphs[0]?.align;
+  const allowed = align === 'ctr' ? 2 * Math.min(absorbs('l'), absorbs('r')) + 1 : (align === 'r' || text.rtl ? absorbs('l') : absorbs('r')) + 1;
+  if (text.trailingGuard <= allowed) return;
+  const wanted = text.trailingGuard;
+  text.trailingGuard = Math.floor(allowed * 32) / 32;
+  if (entries.some((entry) => entry.code === 'LAYOUT_WRAP_RISK' && entry.slide === slide && entry.locator !== undefined && 'selector' in entry.locator && entry.locator.selector === shape.selector)) return;
+  entries.push(reportEntry('LAYOUT_WRAP_RISK', { slide, locator: { selector: shape.selector }, reason: `${shape.name} would have to widen ${(wanted - allowed + 1).toFixed(1)} px for PowerPoint to keep its line breaks; its painted box widens 1 px`, params: { el: shape.name } }));
 }
 
 /** Loads an image fill's bytes: PNG/JPEG as they are; GIF, WebP and SVG re-encoded to PNG (`SUBSTITUTE_IMAGE_FORMAT`), since `a:blipFill` on a shape takes no vector. */

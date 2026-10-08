@@ -48,6 +48,10 @@ _Avoid_: Validation (that is the authoring check before conversion), self-test, 
 The text Chromium lays out on a Slide, read independently of the measurement walk; hidden subtrees, speaker notes, Rasterised elements, Opaque elements, generated content and text wholly off the Canvas excluded.
 _Avoid_: Rendered text, DOM text, content
 
+**Census**:
+Chromium's own read of a rendered Slide for Verification: its Visible text, its speaker notes and how it stacks overlapping Painting elements, taken by a walk independent of the measurement so that one cannot hide what the other lost.
+_Avoid_: Snapshot, scan, inventory
+
 **PowerPoint oracle**:
 The committed PowerPoint renders of a corpus fixture, with the Oracle record of the package they were rendered from; what the corpus gates compare Chromium against.
 _Avoid_: Reference images, golden PNGs

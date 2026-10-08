@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Wrap-width guard</title>
+<!-- Each paragraph's first line ends 0.5 px short of its wrap width ("fits" Slides), or its next word misses the
+     first line by 0.5 px ("misses" Slides), in Chromium; widths measured in Chromium, rounded to 1/64 px.
+     wrap-guard.test.ts counts every paragraph's lines in the PowerPoint oracle against Chromium's. -->
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  p { position: absolute; left: 40px; line-height: 1.5; color: #111827; }
+</style>
+</head>
+<body>
+<section data-title="12 px, first line fits">
+  <p style="top: 30px; width: 363.34375px; font-family: 'Arial', Arial; font-size: 12px">Store teams asked for fewer and clearer messages in every window, one hero product with a single price, and a code that lands on the size guide before the autumn launch.</p>
+  <p style="top: 195px; width: 354.328125px; font-family: 'Georgia', Arial; font-size: 12px">Store teams asked for fewer and clearer messages in every window, one hero product with a single price, and a code that lands on the size guide before the autumn launch.</p>
+  <p style="top: 360px; width: 413.953125px; font-family: 'Verdana', Arial; font-size: 12px">Store teams asked for fewer and clearer messages in every window, one hero product with a single price, and a code that lands on the size guide before the autumn launch.</p>
+  <p style="top: 525px; width: 324.59375px; font-family: 'Times New Roman', Arial; font-size: 12px">Store teams asked for fewer and clearer messages in every window, one hero product with a single price, and a code that lands on the size guide before the autumn launch.</p>
+</section>
+<section data-title="12 px, first line misses">
+  <p style="top: 30px; width: 385.703125px; font-family: 'Arial', Arial; font-size: 12px">Store teams asked for fewer and clearer messages in every window, one hero product with a single price, and a code that lands on the size guide before the autumn launch.</p>
+  <p style="top: 195px; width: 375.578125px; font-family: 'Georgia', Arial; font-size: 12px">Store teams asked for fewer and clearer messages in every window, one hero product with a single price, and a code that lands on the size guide before the autumn launch.</p>
+  <p style="top: 360px; width: 439.203125px; font-family: 'Verdana', Arial; font-size: 12px">Store teams asked for fewer and clearer messages in every window, one hero product with a single price, and a code that lands on the size guide before the autumn launch.</p>
+  <p style="top: 525px; width: 343.921875px; font-family: 'Times New Roman', Arial; font-size: 12px">Store teams asked for fewer and clearer messages in every window, one hero product with a single price, and a code that lands on the size guide before the autumn launch.</p>
+</section>
+<section data-title="20 px, first line fits">
+  <p style="top: 30px; width: 356.234375px; font-family: 'Arial', Arial; font-size: 20px">Store teams asked for fewer and clearer messages in every window, one hero product with a single price, and a code that lands on the size guide before the autumn launch.</p>
+  <p style="top: 195px; width: 347.953125px; font-family: 'Georgia', Arial; font-size: 20px">Store teams asked for fewer and clearer messages in every window, one hero product with a single price, and a code that lands on the size guide before the autumn launch.</p>
+  <p style="top: 360px; width: 406.375px; font-family: 'Verdana', Arial; font-size: 20px">Store teams asked for fewer and clearer messages in every window, one hero product with a single price, and a code that lands on the size guide before the autumn launch.</p>
+  <p style="top: 525px; width: 317.015625px; font-family: 'Times New Roman', Arial; font-size: 20px">Store teams asked for fewer and clearer messages in every window, one hero product with a single price, and a code that lands on the size guide before the autumn launch.</p>
+</section>
+<section data-title="20 px, first line misses">
+  <p style="top: 30px; width: 451.9375px; font-family: 'Arial', Arial; font-size: 20px">Store teams asked for fewer and clearer messages in every window, one hero product with a single price, and a code that lands on the size guide before the autumn launch.</p>
+  <p style="top: 195px; width: 434.921875px; font-family: 'Georgia', Arial; font-size: 20px">Store teams asked for fewer and clearer messages in every window, one hero product with a single price, and a code that lands on the size guide before the autumn launch.</p>
+  <p style="top: 360px; width: 511.421875px; font-family: 'Verdana', Arial; font-size: 20px">Store teams asked for fewer and clearer messages in every window, one hero product with a single price, and a code that lands on the size guide before the autumn launch.</p>
+  <p style="top: 525px; width: 396.546875px; font-family: 'Times New Roman', Arial; font-size: 20px">Store teams asked for fewer and clearer messages in every window, one hero product with a single price, and a code that lands on the size guide before the autumn launch.</p>
+</section>
+</body>
+</html>

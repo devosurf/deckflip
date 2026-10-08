@@ -362,4 +362,29 @@ describe.skipIf(!browserAvailable)('convert and validate', () => {
       expect.objectContaining({ code: 'LAYOUT_WRAP_RISK', kind: 'flagged', severity: 'warning', slide: 1, locator: { selector: '#risky' } }),
     ]);
   });
+
+  it('widens a painted box by at most 1 px for the wrap guard, and flags the block when that leaves PowerPoint too little room', async () => {
+    const page = await browser.newPage();
+    const width = await page.evaluate(() => {
+      const span = document.createElement('span');
+      span.style.cssText = 'font: 16px Arial; white-space: pre; position: absolute';
+      span.textContent = 'A filled label without padding';
+      document.body.append(span);
+      return span.getBoundingClientRect().width;
+    });
+    await page.close();
+    const { dir, file } = await writeTempDeck(`<!doctype html><html><head><title>Painted guard</title><style>
+      * { margin: 0; padding: 0 } p { position: absolute; left: 40px; font: 16px/24px Arial; background: #fde }
+    </style></head><body><section>
+      <p id="tight" style="top: 40px; width: ${width}px">A filled label without padding</p>
+    </section></body></html>`);
+    const output = join(dir, 'painted.pptx');
+    const converted = await convertHtmlToPptx(file, { ...options, browser, strict: false, output });
+    expect(converted.report.entries).toEqual([
+      expect.objectContaining({ code: 'LAYOUT_WRAP_RISK', slide: 1, locator: { selector: '#tight' } }),
+    ]);
+    const shape = (await parsePptx(await readFile(output))).slides[0]!.elements[0]!;
+    expect(shape.box.w - width).toBeGreaterThan(0);
+    expect(shape.box.w - width).toBeLessThan(1.001); // 1 px, to EMU rounding
+  });
 });

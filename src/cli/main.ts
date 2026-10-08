@@ -112,8 +112,14 @@ function defaultValidateReportPath(input: string): string {
   return `${input}.report.json`;
 }
 
-async function printSummary(report: Report, color: boolean): Promise<void> {
-  process.stderr.write(`${formatSummary(report, { color })}\n`);
+/** `--json` puts the report on stdout; unless `--quiet`, the human summary goes to stderr. */
+function printReport(report: Report, options: { json: boolean; quiet: boolean; color?: boolean }): void {
+  if (options.json) {
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+  }
+  if (!options.quiet) {
+    process.stderr.write(`${formatSummary(report, { color: options.color !== false })}\n`);
+  }
 }
 
 async function handleConvert(input: string, options: ConvertCliOptions): Promise<number> {
@@ -141,12 +147,7 @@ async function handleConvert(input: string, options: ConvertCliOptions): Promise
           ...(options.browser === undefined ? {} : { browserPath: options.browser }),
           offline: options.offline,
         });
-  if (options.json) {
-    process.stdout.write(`${JSON.stringify(result.report, null, 2)}\n`);
-  }
-  if (!options.quiet) {
-    await printSummary(result.report, options.color !== false);
-  }
+  printReport(result.report, options);
   return result.exitCode;
 }
 
@@ -163,12 +164,7 @@ async function handleValidate(input: string, options: ValidateCliOptions): Promi
           offline: options.offline,
         });
   await writeSidecar(result.report, options.report ?? defaultValidateReportPath(input));
-  if (options.json) {
-    process.stdout.write(`${JSON.stringify(result.report, null, 2)}\n`);
-  }
-  if (!options.quiet) {
-    await printSummary(result.report, options.color !== false);
-  }
+  printReport(result.report, options);
   return result.exitCode === 0 && options.strict && result.report.entries.length > 0 ? 4 : result.exitCode;
 }
 
@@ -242,12 +238,7 @@ async function handleVerify(source: string, output: string, options: VerifyCliOp
     ...(options.browser === undefined ? {} : { browserPath: options.browser }),
     offline: options.offline,
   });
-  if (options.json) {
-    process.stdout.write(`${JSON.stringify(result.report, null, 2)}\n`);
-  }
-  if (!options.quiet) {
-    await printSummary(result.report, options.color !== false);
-  }
+  printReport(result.report, options);
   return result.exitCode;
 }
 

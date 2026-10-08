@@ -125,6 +125,8 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
   type LineGroup = { top: number; left: number; right: number; bottom: number; height: number };
   /** a text node Chromium shows on the Canvas: its element, the element that owns it, its line rectangles */
   type ShownText = { parent: HTMLElement; owner: HTMLElement; lines: DOMRect[] };
+  /** a rectangle by its edges in page coordinates, as `DOMRect` has them */
+  type Edges = { left: number; top: number; right: number; bottom: number };
 
   const section = document.querySelector('body > section') as HTMLElement | null;
   const docTitle = document.title.trim();
@@ -217,7 +219,7 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
    * How far a line runs past a box: horizontally beyond 1 px, vertically beyond a quarter of the line, since the
    * glyph area a text rectangle spans outgrows tight `line-height`s without anything visible leaving the box.
    */
-  function spills(line: DOMRect, box: { left: number; top: number; right: number; bottom: number }, axes: { x: boolean; y: boolean }): number {
+  function spills(line: DOMRect, box: Edges, axes: { x: boolean; y: boolean }): number {
     const x = axes.x ? Math.max(box.left - line.left, line.right - box.right) : 0;
     const y = axes.y ? Math.max(box.top - line.top, line.bottom - box.bottom) : 0;
     return Math.max(x > 1 ? x : 0, y > line.height / 4 ? y : 0);
@@ -2063,7 +2065,7 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
       wrap,
       rtl,
       // a block that never wraps has no wrap width to guard; PowerPoint's `wrap="none"` lays the line out regardless
-      trailingGuard: wrap ? resolveTrailingGuard(lineGroups, availWidth, align, el, Math.max(px(cs.fontSize), ...runs.flatMap((run) => (run.kind === 'text' ? [run.style.size] : []))), item ? undefined : { skipNestedLists: false, ...(range ? { range } : {}) }) : 0,
+      trailingGuard: wrap ? resolveTrailingGuard(lineGroups, availWidth, align, { el, fontSize: Math.max(px(cs.fontSize), ...runs.flatMap((run) => (run.kind === 'text' ? [run.style.size] : []))), ...(item ? {} : { reflow: { skipNestedLists: false, ...(range ? { range } : {}) } }) }) : 0,
       paragraphs: paragraphs.length ? paragraphs : [{ align, lineHeight: 0, spaceBefore: 0, spaceAfter: 0, indent, marginLeft: 0, level: 0, runs: runs.length ? runs : [{ kind: 'text', text: '', style: styleFromElement(el) }] }],
     };
 
@@ -2189,7 +2191,7 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
           previousBottom = lineBox.lastBottom;
         }
         const availWidth = li.getBoundingClientRect().width - px(liStyle.borderLeftWidth) - px(liStyle.borderRightWidth) - px(liStyle.paddingLeft) - px(liStyle.paddingRight);
-        trailingGuard = Math.max(trailingGuard, resolveTrailingGuard(measureLineGroups(host, true), availWidth, align, host, px(liStyle.fontSize), { skipNestedLists: true }));
+        trailingGuard = Math.max(trailingGuard, resolveTrailingGuard(measureLineGroups(host, true), availWidth, align, { el: host, fontSize: px(liStyle.fontSize), reflow: { skipNestedLists: true } }));
 
         paragraphs.push({
           align,
@@ -2453,13 +2455,14 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
    * so its breaks land where Chromium's did although its line widths stray by up to `WRAP_TOLERANCE_PX_PER_EM` per
    * em of the wrap width (calibrated against PowerPoint for Mac). The widest line needs that much room, and the
    * first word Chromium wraps must stay that far from fitting. When no width gives both, the middle is taken and the
-   * block is flagged `LAYOUT_WRAP_RISK`. `probe` re-lays the block out at other widths to find the next fit; without
-   * it (anonymous flex/grid text) only the widest line is guarded.
+   * block is flagged `LAYOUT_WRAP_RISK`. `block.reflow` lets the block be laid out again at other widths to find the
+   * next fit; anonymous flex/grid text has none, so only its widest line is guarded.
    */
-  function resolveTrailingGuard(groups: LineGroup[], availWidth: number, align: Align, el: HTMLElement, fontSize: number, probe?: { skipNestedLists: boolean; range?: Range }): number {
-    if (align === 'just' && probe) {
+  function resolveTrailingGuard(groups: LineGroup[], availWidth: number, align: Align, block: { el: HTMLElement; fontSize: number; reflow?: { skipNestedLists: boolean; range?: Range } }): number {
+    const { el, fontSize, reflow } = block;
+    if (align === 'just' && reflow) {
       // justification stretches every line but the last to the full width; the guard is about the natural width
-      return withNaturalAlignment(el, () => resolveTrailingGuard(measureLineGroups(el, probe.skipNestedLists, probe.range), availWidth, 'l', el, fontSize, probe));
+      return withNaturalAlignment(el, () => resolveTrailingGuard(measureLineGroups(el, reflow.skipNestedLists, reflow.range), availWidth, 'l', block));
     }
     if (groups.length === 0 || fontSize <= 0) return 0;
     const tolerance = WRAP_TOLERANCE_PX + (WRAP_TOLERANCE_PX_PER_EM * availWidth) / fontSize;
@@ -2467,12 +2470,12 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
     // the extra width at which Chromium pulls a word up, to 1/64 of the search span; none within it counts as never
     let nextFit = Infinity;
     const span = 2 * tolerance + 1;
-    if (probe && groups.length > 1 && breaksChangeWhenWidened(el, span, groups, probe.skipNestedLists, probe.range)) {
+    if (reflow && groups.length > 1 && breaksChangeWhenWidened(el, span, groups, reflow.skipNestedLists, reflow.range)) {
       let holds = 0;
       nextFit = span;
       for (let step = 0; step < 6; step += 1) {
         const middle = (holds + nextFit) / 2;
-        if (breaksChangeWhenWidened(el, middle, groups, probe.skipNestedLists, probe.range)) nextFit = middle;
+        if (breaksChangeWhenWidened(el, middle, groups, reflow.skipNestedLists, reflow.range)) nextFit = middle;
         else holds = middle;
       }
     }
@@ -2484,14 +2487,14 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
     // Whole pairs of 1/64 px layout units, away from zero, keep a widened box (and each half of a centred one) on
     // the grid Chromium lays that Deck out on.
     const middle = (least + most) / 2;
-    const units = (px: number): number => Math.sign(px) * Math.ceil(Math.abs(px) * 32) / 32;
-    if (least <= most) return units(least > 0 ? Math.min(least + GUARD_MARGIN, middle) : Math.max(most - GUARD_MARGIN, middle));
+    const snapToLayoutGrid = (guard: number): number => Math.sign(guard) * Math.ceil(Math.abs(guard) * 32) / 32;
+    if (least <= most) return snapToLayoutGrid(least > 0 ? Math.min(least + GUARD_MARGIN, middle) : Math.max(most - GUARD_MARGIN, middle));
     const selector = cssPath(el);
     if (!wrapRisks.has(selector)) {
       wrapRisks.add(selector);
       entries.push({ code: 'LAYOUT_WRAP_RISK', selector, reason: `a line of ${elementName(el)} ends ${lineSlack.toFixed(1)} px from its wrap width and the next word would fit ${nextFit.toFixed(1)} px further; PowerPoint's line widths differ from Chromium's by up to ${tolerance.toFixed(1)} px`, params: { el: elementName(el) } });
     }
-    return units(middle);
+    return snapToLayoutGrid(middle);
   }
 
   /** Runs `fn` with the block's `text-align` forced to `start` (same breaks, unstretched lines), then restores it. */

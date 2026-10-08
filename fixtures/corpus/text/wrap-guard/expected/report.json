@@ -1,0 +1,24 @@
+[
+  {
+    "code": "LAYOUT_WRAP_RISK",
+    "kind": "flagged",
+    "severity": "warning",
+    "slide": 2,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(2)"
+    },
+    "reason": "a line of p ends 8.5 px from its wrap width and the next word would fit 0.7 px further; PowerPoint's line widths differ from Chromium's by up to 4.8 px",
+    "hint": "Reword p or change its width by a few px so no line ends right at its wrap width; PowerPoint may break it elsewhere"
+  },
+  {
+    "code": "LAYOUT_WRAP_RISK",
+    "kind": "flagged",
+    "severity": "warning",
+    "slide": 4,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(3)"
+    },
+    "reason": "a line of p ends 6.2 px from its wrap width and the next word would fit 0.6 px further; PowerPoint's line widths differ from Chromium's by up to 4.1 px",
+    "hint": "Reword p or change its width by a few px so no line ends right at its wrap width; PowerPoint may break it elsewhere"
+  }
+]

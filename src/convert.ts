@@ -114,8 +114,7 @@ async function runHtmlPipeline(
     const fontEntries = resolveDeckFonts(measured.deck, catalog, { embedFonts: opts.embedFonts });
     const roundTrip = await resolveRoundTrip(measured.deck, measured.sections, loaded.deckFile);
     const entries = [...baseEntries, ...measured.entries, ...fontEntries, ...roundTrip.entries];
-    const native = measured.deck.slides.reduce((n, slide) => n + slide.elements.length, 0);
-    const report = buildReport(reportBase(input, outputPath, loaded.canvas, chromiumVersion(browser), mode), entries, measured.deck.slides.length, native);
+    const report = buildReport(reportBase(input, outputPath, loaded.canvas, chromiumVersion(browser), mode), entries, measured.deck.slides.length, nativeCount(measured.deck));
     return hasError(entries) ? { report } : { report, deck: measured.deck, census: measured.census, roundTrip };
   } finally {
     if (opts.browser === undefined) await browser.close();
@@ -153,7 +152,7 @@ export async function convertHtmlToPptx(
 
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, pptx);
-  const verified = verifyDecks({ deck: run.deck, census: run.census ?? [] }, await parsePptx(pptx), 'html-to-pptx');
+  const verified = verifyDecks({ deck: run.deck, census: run.census ?? [] }, await parsePptx(pptx), 'html');
   const report = withEntries(run.report, verified);
   await writeSidecar(report, reportPath);
 
@@ -188,10 +187,9 @@ export async function convertPptxToHtml(input: string, opts: ConvertToHtmlOption
   const source = await indexSource(await OpcReader.load(bytes));
   const catalog = await FontCatalog.scan({ extraFiles: [] });
   const entries = [...resolveDeckFonts(deck, catalog, { embedFonts: false }), ...sourceEntries(deck, source)];
-  const native = deck.slides.reduce((n, slide) => n + slide.elements.length, 0);
   const base = { ...reportBase(input, outputPath, deck.canvas, undefined, 'convert'), input: { path: input, kind: 'pptx' as const }, output: { path: outputPath, kind: 'html' as const } };
   if (hasError(entries)) {
-    const report = buildReport(base, entries, deck.slides.length, native);
+    const report = buildReport(base, entries, deck.slides.length, nativeCount(deck));
     await writeSidecar(report, reportPath);
     return { report, outputPath, assetsDir, exitCode: 2 };
   }
@@ -210,8 +208,8 @@ export async function convertPptxToHtml(input: string, opts: ConvertToHtmlOption
   }
   const laidOut = await measureHtmlSide(outputPath, { ...opts, offline: opts.offline ?? false });
   // the written Deck failing validation is as much a deckflip defect as a mismatch
-  const verified = laidOut.measured ? verifyDecks(laidOut.measured, deck, 'pptx-to-html') : laidOut.errors;
-  const report = buildReport({ ...base, tool: { ...base.tool, ...(laidOut.browser === undefined ? {} : { browser: laidOut.browser }) } }, [...entries, ...verified], deck.slides.length, native);
+  const verified = laidOut.measured ? verifyDecks(laidOut.measured, deck, 'pptx') : laidOut.errors;
+  const report = withEntries(buildReport({ ...base, tool: { ...base.tool, ...(laidOut.browser === undefined ? {} : { browser: laidOut.browser }) } }, entries, deck.slides.length, nativeCount(deck)), verified);
   await writeSidecar(report, reportPath);
   return { report, outputPath, assetsDir, exitCode: verified.length > 0 ? 5 : opts.strict && report.entries.length > 0 ? 4 : 0 };
 }
@@ -223,9 +221,8 @@ export async function validatePptx(input: string, opts: { report?: string } = {}
   const source = await indexSource(await OpcReader.load(bytes));
   const catalog = await FontCatalog.scan({ extraFiles: [] });
   const entries = [...resolveDeckFonts(deck, catalog, { embedFonts: false }), ...sourceEntries(deck, source)];
-  const native = deck.slides.reduce((n, slide) => n + slide.elements.length, 0);
   const base = { ...reportBase(input, undefined, deck.canvas, undefined, 'validate'), input: { path: input, kind: 'pptx' as const } };
-  const report = buildReport(base, entries, deck.slides.length, native);
+  const report = buildReport(base, entries, deck.slides.length, nativeCount(deck));
   if (opts.report !== undefined) await writeSidecar(report, opts.report);
   return { report, exitCode: hasError(entries) ? 2 : 0 };
 }
@@ -233,7 +230,8 @@ export async function validatePptx(input: string, opts: { report?: string } = {}
 /**
  * `verify <source> <output>` (Verification): one HTML Deck and one PPTX, the source's kind deciding the
  * direction. The HTML side is measured afresh; the report holds `VERIFY_*` entries only and is written only
- * where `--report` asks, so the conversion's own sidecar survives.
+ * where `--report` asks, so the conversion's own sidecar survives. An HTML source that fails validation is the
+ * author's to fix (exit 2); an HTML output that does is a deckflip defect, as Verification errors are (exit 5).
  */
 export async function verifyConversion(source: string, output: string, opts: VerifyOptions): Promise<{ report: Report; exitCode: 0 | 2 | 5 }> {
   const sourceKind = inferKind(source);
@@ -248,10 +246,14 @@ export async function verifyConversion(source: string, output: string, opts: Ver
     input: { path: source, kind: sourceKind },
     output: { path: output, kind: sourceKind === 'html' ? 'pptx' as const : 'html' as const },
   };
-  const entries = laidOut.measured ? verifyDecks(laidOut.measured, pptx, sourceKind === 'html' ? 'html-to-pptx' : 'pptx-to-html') : laidOut.errors;
-  const report = buildReport(base, entries, pptx.slides.length, pptx.slides.reduce((n, slide) => n + slide.elements.length, 0));
+  const entries = laidOut.measured ? verifyDecks(laidOut.measured, pptx, sourceKind) : laidOut.errors;
+  const report = buildReport(base, entries, pptx.slides.length, nativeCount(pptx));
   if (opts.report !== undefined) await writeSidecar(report, opts.report);
-  return { report, exitCode: laidOut.measured === undefined ? 2 : entries.length > 0 ? 5 : 0 };
+  return { report, exitCode: laidOut.measured === undefined && sourceKind === 'html' ? 2 : entries.length > 0 ? 5 : 0 };
+}
+
+function nativeCount(deck: Deck): number {
+  return deck.slides.reduce((n, slide) => n + slide.elements.length, 0);
 }
 
 /** The HTML side of a conversion laid out in Chromium for Verification, or the validation errors that stopped it. */

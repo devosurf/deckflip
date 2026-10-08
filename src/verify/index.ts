@@ -9,7 +9,8 @@ import type { Box, Deck, Element, Slide, TextBody } from '../model/index.js';
 import { entry } from '../report/codes.js';
 import type { Entry, Locator } from '../report/types.js';
 
-export type Direction = 'html-to-pptx' | 'pptx-to-html';
+/** The kind of Deck a conversion started from: its side is the truth the other is verified against. */
+export type Side = 'html' | 'pptx';
 
 /** The HTML side of a conversion as Chromium laid it out: the measured Deck and one census per Slide. */
 export interface HtmlSide {
@@ -17,15 +18,15 @@ export interface HtmlSide {
   census: BrowserCensus[];
 }
 
-type Side = 'html' | 'pptx';
-
 /** An element at its Canvas position: axis-aligned bounds through every enclosing group, plus how far it may legitimately move. */
 interface Placed {
   element: Element;
   bounds: Box;
   rotation: number;
-  /** CSS px each edge may differ by: the comparison tolerance plus the wrap-width guard the emitter applied */
-  slack: number;
+  /** CSS px the left and right edges may differ by: the comparison tolerance plus the widening of a wrap-width guard */
+  slackX: number;
+  /** the same for the top and bottom edges, which a guard only moves when the element is turned */
+  slackY: number;
 }
 
 interface TextRun {
@@ -42,8 +43,7 @@ const GEOMETRY_TOLERANCE = 0.5;
 const ROTATION_TOLERANCE = 0.1;
 const QUOTE_LIMIT = 80;
 
-export function verifyDecks(html: HtmlSide, pptx: Deck, direction: Direction): Entry[] {
-  const sourceSide: Side = direction === 'html-to-pptx' ? 'html' : 'pptx';
+export function verifyDecks(html: HtmlSide, pptx: Deck, sourceSide: Side): Entry[] {
   const entries: Entry[] = [];
   const slides = Math.max(html.census.length, pptx.slides.length);
   for (let index = 0; index < slides; index += 1) {
@@ -89,13 +89,10 @@ function verifySlide(htmlSlide: Slide | undefined, census: BrowserCensus | undef
     entries.push(entry('VERIFY_GEOMETRY', { slide, locator: locate(lone.element, outputSide), reason: `${lone.element.name} in the ${SIDE_NAME[outputSide]} has no counterpart in the ${SIDE_NAME[sourceSide]}` }));
   }
   for (const [source, output] of pairs) {
-    const drift = Math.max(
-      Math.abs(source.bounds.x - output.bounds.x),
-      Math.abs(source.bounds.y - output.bounds.y),
-      Math.abs(source.bounds.x + source.bounds.w - output.bounds.x - output.bounds.w),
-      Math.abs(source.bounds.y + source.bounds.h - output.bounds.y - output.bounds.h),
-    );
-    if (drift > Math.max(source.slack, output.slack)) {
+    const driftX = Math.max(Math.abs(source.bounds.x - output.bounds.x), Math.abs(source.bounds.x + source.bounds.w - output.bounds.x - output.bounds.w));
+    const driftY = Math.max(Math.abs(source.bounds.y - output.bounds.y), Math.abs(source.bounds.y + source.bounds.h - output.bounds.y - output.bounds.h));
+    const drift = Math.max(driftX, driftY);
+    if (driftX > Math.max(source.slackX, output.slackX) || driftY > Math.max(source.slackY, output.slackY)) {
       entries.push(entry('VERIFY_GEOMETRY', { slide, locator: locate(source.element, sourceSide), reason: `${source.element.name} is ${describe(output.bounds)} in the ${SIDE_NAME[outputSide]}, ${round(drift)} px from ${describe(source.bounds)} in the ${SIDE_NAME[sourceSide]}` }));
     } else if (Math.abs(normalizeAngle(source.rotation - output.rotation)) > ROTATION_TOLERANCE) {
       entries.push(entry('VERIFY_GEOMETRY', { slide, locator: locate(source.element, sourceSide), reason: `${source.element.name} is rotated ${round(output.rotation)}° in the ${SIDE_NAME[outputSide]} but ${round(source.rotation)}° in the ${SIDE_NAME[sourceSide]}` }));
@@ -107,6 +104,7 @@ function verifySlide(htmlSlide: Slide | undefined, census: BrowserCensus | undef
 
 /** Chromium's stacking of every overlapping pair against the order of their counterparts in the PPTX shape tree. */
 function compareStacking(stacking: BrowserCensus['stacking'], placed: Record<Side, Placed[]>, pairs: Array<[Placed, Placed]>, sourceSide: Side, slide: number, locate: (element: Element, side: Side) => Locator): Entry[] {
+  // the census leaves out selectors two elements share (browser-script.ts `stackingOrder`); so must the lookup
   const selectors = placed.html.map(({ element }) => element.selector);
   const htmlBySelector = new Map(placed.html.filter(({ element }) => selectors.indexOf(element.selector) === selectors.lastIndexOf(element.selector)).map(({ element }) => [element.selector, element]));
   const pptxOf = new Map(pairs.map(([source, output]) => (sourceSide === 'html' ? [source.element, output.element] : [output.element, source.element])));
@@ -141,8 +139,10 @@ function place(elements: Element[], toCanvas: Matrix2d = IDENTITY): Placed[] {
     const next = elements[index + 1];
     if (element.kind === 'picture' && next?.kind === 'shape' && next.name === `${element.name} border` && !next.text) index += 1;
     const rotation = 'rotation' in element ? element.rotation : 0;
-    const guard = element.kind === 'shape' && element.text ? Math.abs(element.text.trailingGuard) : 0;
-    out.push({ element, bounds: transformedBounds(element.box, rotation, toCanvas), rotation, slack: GEOMETRY_TOLERANCE + guard });
+    // a guard widens the shape horizontally (narrowing stays in the insets), which only stays horizontal unrotated
+    const widened = element.kind === 'shape' && element.text ? Math.max(0, element.text.trailingGuard) : 0;
+    const axisAligned = rotation % 180 === 0 && toCanvas.b === 0 && toCanvas.c === 0;
+    out.push({ element, bounds: transformedBounds(element.box, rotation, toCanvas), rotation, slackX: GEOMETRY_TOLERANCE + widened, slackY: GEOMETRY_TOLERANCE + (axisAligned ? 0 : widened) });
   }
   return out;
 }

@@ -55,7 +55,7 @@ The digest is SHA-256 over the package parts by name, leaving out `docProps/` (t
 
 `fixtures/corpus/<category>/<name>/` with `deck.html` (+ assets; a category may keep shared assets in `fixtures/corpus/<category>/_assets/`, which the oracle script skips) or `source.pptx`, and `expected/` holding `chromium/slide-NNN.png` (generated, not committed), `powerpoint/slide-NNN.png` and `oracle.json` (committed, the PowerPoint oracle and its Oracle record, produced on a Mac with PowerPoint by `npm run corpus:oracle [category[/name] ...]`), `report.json` (committed, the expected entries, never a `VERIFY_*`), and optionally `ignore.json` (`{ "<slide>": [{ "x1", "y1", "x2", "y2" }] }` in CSS px: the comparator's `ignoreRegions` for areas the fixture deliberately renders differently, such as a flattened effect). Categories, each with 3-8 decks:
 
-- `text`: wrapping at boundaries, mixed sizes in a line, lists (nested, numbered, `inside`/`outside`), alignment, `pre`, RTL, emoji.
+- `text`: wrapping at boundaries, the wrap-width guard (`wrap-guard`: every first line 0.5 px from its break in four safe fonts at 12 and 20 px; `wrap-guard.test.ts` requires PowerPoint's oracle to end every line where Chromium does), mixed sizes in a line, lists (nested, numbered, `inside`/`outside`), alignment, `pre`, RTL, emoji.
 - `shapes`: fills, gradients, borders (uniform, per-side, dashed), radius, shadows, opacity, rotation.
 - `pictures`: formats, crop via `object-fit`, `clip-path: inset`, SVG file and inline SVG.
 - `tables`: spans, per-edge borders, cell padding, header rows.

@@ -5,13 +5,13 @@
 ### Added
 
 - Verification: every conversion compares what its source shows with what its output contains (Visible text, speaker notes, element geometry, stacking) and reports a mismatch as `VERIFY_TEXT_MISSING`, `VERIFY_TEXT_EXTRA`, `VERIFY_GEOMETRY` or `VERIFY_STACKING` with the new exit code 5, keeping the output. PPTX-to-HTML conversion now lays the written Deck out in Chromium to verify it.
-- `deckflip verify <source> <output>` re-checks an earlier conversion; it writes a report only where `--report` says.
+- `deckflip verify <source> <output>` re-checks an earlier conversion; it writes a report only where `--report` says, and exits 2 only when an HTML source fails validation (an HTML output that does is a Verification failure, 5).
 - Layout flags, a new entry kind `flagged` with a `summary.flagged` count: `LAYOUT_TEXT_OVERFLOW`, `LAYOUT_TEXT_OVERLAP`, `LAYOUT_TEXT_ILLEGIBLE` and `LAYOUT_WRAP_RISK`, from `validate` and `convert`.
 - `FLATTEN_OVERFLOW_CLIP` for text an `overflow: hidden` ancestor hides (PowerPoint shows it whole), and `DROPPED_GENERATED_CONTENT` for `::before`/`::after` content, both previously silent.
 
 ### Changed
 
-- The wrap-width guard is calibrated against PowerPoint for Mac: wrap width moves by up to a pixel plus 0.12 px per em of line instead of a fixed 1 px, keeping PowerPoint's line breaks on Chromium's in every calibration case.
+- The wrap-width guard is calibrated against PowerPoint for Mac: wrap width moves by up to a pixel plus 0.12 px per em of line instead of a fixed 1 px, keeping PowerPoint's line breaks on Chromium's in every calibration case; a painted box still widens by at most 1 px, and a block that needs more is flagged. The new `text/wrap-guard` corpus fixture checks PowerPoint's line ends against Chromium's.
 - Corpus gates compare Chromium with the committed PowerPoint renders, bound to the emitted package by `expected/oracle.json`; the LibreOffice comparison is opt-in (`DECKFLIP_LIBREOFFICE_GATE=1`) and CI no longer installs LibreOffice.
 - The skill's agent loop no longer renders the PPTX; the section divider template's lede is legible on its gradient.
 
