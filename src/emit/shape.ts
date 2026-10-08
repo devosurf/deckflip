@@ -141,9 +141,10 @@ interface GuardPlan {
 }
 
 /**
- * Wrap-width guard (spec 04): give PowerPoint up to 1 px more wrap width on the trailing side. Insets absorb it
- * when they can (no visible change at all); only when an inset would go negative is the shape itself widened
- * (and shifted, so the text does not move), which moves a stroked border by the guard.
+ * Wrap-width guard (spec 04): the measured change of wrap width PowerPoint gets on the trailing side (half each
+ * side when centred). Insets absorb it when they can (no visible change at all); only when an inset would go
+ * negative is the shape itself widened (and shifted, so the text does not move), which moves a stroked border by
+ * the remainder. Narrowing always fits in the insets.
  */
 function planGuard(shape: ShapeElement): GuardPlan {
   const plan: GuardPlan = { widen: 0, shift: 0, insetL: 0, insetR: 0 };

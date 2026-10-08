@@ -15,7 +15,7 @@ Present on every supported PowerPoint on Windows and macOS, so no embedding is n
 
 Arial, Courier New, Georgia, Times New Roman, Trebuchet MS, Verdana, plus the Office-bundled families Aptos, Calibri, Cambria, Candara, Consolas, Constantia, Corbel, Franklin Gothic, Century Gothic. Segoe UI is Windows-only and not safe.
 
-Choose Aptos or Calibri for a "PowerPoint look"; Arial or Georgia when the deck must also render identically in LibreOffice (CI, `deckflip render` without PowerPoint), which substitutes metric-compatible fonts for the Office-bundled ones (`RENDER_FONT_SUBSTITUTED`, info).
+Choose Aptos or Calibri for a "PowerPoint look"; Arial or Georgia when the deck must also look identical in viewers without the Office fonts, such as LibreOffice (`deckflip render deck.pptx` without PowerPoint), which substitutes metric-compatible fonts for the Office-bundled ones (`RENDER_FONT_SUBSTITUTED`, info).
 
 ## Rules for the agent
 

@@ -208,7 +208,7 @@ describe.skipIf(!browserAvailable)('measureDeck', () => {
           { position: 1, color: { hex: '000000', alpha: 1 } },
         ],
       });
-      expect(measured.entries.filter((entry) => entry.code !== 'SUBSTITUTE_BORDER_SIDES' && entry.code !== 'RASTER_SHADOW')).toEqual([
+      expect(measured.entries.filter((entry) => entry.code !== 'SUBSTITUTE_BORDER_SIDES' && entry.code !== 'RASTER_SHADOW' && !entry.code.startsWith('LAYOUT_'))).toEqual([
         expect.objectContaining({ code: 'SUBSTITUTE_GRADIENT_RADIAL', slide: 1, locator: { selector: 'section:nth-of-type(1) > div:nth-child(3)' } }),
         expect.objectContaining({ code: 'SUBSTITUTE_OPACITY', slide: 1, locator: { selector: 'section:nth-of-type(1) > div:nth-child(4)' } }),
         expect.objectContaining({ code: 'SUBSTITUTE_OPACITY', slide: 1, locator: { selector: 'section:nth-of-type(1) > div:nth-child(5) > div:nth-child(1)' } }),

@@ -97,7 +97,9 @@ function emitSlide(slide: Slide, id: string, ctx: ElementContext): { html: strin
     const css = [...geometryCss(shape.geometry), ...(shape.fill && shape.fill.type !== 'image' ? fillCss(shape.fill) : []), ...borderCss(shape.line, shape.borders), ...shadowCss(shape.shadow)];
     attrs.push(`style="${css.join('; ')}"`);
   }
-  const elements = elementsHtml(rest, { x: 0, y: 0 }, ctx);
+  // absolutely positioned children are placed from the section's padding box, inside its border
+  const origin = { x: shape?.borders?.left?.width ?? shape?.line?.width ?? 0, y: shape?.borders?.top?.width ?? shape?.line?.width ?? 0 };
+  const elements = elementsHtml(rest, origin, ctx);
   const notes = slide.notes ? [notesHtml(slide.notes, ctx.sheet)] : [];
   const html = [`<section ${attrs.join(' ')}>`, ...elements, ...notes, '</section>'].join('\n');
   const record: HtmlSlide = { id, ...(shape?.shapeId === undefined ? {} : { background: shape.shapeId }), merged: Object.fromEntries(ctx.merged) };

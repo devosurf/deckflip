@@ -1,6 +1,6 @@
 // Conversion report schema (docs/spec/01-cli.md, 08-report-codes.md).
 
-export type EntryKind = 'error' | 'rasterised' | 'flattened' | 'substituted' | 'dropped' | 'preserved' | 'overridden';
+export type EntryKind = 'error' | 'rasterised' | 'flattened' | 'substituted' | 'dropped' | 'preserved' | 'overridden' | 'flagged';
 export type Severity = 'error' | 'warning' | 'info';
 
 export type Locator = { selector: string } | { shapeId: string; name: string };
@@ -20,7 +20,7 @@ export interface Entry {
 export interface Report {
   schemaVersion: 1;
   tool: { name: 'deckflip'; version: string; browser?: string };
-  command: 'convert' | 'validate' | 'render' | 'inspect';
+  command: 'convert' | 'validate' | 'render' | 'inspect' | 'verify';
   input: { path: string; kind: 'html' | 'pptx' };
   output?: { path: string; kind: 'pptx' | 'html' | 'png' };
   canvas: { width: number; height: number; source: 'default' | 'deck-meta' | 'flag' };
@@ -33,6 +33,8 @@ export interface Report {
     dropped: number;
     preserved: number;
     overridden: number;
+    /** Layout flags: converted faithfully, but rarely what an author intends */
+    flagged: number;
     errors: number;
   };
   entries: Entry[];

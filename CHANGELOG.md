@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### Added
+
+- Verification: every conversion compares what its source shows with what its output contains (Visible text, speaker notes, element geometry, stacking) and reports a mismatch as `VERIFY_TEXT_MISSING`, `VERIFY_TEXT_EXTRA`, `VERIFY_GEOMETRY` or `VERIFY_STACKING` with the new exit code 5, keeping the output. PPTX-to-HTML conversion now lays the written Deck out in Chromium to verify it.
+- `deckflip verify <source> <output>` re-checks an earlier conversion; it writes a report only where `--report` says.
+- Layout flags, a new entry kind `flagged` with a `summary.flagged` count: `LAYOUT_TEXT_OVERFLOW`, `LAYOUT_TEXT_OVERLAP`, `LAYOUT_TEXT_ILLEGIBLE` and `LAYOUT_WRAP_RISK`, from `validate` and `convert`.
+- `FLATTEN_OVERFLOW_CLIP` for text an `overflow: hidden` ancestor hides (PowerPoint shows it whole), and `DROPPED_GENERATED_CONTENT` for `::before`/`::after` content, both previously silent.
+
+### Changed
+
+- The wrap-width guard is calibrated against PowerPoint for Mac: wrap width moves by up to a pixel plus 0.12 px per em of line instead of a fixed 1 px, keeping PowerPoint's line breaks on Chromium's in every calibration case.
+- Corpus gates compare Chromium with the committed PowerPoint renders, bound to the emitted package by `expected/oracle.json`; the LibreOffice comparison is opt-in (`DECKFLIP_LIBREOFFICE_GATE=1`) and CI no longer installs LibreOffice.
+- The skill's agent loop no longer renders the PPTX; the section divider template's lede is legible on its gradient.
+
+### Fixed
+
+- PPTX-to-HTML placed every element of a Slide whose background shape has a border inside that border, offset by its width.
+
 ## 0.1.2 - 2026-09-17
 
 ### Changed

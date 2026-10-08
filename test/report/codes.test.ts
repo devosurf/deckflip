@@ -13,6 +13,8 @@ describe('report codes', () => {
       'DROPPED',
       'OVERRIDE',
       'RENDER',
+      'LAYOUT',
+      'VERIFY',
     ]);
 
     for (const code of Object.keys(CODES) as Array<keyof typeof CODES>) {

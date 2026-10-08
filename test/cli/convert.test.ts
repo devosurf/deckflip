@@ -199,7 +199,7 @@ describe.skipIf(!browserAvailable)('convert and validate', () => {
       ['RASTER_CSS_FILTER', 1],
       ['RASTER_EXPLICIT', 2],
     ]);
-    expect(validated.report.summary).toEqual({ slides: 2, native: 3, rasterised: 2, flattened: 1, substituted: 0, dropped: 0, preserved: 0, overridden: 0, errors: 0 });
+    expect(validated.report.summary).toEqual({ slides: 2, native: 3, rasterised: 2, flattened: 1, substituted: 0, dropped: 0, preserved: 0, overridden: 0, flagged: 0, errors: 0 });
     expect(validated.report.command).toBe('validate');
     await expect(stat(join(dir, 'deck.pptx'))).rejects.toThrow();
     expect((await stat(join(dir, 'out.pptx'))).size).toBeGreaterThan(0);
@@ -223,5 +223,143 @@ describe.skipIf(!browserAvailable)('convert and validate', () => {
     expect(converted.report.entries.map((entry) => entry.code)).toEqual(['VALIDATE_ELEMENT']);
     await expect(stat(output)).rejects.toThrow();
     expect((await stat(`${output}.report.json`)).size).toBeGreaterThan(0);
+  });
+
+  it('writes the PPTX and its report but exits 5, strict or not, when Verification finds text the PPTX lost', async () => {
+    // A visible child of a visibility:hidden container is painted by Chromium but skipped by the measurement walk.
+    const { dir, file } = await writeTempDeck(`<!doctype html><html><head><title>Lost</title>
+      <style>body { font: 20px/28px Arial } .ghost { visibility: hidden } #shown { visibility: visible }</style></head><body>
+      <section><p>Kept text</p><div class="ghost"><p id="shown">LOST_SENTINEL</p></div></section></body></html>`);
+    for (const strict of [false, true]) {
+      const output = join(dir, `lost-${strict}.pptx`);
+      const converted = await convertHtmlToPptx(file, { ...options, browser, strict, output });
+      expect(converted.exitCode).toBe(5);
+      expect(converted.report.entries).toEqual([
+        expect.objectContaining({ code: 'VERIFY_TEXT_MISSING', severity: 'error', slide: 1, locator: { selector: '#shown' }, reason: expect.stringContaining('LOST_SENTINEL') }),
+      ]);
+      expect(converted.report.summary.errors).toBe(1);
+      expect((await stat(output)).size).toBeGreaterThan(0);
+      expect(JSON.parse(await readFile(`${output}.report.json`, 'utf8'))).toEqual(converted.report);
+    }
+  });
+
+  it('keeps text an overflow:hidden ancestor clips native and complete, and reports the clip', async () => {
+    const { dir, file } = await writeTempDeck(`<!doctype html><html><head><title>Clip</title><style>
+      * { margin: 0; padding: 0 } body { font: 16px/24px Arial }
+      .clip { position: absolute; left: 40px; top: 40px; width: 300px; height: 24px; overflow: hidden; background: #eee }
+      .fits { position: absolute; left: 400px; top: 40px; width: 300px; height: 48px; overflow: hidden }
+    </style></head><body><section>
+      <div class="clip"><p id="clipped">CLIP_ONE visible, then CLIP_TWO and CLIP_THREE are clipped away by the parent</p></div>
+      <div class="fits"><p>Short enough</p></div>
+    </section></body></html>`);
+    const output = join(dir, 'clip.pptx');
+    const converted = await convertHtmlToPptx(file, { ...options, browser, strict: true, output });
+    expect(converted.report.entries).toEqual([
+      expect.objectContaining({ code: 'FLATTEN_OVERFLOW_CLIP', kind: 'flattened', severity: 'warning', slide: 1, locator: { selector: '#clipped' }, reason: expect.stringContaining('overflow: hidden') }),
+    ]);
+    expect(converted.exitCode).toBe(4);
+    const deck = await parsePptx(await readFile(output));
+    const texts = deck.slides[0]!.elements.flatMap((el) => (el.kind === 'shape' && el.text ? [el.text.paragraphs.flatMap((p) => p.runs).map((r) => (r.kind === 'text' ? r.text : '')).join('')] : []));
+    expect(texts).toContain('CLIP_ONE visible, then CLIP_TWO and CLIP_THREE are clipped away by the parent');
+  });
+
+  it('reports ::before and ::after content it cannot convert, text and painted boxes alike', async () => {
+    const { dir, file } = await writeTempDeck(`<!doctype html><html><head><title>Generated</title><style>
+      * { margin: 0; padding: 0 } body { font: 16px/24px Arial } section { padding: 40px }
+      ul { list-style: none } li { padding-left: 20px; position: relative }
+      li::before { content: '\\2014'; position: absolute; left: 0; color: #c00 }
+      #tag::after { content: ''; display: block; width: 80px; height: 6px; background: #c00 }
+      #plain::after { content: '' }
+    </style></head><body><section>
+      <ul><li id="item">ITEM_ONE</li></ul><p id="tag">TAG_TEXT</p><p id="plain">PLAIN_TEXT</p>
+    </section></body></html>`);
+    const validated = await validateHtml(file, { ...options, browser });
+    expect(validated.report.entries).toEqual([
+      expect.objectContaining({ code: 'DROPPED_GENERATED_CONTENT', kind: 'dropped', severity: 'warning', slide: 1, locator: { selector: '#item' }, reason: expect.stringContaining('::before') }),
+      expect.objectContaining({ code: 'DROPPED_GENERATED_CONTENT', kind: 'dropped', severity: 'warning', slide: 1, locator: { selector: '#tag' }, reason: expect.stringContaining('::after') }),
+    ]);
+  });
+
+  it('flags text spilling out of its painted box, but not text that fits or misses by under a pixel', async () => {
+    const { file } = await writeTempDeck(`<!doctype html><html><head><title>Overflow</title><style>
+      * { margin: 0; padding: 0 } body { font: 16px/24px Arial }
+      .card { position: absolute; top: 40px; width: 300px; height: 24px; background: #fde }
+      #spill { left: 40px } #fits { left: 400px; height: 48px } #inner-card { left: 800px; height: 30px }
+      #tight { left: 400px; top: 200px; height: 23.5px }
+    </style></head><body><section>
+      <p id="spill" class="card">SPILL_ONE and then SPILL_TWO SPILL_THREE SPILL_FOUR spill below the pink box</p>
+      <p id="fits" class="card">Fits inside</p><p id="tight" class="card">Half a pixel short</p>
+      <div id="inner-card" class="card"><p id="inner">INNER_ONE and then INNER_TWO INNER_THREE spill below the card</p></div>
+    </section></body></html>`);
+    const validated = await validateHtml(file, { ...options, browser });
+    expect(validated.report.entries).toEqual([
+      expect.objectContaining({ code: 'LAYOUT_TEXT_OVERFLOW', kind: 'flagged', severity: 'warning', slide: 1, locator: { selector: '#spill' } }),
+      expect.objectContaining({ code: 'LAYOUT_TEXT_OVERFLOW', kind: 'flagged', severity: 'warning', slide: 1, locator: { selector: '#inner' }, reason: expect.stringContaining('div#inner-card') }),
+    ]);
+    expect(validated.report.summary).toMatchObject({ flagged: 2, errors: 0 });
+  });
+
+  it('flags Text blocks whose lines overlap, once per pair, but not lines that only touch', async () => {
+    const { file } = await writeTempDeck(`<!doctype html><html><head><title>Overlap</title><style>
+      * { margin: 0; padding: 0 } body { font: 28px/32px Arial } p { position: absolute; width: 500px }
+      #first { left: 40px; top: 200px } #second { left: 60px; top: 210px; color: #c00 }
+      #above { left: 40px; top: 400px } #below { left: 40px; top: 432px }
+    </style></head><body><section>
+      <p id="first">OVERLAP_FIRST heading</p><p id="second">OVERLAP_SECOND heading</p>
+      <p id="above">Touching above</p><p id="below">Touching below</p>
+    </section></body></html>`);
+    const validated = await validateHtml(file, { ...options, browser });
+    expect(validated.report.entries).toEqual([
+      expect.objectContaining({ code: 'LAYOUT_TEXT_OVERLAP', kind: 'flagged', slide: 1, locator: { selector: '#second' }, reason: expect.stringContaining('p#first') }),
+    ]);
+  });
+
+  it('flags nearly invisible text, not muted grey or text over a picture, and strict mode exits 4 on flags alone', async () => {
+    const { dir, file } = await writeTempDeck(`<!doctype html><html><head><title>Contrast</title><style>
+      * { margin: 0; padding: 0 } body { font: 16px/24px Arial } p { position: absolute; left: 40px; width: 400px }
+      #faint { top: 40px; color: #f4f4f4 } #muted { top: 80px; color: #999 }
+      .dark { position: absolute; left: 600px; top: 40px; width: 300px; height: 100px; background: #036 }
+      #light { left: 20px; top: 20px; color: #fff } #lost { left: 20px; top: 50px; color: #024 }
+      img { position: absolute; left: 40px; top: 200px; width: 300px; height: 100px }
+      #over-image { top: 240px; color: #fafafa }
+    </style></head><body><section>
+      <p id="faint">FAINT_SENTINEL</p><p id="muted">Muted grey</p>
+      <div class="dark"><p id="light">White on navy</p><p id="lost">Navy on navy</p></div>
+      <img src="pixel.png"><p id="over-image">Over the picture</p>
+    </section></body></html>`);
+    await writeFile(join(dir, 'pixel.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64'));
+    const converted = await convertHtmlToPptx(file, { ...options, browser, strict: true, output: join(dir, 'contrast.pptx') });
+    expect(converted.report.entries).toEqual([
+      expect.objectContaining({ code: 'LAYOUT_TEXT_ILLEGIBLE', kind: 'flagged', slide: 1, locator: { selector: '#faint' }, reason: expect.stringContaining('f4f4f4') }),
+      expect.objectContaining({ code: 'LAYOUT_TEXT_ILLEGIBLE', kind: 'flagged', slide: 1, locator: { selector: '#lost' } }),
+    ]);
+    expect(converted.exitCode).toBe(4);
+  });
+
+  it('flags a paragraph whose first line nearly fills its width while the next word nearly fits, and not one with room', async () => {
+    // Widths come from Chromium itself: the risky paragraph leaves half of " a" either side of its break, far
+    // inside PowerPoint's calibrated line-width tolerance at 12 px; the roomy one leaves 20 px before a long word.
+    const page = await browser.newPage();
+    const width = (text: string) => page.evaluate((content) => {
+      const span = document.createElement('span');
+      span.style.cssText = 'font: 12px Arial; white-space: pre; position: absolute';
+      span.textContent = content;
+      document.body.append(span);
+      return span.getBoundingClientRect().width;
+    }, text);
+    const first = 'Quarterly revenue grew faster than planned across every region in the third quarter of the year';
+    const risky = (await width(first)) + (await width(' a')) / 2;
+    const roomy = (await width(first)) + 20;
+    await page.close();
+    const { file } = await writeTempDeck(`<!doctype html><html><head><title>Wrap risk</title><style>
+      * { margin: 0; padding: 0 } p { position: absolute; left: 40px; font: 12px/18px Arial }
+    </style></head><body><section>
+      <p id="risky" style="top: 40px; width: ${risky}px">${first} a closing clause</p>
+      <p id="roomy" style="top: 120px; width: ${roomy}px">${first} afterwards closing</p>
+    </section></body></html>`);
+    const validated = await validateHtml(file, { ...options, browser });
+    expect(validated.report.entries).toEqual([
+      expect.objectContaining({ code: 'LAYOUT_WRAP_RISK', kind: 'flagged', severity: 'warning', slide: 1, locator: { selector: '#risky' } }),
+    ]);
   });
 });

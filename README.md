@@ -7,7 +7,7 @@ Bidirectional conversion between HTML slides and PowerPoint (`.pptx`), built for
 - macOS; Windows and Linux hosts are unsupported for now
 - Node.js 20.16 or newer
 - Chromium, installed automatically on first use unless `--offline` is set
-- LibreOffice for the default `render` command, or PowerPoint with `--renderer powerpoint`
+- Optional: LibreOffice or PowerPoint (`--renderer powerpoint`), only to render a PPTX with `render`; conversion and its checks do not need either
 
 ## Quick start
 
@@ -17,14 +17,15 @@ Run without a global installation:
 npx deckflip@latest --help
 ```
 
-Validate an HTML Deck, convert it, render the result, and inspect its structure:
+Validate an HTML Deck, convert it (the conversion verifies its own output), and inspect its structure:
 
 ```sh
 npx deckflip@latest validate deck.html --json
 npx deckflip@latest convert deck.html --strict --json -o deck.pptx
-npx deckflip@latest render deck.pptx -o rendered/
 npx deckflip@latest inspect deck.html
 ```
+
+Look at the design in Chromium with `npx deckflip@latest render deck.html -o rendered/`; re-check an earlier conversion with `npx deckflip@latest verify deck.html deck.pptx`.
 
 Convert an existing PowerPoint Deck to HTML:
 
@@ -42,13 +43,14 @@ Install the bundled authoring skill and templates for supported coding agents:
 npx skills add devosurf/deckflip
 ```
 
-The skill documents the `validate -> convert --strict -> render -> inspect` loop, the supported HTML/CSS subset, Conversion report codes, font handling, and round-trip editing. Its source is in [`skills/deckflip`](skills/deckflip).
+The skill documents the `validate -> convert --strict -> inspect` loop, the supported HTML/CSS subset, Conversion report codes, font handling, and round-trip editing. Its source is in [`skills/deckflip`](skills/deckflip).
 
 ## Conversion behavior
 
 - Text, shapes, pictures, lists, tables, and groups are emitted as native PowerPoint elements when representable.
 - Unsupported visual effects on text-free elements are rasterised; unsupported effects on text are flattened so the text remains editable.
-- Every rasterised, flattened, substituted, dropped, preserved, or overridden construct is recorded in a machine-readable Conversion report.
+- Every rasterised, flattened, substituted, dropped, preserved, or overridden construct is recorded in a machine-readable Conversion report, as are Layout flags: text spilling out of its box, text over text, illegible text, and lines PowerPoint may break elsewhere.
+- Every conversion verifies its output against its source: Visible text, speaker notes, element geometry and stacking. A mismatch is a deckflip defect, reported as `VERIFY_*` errors with exit 5; the output is kept.
 - Validation errors return exit 2 with a diagnostic report, without creating or replacing the converted Deck or its Asset directory.
 - Otherwise, Strict mode returns exit 4 when the report is non-empty while retaining the output; successful non-strict operations return 0.
 - Part ordering, relationship IDs, media names, timestamps, and capture paths are deterministic.

@@ -38,6 +38,7 @@ src/
   roundtrip/    fingerprints, manifest, untouched detection, source-part splicing
   report/       entry construction, codes table (single source for docs/spec/08 and the skill's reference)
   render/       chromium, libreoffice, powerpoint drivers; pdf rasteriser
+  verify/       Verification: the measured Deck and Chromium's census against the parsed PPTX
   inspect/      IDM -> inspect JSON
 ```
 
@@ -47,7 +48,9 @@ The **IDM** is the seam: both directions produce it, `inspect` serialises it, te
 
 HTML -> PPTX: `load` -> `validate` (static) -> `measure` (one Chromium page per Slide document; `load` + `document.fonts.ready`; animations paused) -> `validate` (measured) -> fonts resolve/classify -> `raster` pass -> `roundtrip` (splice untouched source parts when a manifest exists) -> `emit` -> report. A validation error stops before `measure` writes anything.
 
-PPTX -> HTML: `opc` read -> `parse` (with inheritance resolved to explicit values) -> `htmlout` (HTML, assets, previews via LibreOffice when present, manifest) -> report.
+PPTX -> HTML: `opc` read -> `parse` (with inheritance resolved to explicit values) -> `htmlout` (HTML, assets, manifest) -> `measure` of the written Deck -> `verify` -> report.
+
+HTML -> PPTX ends the same way: after `emit` writes the package, `parse` reads it back and `verify` compares it with the measurement and census (spec 10 "Verification").
 
 ## Determinism
 

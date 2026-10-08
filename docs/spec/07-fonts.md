@@ -18,7 +18,7 @@ Decided in [#15](https://github.com/devosurf/deckflip/issues/15).
 | **Deck-provided** | `@font-face` with local file | `FONT_NOT_SAFE` (warning) unless embedded |
 | **Other installed** | anything else | `FONT_NOT_SAFE` (warning) unless embedded |
 
-The Office-bundled families are safe for the viewer (PowerPoint) but not for the LibreOffice render oracle: `render --renderer libreoffice` adds `RENDER_FONT_SUBSTITUTED` (info) for them, and CI installs the metric-compatible Carlito/Caladea for Calibri/Cambria. [INFERENCE: the Office-bundled list is from product knowledge, not the #3 sources; the spec marks it "verify on a clean Office for Mac install" as a build-phase check.]
+The Office-bundled families are safe for the viewer (PowerPoint) but not for a LibreOffice render: `render --renderer libreoffice` adds `RENDER_FONT_SUBSTITUTED` (info) for them, since LibreOffice substitutes the metric-compatible Carlito/Caladea for Calibri/Cambria where installed. CI no longer renders with LibreOffice ([ADR 0007](../adr/0007-verification-and-powerpoint-oracle.md)). [INFERENCE: the Office-bundled list is from product knowledge, not the #3 sources; the spec marks it "verify on a clean Office for Mac install" as a build-phase check.]
 
 ## Embedding
 
@@ -36,6 +36,6 @@ The Office-bundled families are safe for the viewer (PowerPoint) but not for the
 ## What the skill tells the agent
 
 1. Name a concrete family first; end every stack with a safe family; never rely on a generic alone.
-2. Prefer the safe set. Use Aptos/Calibri when a "PowerPoint look" is wanted, Arial/Georgia when the deck must also render identically in LibreOffice/CI.
+2. Prefer the safe set. Use Aptos/Calibri when a "PowerPoint look" is wanted, Arial/Georgia when the deck must also look identical in viewers without Office fonts, such as LibreOffice.
 3. A brand font is fine if its file is in the Deck (`@font-face`) and `--embed-fonts` is passed; read `FONT_*` entries: `FONT_EMBED_RESTRICTED` means the licence forbids it, switch fonts.
 4. `inspect` lists `fonts[]` with class, resolved file and whether it will be embedded.

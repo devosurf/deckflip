@@ -26,7 +26,7 @@ Elements: `section`; block containers (`div`, `header`, `footer`, `main`, `artic
 | `opacity` | folded into fill, line and text alpha (`SUBSTITUTE_OPACITY` info) |
 | `transform: rotate()`, `translate()`, `scale()` | rotation, position, size (uniform scale folds into font size); `data-group` containers also support nonuniform scale and flips without changing child geometry |
 | `object-fit`, `object-position`, `clip-path: inset()` on `img` | picture crop |
-| `overflow: hidden` | no-op; children fully outside the Canvas are dropped (`DROPPED_OFFCANVAS` info), partly outside are clipped by PowerPoint (`FLATTEN_OFFCANVAS` warning) |
+| `overflow: hidden` | does not clip in PowerPoint: text it hides shows in full (`FLATTEN_OVERFLOW_CLIP` warning; size the box to its text); children fully outside the Canvas are dropped (`DROPPED_OFFCANVAS` info), partly outside are clipped by PowerPoint (`FLATTEN_OFFCANVAS` warning) |
 | `visibility: hidden`, `display: none` | not emitted |
 | uniform `outline` without offset on a border-less box | outline |
 
@@ -39,7 +39,7 @@ Inside a native group, the raster picture retains child coordinates; ancestor gr
 
 ## Text effects flattened (`FLATTEN_TEXT_*` warning)
 
-`-webkit-text-stroke` (dropped), `background-clip: text` (dropped), non-solid `text-decoration-style` (rendered solid), `font-variant-*` other than small-caps (dropped), multiple `text-shadow` layers (first kept). `animation`/`transition`: first frame used (`FLATTEN_ANIMATION`, info). `video` without `poster`: grey box in PowerPoint (`FLATTEN_MEDIA_POSTER`).
+`-webkit-text-stroke` (dropped), `background-clip: text` (dropped), non-solid `text-decoration-style` (rendered solid), `font-variant-*` other than small-caps (dropped), multiple `text-shadow` layers (first kept). `animation`/`transition`: first frame used (`FLATTEN_ANIMATION`, info). `video` without `poster`: grey box in PowerPoint (`FLATTEN_MEDIA_POSTER`). `::before`/`::after` content (text, counters, images, painted boxes) is not converted (`DROPPED_GENERATED_CONTENT`): put dashes, bars and labels into the HTML as elements; `::marker` bullets are native.
 
 ## Rejected (`VALIDATE_*` error, exit 2)
 

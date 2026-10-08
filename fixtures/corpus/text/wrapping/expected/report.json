@@ -1,1 +1,13 @@
-[]
+[
+  {
+    "code": "LAYOUT_TEXT_OVERFLOW",
+    "kind": "flagged",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(3)"
+    },
+    "reason": "text of p.box runs 1308.3 px past its box",
+    "hint": "Give p.box room for its text or shorten the text; accept it only if the spill is intended"
+  }
+]

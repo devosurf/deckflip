@@ -70,6 +70,26 @@ export interface BrowserMeasureResult {
   shapes: BrowserElement[];
   entries: BrowserEntry[];
   fontFaces: BrowserFontFace[];
+  census: BrowserCensus;
+}
+
+/** The element a piece of Visible text belongs to: the one carrying its `data-shape-id`, else its nearest block container. */
+export interface TextOwner {
+  selector: string;
+  shapeId?: string;
+}
+
+/**
+ * Verification's view of one Slide (spec 10 "Verification"), read from what Chromium rendered by a walk
+ * of its own, so a measurement defect cannot hide what it lost.
+ */
+export interface BrowserCensus {
+  /** Visible text in document order: one run per owner, separated where a line break or block intervenes */
+  text: Array<{ owner: TextOwner; text: string }>;
+  /** the speaker notes' text */
+  notes: string;
+  /** every overlapping pair of Painting elements, as Chromium stacks them at a point both cover */
+  stacking: Array<{ above: string; below: string }>;
 }
 
 /** Marks the stylesheet measure.ts injects to freeze animations; `validateDocument` lifts it while reading `transition`. */
@@ -103,6 +123,8 @@ export async function preloadBackgroundImages(): Promise<void> {
 
 export function measureSlideDocument(blockedImages: string[]): BrowserMeasureResult {
   type LineGroup = { top: number; left: number; right: number; bottom: number; height: number };
+  /** a text node Chromium shows on the Canvas: its element, the element that owns it, its line rectangles */
+  type ShownText = { parent: HTMLElement; owner: HTMLElement; lines: DOMRect[] };
 
   const section = document.querySelector('body > section') as HTMLElement | null;
   const docTitle = document.title.trim();
@@ -115,6 +137,7 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
       shapes: [],
       entries: [],
       fontFaces: collectFontFaces(document.baseURI),
+      census: { text: [], notes: '', stacking: [] },
     };
   }
 
@@ -135,6 +158,22 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
   const shapes: BrowserElement[] = [];
   const entries: BrowserEntry[] = [];
   const unreportedImages = new Set(blockedImages);
+  /**
+   * How far PowerPoint for Mac's line widths stray from Chromium's (spec 04 "Wrap-width guard"): a pixel plus
+   * 0.12 px per em of line length either way. Measured over six safe fonts at 10-32 px, lines of 30-40 em strayed by
+   * up to 0.12 px per em (the gap is per-glyph rounding, so it grows with the line), short lines by under a pixel.
+   */
+  const WRAP_TOLERANCE_PX = 1;
+  const WRAP_TOLERANCE_PX_PER_EM = 0.12;
+  /** px the guard moves past the least it needs: a hysteresis, so a guarded block measures as guarded once round-tripped */
+  const GUARD_MARGIN = 0.5;
+  /** Text blocks already flagged `LAYOUT_WRAP_RISK`: a block measured twice is reported once. */
+  const wrapRisks = new Set<string>();
+  /** Text bodies of anonymous inline sequences: they name their container, whose box is not theirs. */
+  const anonymousShapes = new Set<BrowserElement>();
+  // Census (Verification): elements whose text Chromium never paints, and the notes markup that starts a new line.
+  const UNRENDERED_TAGS: Record<string, true> = { SCRIPT: true, STYLE: true, TEMPLATE: true, NOSCRIPT: true, VIDEO: true, AUDIO: true };
+  const NOTES_BREAK_TAGS: Record<string, true> = { BR: true, P: true, UL: true, OL: true, LI: true, DIV: true, BLOCKQUOTE: true, PRE: true, H1: true, H2: true, H3: true, H4: true, H5: true, H6: true, TABLE: true, TR: true, TD: true, TH: true };
   validateDocument(section);
   // Spec 03 rule 3 applies to the Slide too: a section with a background, border or shadow paints a full-Canvas
   // shape behind everything else. Anonymous inline content is measured separately from that background.
@@ -144,6 +183,10 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
   shapes.push(...walkContents(section));
   // The native walk skips rasterised subtrees and SVG drawings, but their visible images still count.
   reportBlockedImages(section);
+  const shownText = shownTextNodes();
+  const clipped = reportClippedText(shownText);
+  reportGeneratedContent();
+  reportLayoutFlags(shownText, clipped);
   return {
     meta,
     sectionBox,
@@ -151,8 +194,323 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
     shapes,
     entries,
     fontFaces: collectFontFaces(document.baseURI),
+    census: { text: visibleText(), notes: notesText(), stacking: stackingOrder() },
   };
 
+  /** Every text node Chromium shows on the Canvas, with its owner and its line rectangles: what the layout checks read. */
+  function shownTextNodes(): ShownText[] {
+    const out: ShownText[] = [];
+    const walker = document.createTreeWalker(section!, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const parent = node.parentElement;
+      if (!parent || !showsText(parent) || !hasVisibleText(node.textContent ?? '')) continue;
+      const owner = textOwner(parent);
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      const lines = Array.from(range.getClientRects()).filter((rect) => rect.width > 0 && rect.height > 0);
+      if (owner && lines.length > 0) out.push({ parent, owner, lines });
+    }
+    return out;
+  }
+
+  /**
+   * How far a line runs past a box: horizontally beyond 1 px, vertically beyond a quarter of the line, since the
+   * glyph area a text rectangle spans outgrows tight `line-height`s without anything visible leaving the box.
+   */
+  function spills(line: DOMRect, box: { left: number; top: number; right: number; bottom: number }, axes: { x: boolean; y: boolean }): number {
+    const x = axes.x ? Math.max(box.left - line.left, line.right - box.right) : 0;
+    const y = axes.y ? Math.max(box.top - line.top, line.bottom - box.bottom) : 0;
+    return Math.max(x > 1 ? x : 0, y > line.height / 4 ? y : 0);
+  }
+
+  /**
+   * `FLATTEN_OVERFLOW_CLIP`: text that a clipping `overflow` (on the Text block or an ancestor below the section)
+   * hides. PowerPoint cannot clip text, so the text stays native and whole; one entry per owner, whose element is
+   * returned so the overflow flag does not repeat what Chromium never shows.
+   */
+  function reportClippedText(nodes: ShownText[]): Set<HTMLElement> {
+    const reported = new Set<HTMLElement>();
+    for (const { parent, owner, lines } of nodes) {
+      for (let clip: HTMLElement | null = parent; clip && clip !== section; clip = clip.parentElement) {
+        const cs = getComputedStyle(clip);
+        if ((cs.overflowX === 'visible' && cs.overflowY === 'visible') || isInlineRendered(clip)) continue;
+        const rect = clip.getBoundingClientRect();
+        const left = rect.left + clip.clientLeft;
+        const top = rect.top + clip.clientTop;
+        const padding = { left, top, right: left + clip.clientWidth, bottom: top + clip.clientHeight };
+        if (!lines.some((line) => spills(line, padding, { x: cs.overflowX !== 'visible', y: cs.overflowY !== 'visible' }) > 0)) continue;
+        if (!reported.has(owner)) {
+          reported.add(owner);
+          entries.push({ code: 'FLATTEN_OVERFLOW_CLIP', selector: cssPath(owner), reason: `overflow: ${cs.overflow} on ${elementName(clip)} hides part of the text of ${elementName(owner)}`, params: { el: elementName(owner), decl: `overflow: ${cs.overflow}` } });
+        }
+        break;
+      }
+    }
+    return reported;
+  }
+
+  /**
+   * Layout flags: what converts faithfully but an author rarely intends, read from the text Chromium shows.
+   * `LAYOUT_TEXT_OVERFLOW` when lines run past the box that paints behind them (the Text block's own, or its
+   * nearest painting ancestor's); `LAYOUT_TEXT_OVERLAP` once per pair of Text blocks whose lines cross, at the
+   * later one; `LAYOUT_TEXT_ILLEGIBLE` below 2:1 contrast against the colours painted beneath.
+   */
+  function reportLayoutFlags(nodes: ShownText[], clipped: Set<HTMLElement>): void {
+    const linesOf = new Map<HTMLElement, DOMRect[]>();
+    for (const { owner, lines } of nodes) linesOf.set(owner, [...(linesOf.get(owner) ?? []), ...lines]);
+
+    for (const [owner, lines] of linesOf) {
+      if (clipped.has(owner)) continue;
+      let painter: HTMLElement | null = owner;
+      while (painter && painter !== section && !paintsBox(painter)) painter = painter.parentElement;
+      if (!painter || painter === section) continue;
+      const box = painter.getBoundingClientRect();
+      const spill = Math.max(...lines.map((line) => spills(line, box, { x: true, y: true })));
+      if (spill === 0) continue;
+      const where = painter === owner ? 'its box' : elementName(painter);
+      entries.push({ code: 'LAYOUT_TEXT_OVERFLOW', selector: cssPath(owner), reason: `text of ${elementName(owner)} runs ${spill.toFixed(1)} px past ${where}`, params: { el: elementName(painter) } });
+    }
+
+    const owners = Array.from(linesOf.keys());
+    for (let j = 1; j < owners.length; j += 1) {
+      for (let i = 0; i < j; i += 1) {
+        const crosses = linesOf.get(owners[i]!)!.some((a) => linesOf.get(owners[j]!)!.some((b) =>
+          Math.min(a.right, b.right) - Math.max(a.left, b.left) > 2 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 2));
+        if (crosses) {
+          entries.push({ code: 'LAYOUT_TEXT_OVERLAP', selector: cssPath(owners[j]!), reason: `text of ${elementName(owners[j]!)} overlaps text of ${elementName(owners[i]!)}`, params: { el: elementName(owners[j]!) } });
+        }
+      }
+    }
+
+    const illegible = new Set<HTMLElement>();
+    withPointerEvents(() => {
+      for (const { parent, owner, lines } of nodes) {
+        if (illegible.has(owner)) continue;
+        const text = parseColor(getComputedStyle(parent).color);
+        const alpha = (text?.alpha ?? 0) * effectiveOpacity(parent);
+        if (!text || alpha === 0) continue;
+        for (const line of lines) {
+          const backdrops = backdropsAt(line.left + line.width / 2, line.top + line.height / 2, parent);
+          if (!backdrops) continue;
+          const worst = backdrops.map((backdrop) => ({ backdrop, ratio: contrast(over(rgb(text.hex), alpha, backdrop), backdrop) })).sort((a, b) => a.ratio - b.ratio)[0];
+          if (worst && worst.ratio < 2) {
+            illegible.add(owner);
+            const behind = `#${worst.backdrop.map((channel) => Math.round(channel).toString(16).padStart(2, '0')).join('')}`;
+            entries.push({ code: 'LAYOUT_TEXT_ILLEGIBLE', selector: cssPath(owner), reason: `text colour #${text.hex.toLowerCase()} of ${elementName(owner)} has ${worst.ratio.toFixed(1)}:1 contrast against ${behind} behind it`, params: { el: elementName(owner) } });
+            break;
+          }
+        }
+      }
+    });
+  }
+
+  /**
+   * The colours that can lie under the text at a point: everything Chromium paints at or beneath the text's own
+   * element, composited bottom-up over white, one candidate per gradient stop. Undefined where that is unknowable:
+   * a picture, an image fill, or an effect blending what lies below.
+   */
+  function backdropsAt(x: number, y: number, textElement: HTMLElement): Array<[number, number, number]> | undefined {
+    const hits = document.elementsFromPoint(x, y);
+    const own = hits.findIndex((hit) => hit.contains(textElement));
+    if (own < 0) return undefined;
+    let backdrops: Array<[number, number, number]> = [[255, 255, 255]];
+    for (const hit of hits.slice(own).reverse()) {
+      if (!(hit instanceof HTMLElement) || hit.tagName === 'IMG' || hit.tagName === 'VIDEO' || hit.tagName === 'CANVAS') return undefined;
+      const cs = getComputedStyle(hit);
+      if (cs.filter !== 'none' || cs.mixBlendMode !== 'normal' || cs.backdropFilter !== 'none' || /url\(/.test(cs.backgroundImage)) return undefined;
+      const opacity = effectiveOpacity(hit);
+      const stops = cs.backgroundImage === 'none' ? [] : (cs.backgroundImage.match(/rgba?\([^)]*\)/g) ?? []).map(parseColor).filter((color): color is Color => color !== undefined);
+      if (stops.length > 0) backdrops = backdrops.flatMap((backdrop) => stops.map((stop) => over(rgb(stop.hex), stop.alpha * opacity, backdrop)));
+      const fill = parseColor(cs.backgroundColor);
+      if (fill && fill.alpha > 0) backdrops = backdrops.map((backdrop) => over(rgb(fill.hex), fill.alpha * opacity, backdrop));
+    }
+    return backdrops;
+  }
+
+  function rgb(hex: string): [number, number, number] {
+    return [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)];
+  }
+
+  function over(color: [number, number, number], alpha: number, backdrop: [number, number, number]): [number, number, number] {
+    return [0, 1, 2].map((i) => color[i]! * alpha + backdrop[i]! * (1 - alpha)) as [number, number, number];
+  }
+
+  /** WCAG 2 contrast ratio of two opaque sRGB colours. */
+  function contrast(a: [number, number, number], b: [number, number, number]): number {
+    const luminance = (color: [number, number, number]): number => {
+      const [r, g, b2] = color.map((channel) => {
+        const c = channel / 255;
+        return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+      }) as [number, number, number];
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b2;
+    };
+    const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
+    return (light + 0.05) / (dark + 0.05);
+  }
+
+  /** Runs `fn` with every element hit-testable, so the stacking and backdrop probes see what Chromium paints. */
+  function withPointerEvents<T>(fn: () => T): T {
+    const force = document.createElement('style');
+    force.textContent = '*{pointer-events:auto!important}';
+    document.head.append(force);
+    try {
+      return fn();
+    } finally {
+      force.remove();
+    }
+  }
+
+  /**
+   * `DROPPED_GENERATED_CONTENT`: `::before`/`::after` text, or an empty one that paints a box. The walk reads
+   * elements and their text only, so generated content never reaches the PPTX. Rasterised and opaque subtrees
+   * keep theirs (in the picture or the source part); `::marker` is the native bullet.
+   */
+  function reportGeneratedContent(): void {
+    const walker = document.createTreeWalker(section!, NodeFilter.SHOW_ELEMENT, {
+      acceptNode(node: Node): number {
+        const el = node as HTMLElement;
+        const preserve = el.getAttribute('data-preserve');
+        return isSkipped(el) || el instanceof SVGElement || el.hasAttribute('data-raster') || (preserve !== null && preserve !== 'text-effects') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+      },
+    });
+    for (let el: HTMLElement | null = section!; el; el = walker.nextNode() as HTMLElement | null) {
+      const pseudos = (['::before', '::after'] as const).filter((pseudo) => {
+        const cs = getComputedStyle(el!, pseudo);
+        if (cs.content === 'none' || cs.content === 'normal' || cs.display === 'none' || cs.visibility === 'hidden') return false;
+        // a single blank string (the clearfix idiom) paints only through its box; anything else is text, a counter or an image
+        if (!/^"\s*"$/.test(cs.content)) return true;
+        const box = (parseColor(cs.backgroundColor)?.alpha ?? 0) > 0 || cs.backgroundImage !== 'none' || parseBorderSides(cs) !== undefined || cs.boxShadow !== 'none';
+        return box && px(cs.width) > 0 && px(cs.height) > 0;
+      });
+      if (pseudos.length === 0) continue;
+      const decl = pseudos.join(' and ');
+      entries.push({ code: 'DROPPED_GENERATED_CONTENT', selector: cssPath(el), reason: `${decl} on ${elementName(el)} paints content the conversion leaves out`, params: { decl } });
+    }
+  }
+
+  /**
+   * How Chromium stacks every overlapping pair of Painting elements (Verification), hit-tested at the middle of
+   * their overlap with pointer events forced on. Anonymous text names its container, whose box is not its own,
+   * and elements sharing a selector cannot be told apart in the hit list: both are left out.
+   */
+  function stackingOrder(): BrowserCensus['stacking'] {
+    const elements: BrowserElement[] = [];
+    const visit = (list: BrowserElement[]): void => {
+      for (const element of list) {
+        elements.push(element);
+        if (element.kind === 'group') visit(element.children);
+      }
+    };
+    visit(shapes);
+    const selectors = elements.map((element) => element.selector);
+    // Overlap is judged on the measured boxes, which are what the PPTX stacks: a table's DOM box, say, also
+    // holds the caption that is emitted as a shape of its own beside it.
+    const items: Array<{ selector: string; node: Element; box: Box }> = [];
+    for (const element of elements) {
+      const selector = element.selector;
+      if (anonymousShapes.has(element) || selectors.indexOf(selector) !== selectors.lastIndexOf(selector)) continue;
+      let node: Element | null = null;
+      try {
+        node = selector.startsWith('#') ? document.getElementById(selector.slice(1)) : document.querySelector(selector);
+      } catch {
+        continue;
+      }
+      if (node && node !== section) items.push({ selector, node, box: element.box });
+    }
+    return withPointerEvents(() => {
+      const out: BrowserCensus['stacking'] = [];
+      for (let i = 0; i < items.length; i += 1) {
+        for (let j = i + 1; j < items.length; j += 1) {
+          const a = items[i]!;
+          const b = items[j]!;
+          const left = Math.max(a.box.x, b.box.x);
+          const right = Math.min(a.box.x + a.box.w, b.box.x + b.box.w);
+          const top = Math.max(a.box.y, b.box.y);
+          const bottom = Math.min(a.box.y + a.box.h, b.box.y + b.box.h);
+          if (right - left < 2 || bottom - top < 2) continue;
+          const hits = document.elementsFromPoint(sectionRect.left + (left + right) / 2, sectionRect.top + (top + bottom) / 2);
+          const ia = hits.indexOf(a.node);
+          const ib = hits.indexOf(b.node);
+          if (ia < 0 || ib < 0) continue;
+          out.push(ia < ib ? { above: a.selector, below: b.selector } : { above: b.selector, below: a.selector });
+        }
+      }
+      return out;
+    });
+  }
+
+  /**
+   * Visible text (Verification): every laid-out text node of the Slide, in document order, as Chromium shows
+   * it. Hidden, notes, rasterised, opaque and off-Canvas text is left out, as is generated content, which no
+   * text node holds. Runs of one owner are cut where a line break or a block intervenes, so neighbouring
+   * words never fuse.
+   */
+  function visibleText(): BrowserCensus['text'] {
+    const out: BrowserCensus['text'] = [];
+    let current: BrowserCensus['text'][number] | undefined;
+    const walker = document.createTreeWalker(section!, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const el = node as HTMLElement;
+        if (current && (el.tagName === 'BR' || !isInlineRendered(el))) current.text += ' ';
+        continue;
+      }
+      const parent = node.parentElement;
+      if (!parent || !showsText(parent) || !isLaidOut(node as Text)) continue;
+      const owner = textOwner(parent);
+      if (!owner) continue;
+      const selector = cssPath(owner);
+      if (!current || current.owner.selector !== selector) {
+        const shapeId = owner.getAttribute('data-shape-id');
+        current = { owner: { selector, ...(shapeId ? { shapeId } : {}) }, text: '' };
+        out.push(current);
+      }
+      current.text += applyTextTransform(parent, removeSoftHyphens(node.textContent ?? ''));
+    }
+    return out.filter((run) => hasVisibleText(run.text));
+  }
+
+  function showsText(el: HTMLElement): boolean {
+    if (getComputedStyle(el).visibility === 'hidden') return false;
+    for (let current: Element | null = el; current && current !== section; current = current.parentElement) {
+      if (current instanceof SVGElement || UNRENDERED_TAGS[current.tagName] || (current.tagName === 'ASIDE' && current.classList.contains('notes')) || current.hasAttribute('data-raster')) return false;
+      const preserve = current.getAttribute('data-preserve');
+      if (preserve !== null && preserve !== 'text-effects') return false;
+    }
+    return true;
+  }
+
+  function isLaidOut(node: Text): boolean {
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    return Array.from(range.getClientRects()).some((rect) => rect.width > 0 && rect.height > 0);
+  }
+
+  /** The `data-shape-id` element the text belongs to, else its nearest block container; undefined when that lies wholly off the Canvas. */
+  function textOwner(el: HTMLElement): HTMLElement | undefined {
+    let block: HTMLElement | undefined;
+    let owner: HTMLElement | undefined;
+    for (let current: HTMLElement | null = el; current && current !== section && !owner; current = current.parentElement) {
+      if (current.hasAttribute('data-shape-id')) owner = current;
+      else if (!block && !isInlineRendered(current)) block = current;
+    }
+    owner ??= block ?? section!;
+    const rect = owner.getBoundingClientRect();
+    return rect.right <= sectionRect.left || rect.left >= sectionRect.right || rect.bottom <= sectionRect.top || rect.top >= sectionRect.bottom ? undefined : owner;
+  }
+
+  /** The speaker notes' text, separated at line breaks and blocks: the stylesheet hides notes, so they are read, not laid out. */
+  function notesText(): string {
+    const aside = Array.from(section!.children).find((child) => child.tagName === 'ASIDE' && child.classList.contains('notes'));
+    if (!aside) return '';
+    let text = '';
+    const walker = document.createTreeWalker(aside, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (node.nodeType === Node.TEXT_NODE) text += node.textContent ?? '';
+      else if (NOTES_BREAK_TAGS[(node as Element).tagName]) text += ' ';
+    }
+    return text;
+  }
 
   /**
    * `VALIDATE_TEXT_CSS` and `VALIDATE_POSITION` (spec 03 "Rejected by validate"): computed styles the emitter
@@ -663,6 +1021,7 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
         };
         finishShape(el, shape, transform?.scaleX ?? 1);
         out.push(shape);
+        anonymousShapes.add(shape);
       }
       out.push(...measureInlinePictures(el, range));
       first = last = undefined;
@@ -1704,7 +2063,7 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
       wrap,
       rtl,
       // a block that never wraps has no wrap width to guard; PowerPoint's `wrap="none"` lays the line out regardless
-      trailingGuard: wrap ? resolveTrailingGuard(lineGroups, availWidth, align, item ? undefined : { el, skipNestedLists: false, ...(range ? { range } : {}) }) : 0,
+      trailingGuard: wrap ? resolveTrailingGuard(lineGroups, availWidth, align, el, Math.max(px(cs.fontSize), ...runs.flatMap((run) => (run.kind === 'text' ? [run.style.size] : []))), item ? undefined : { skipNestedLists: false, ...(range ? { range } : {}) }) : 0,
       paragraphs: paragraphs.length ? paragraphs : [{ align, lineHeight: 0, spaceBefore: 0, spaceAfter: 0, indent, marginLeft: 0, level: 0, runs: runs.length ? runs : [{ kind: 'text', text: '', style: styleFromElement(el) }] }],
     };
 
@@ -1830,7 +2189,7 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
           previousBottom = lineBox.lastBottom;
         }
         const availWidth = li.getBoundingClientRect().width - px(liStyle.borderLeftWidth) - px(liStyle.borderRightWidth) - px(liStyle.paddingLeft) - px(liStyle.paddingRight);
-        trailingGuard = Math.max(trailingGuard, resolveTrailingGuard(measureLineGroups(host, true), availWidth, align, { el: host, skipNestedLists: true }));
+        trailingGuard = Math.max(trailingGuard, resolveTrailingGuard(measureLineGroups(host, true), availWidth, align, host, px(liStyle.fontSize), { skipNestedLists: true }));
 
         paragraphs.push({
           align,
@@ -2090,25 +2449,49 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
   }
 
   /**
-   * Wrap-width guard, both directions (spec 04). Positive: a line fills its width to within 0.5 px, so PowerPoint
-   * gets 1 px more (0.5 per side when centred) in case its advances come out wider. Negative: the block's breaks
-   * change when Chromium gets 0.5 px more, so PowerPoint (whose advances may come out narrower) gets 1 px less.
+   * Wrap-width guard, both directions (spec 04): how much wrap width PowerPoint gets beyond (or short of) Chromium's,
+   * so its breaks land where Chromium's did although its line widths stray by up to `WRAP_TOLERANCE_PX_PER_EM` per
+   * em of the wrap width (calibrated against PowerPoint for Mac). The widest line needs that much room, and the
+   * first word Chromium wraps must stay that far from fitting. When no width gives both, the middle is taken and the
+   * block is flagged `LAYOUT_WRAP_RISK`. `probe` re-lays the block out at other widths to find the next fit; without
+   * it (anonymous flex/grid text) only the widest line is guarded.
    */
-  function resolveTrailingGuard(groups: LineGroup[], availWidth: number, align: Align, block?: { el: HTMLElement; skipNestedLists: boolean; range?: Range }): number {
-    if (align === 'just' && block) {
+  function resolveTrailingGuard(groups: LineGroup[], availWidth: number, align: Align, el: HTMLElement, fontSize: number, probe?: { skipNestedLists: boolean; range?: Range }): number {
+    if (align === 'just' && probe) {
       // justification stretches every line but the last to the full width; the guard is about the natural width
-      return withNaturalAlignment(block.el, () => resolveTrailingGuard(measureLineGroups(block.el, block.skipNestedLists, block.range), availWidth, 'l', block));
+      return withNaturalAlignment(el, () => resolveTrailingGuard(measureLineGroups(el, probe.skipNestedLists, probe.range), availWidth, 'l', el, fontSize, probe));
     }
-    let guard = 0;
-    for (const group of groups) {
-      if (availWidth - Math.max(0, group.right - group.left) < 0.5) {
-        guard = Math.max(guard, align === 'ctr' ? 0.5 : 1);
+    if (groups.length === 0 || fontSize <= 0) return 0;
+    const tolerance = WRAP_TOLERANCE_PX + (WRAP_TOLERANCE_PX_PER_EM * availWidth) / fontSize;
+    const lineSlack = availWidth - Math.max(...groups.map((group) => Math.max(0, group.right - group.left)));
+    // the extra width at which Chromium pulls a word up, to 1/64 of the search span; none within it counts as never
+    let nextFit = Infinity;
+    const span = 2 * tolerance + 1;
+    if (probe && groups.length > 1 && breaksChangeWhenWidened(el, span, groups, probe.skipNestedLists, probe.range)) {
+      let holds = 0;
+      nextFit = span;
+      for (let step = 0; step < 6; step += 1) {
+        const middle = (holds + nextFit) / 2;
+        if (breaksChangeWhenWidened(el, middle, groups, probe.skipNestedLists, probe.range)) nextFit = middle;
+        else holds = middle;
       }
     }
-    if (guard === 0 && block && groups.length > 1 && breaksChangeWhenWidened(block.el, 0.5, groups, block.skipNestedLists, block.range)) {
-      guard = align === 'ctr' ? -0.5 : -1;
+    const least = tolerance - lineSlack;
+    const most = nextFit - tolerance;
+    if (least <= 0 && most >= 0) return 0;
+    // Overshoot the bound by GUARD_MARGIN, never past the middle, so the Deck PowerPoint gets back measures as
+    // already guarded (the next fit is only known to the search's resolution) and a round trip emits the same insets.
+    // Whole pairs of 1/64 px layout units, away from zero, keep a widened box (and each half of a centred one) on
+    // the grid Chromium lays that Deck out on.
+    const middle = (least + most) / 2;
+    const units = (px: number): number => Math.sign(px) * Math.ceil(Math.abs(px) * 32) / 32;
+    if (least <= most) return units(least > 0 ? Math.min(least + GUARD_MARGIN, middle) : Math.max(most - GUARD_MARGIN, middle));
+    const selector = cssPath(el);
+    if (!wrapRisks.has(selector)) {
+      wrapRisks.add(selector);
+      entries.push({ code: 'LAYOUT_WRAP_RISK', selector, reason: `a line of ${elementName(el)} ends ${lineSlack.toFixed(1)} px from its wrap width and the next word would fit ${nextFit.toFixed(1)} px further; PowerPoint's line widths differ from Chromium's by up to ${tolerance.toFixed(1)} px`, params: { el: elementName(el) } });
     }
-    return guard;
+    return units(middle);
   }
 
   /** Runs `fn` with the block's `text-align` forced to `start` (same breaks, unstretched lines), then restores it. */
@@ -2136,7 +2519,8 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
     style.setProperty('flex', 'none', 'important');
     let changed = false;
     try {
-      if (Math.abs(el.getBoundingClientRect().width - rect.width - delta) < 0.01) {
+      // Chromium snaps widths to 1/64 px layout units, so the widened box may miss `delta` by up to one unit
+      if (Math.abs(el.getBoundingClientRect().width - rect.width - delta) <= 1 / 64 + 0.001) {
         const after = measureLineGroups(el, skipNestedLists, range);
         changed = after.length !== before.length || after.some((group, index) => Math.abs((group.right - group.left) - (before[index]!.right - before[index]!.left)) > 0.01);
       }

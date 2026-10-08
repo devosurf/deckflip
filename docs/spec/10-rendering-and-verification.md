@@ -6,7 +6,20 @@ Consolidates the renderer research ([#5](https://github.com/devosurf/deckflip/is
 
 macOS is the only supported CLI host for now. Windows and Linux implementation paths are retained but are not supported or CI-gated. Cross-platform notes elsewhere in the specs describe retained implementation details or future work, not current release acceptance criteria. This does not change the PPTX format or Safe font policy.
 
+## Verification
+
+Every `convert`, once its output is written, and every `verify <source> <output>` compares what the source shows with what the output contains ([ADR 0007](../adr/0007-verification-and-powerpoint-oracle.md)). A mismatch is a `VERIFY_*` error (exit 5, output kept): a deckflip defect, never an authoring choice.
+
+- **The two sides.** The HTML side is the measured Deck plus a census Chromium takes of each Slide by a walk of its own, so a defect in the measurement walk cannot hide what it lost. The PPTX side is the package read back by the parser. HTML -> PPTX verifies the emitted bytes; PPTX -> HTML lays the written Deck out in the same Chromium and compares it with the parsed source.
+- **Visible text** (`VERIFY_TEXT_MISSING`, `VERIFY_TEXT_EXTRA`): every laid-out, shown text node of the Slide, `text-transform` applied and soft hyphens removed, grouped by owner (the element carrying its `data-shape-id`, else its nearest block) and cut at line breaks and blocks. Hidden subtrees, speaker notes, `data-raster` and opaque subtrees, generated content and owners wholly off the Canvas are left out. Per Slide, the multiset of whitespace-separated words must match the words of every text body in the PPTX; missing words are reported at their source owner, extra words at their output owner. Speaker notes are compared the same way.
+- **Geometry** (`VERIFY_GEOMETRY`): elements are paired by `shapeId` when both sides carry one (round trips), then by the longest common subsequence of kind and name, then remaining same-named leftovers. Paired elements must agree on their Canvas bounds (group transforms composed; groups themselves compare through their children) within 0.5 px per edge plus the wrap-width guard, and on rotation within 0.1°. An unpaired element that paints is reported; a picture's `<name> border` shape counts as part of the picture; opaque content missing after an HTML -> PPTX round trip is the round trip's to report (`PRESERVE_*`).
+- **Stacking** (`VERIFY_STACKING`): for every pair of Painting elements whose measured boxes overlap by 2 px both ways, Chromium hit-tests the middle of the overlap with pointer events forced on; the PPTX must stack their counterparts in the same order. Anonymous text and elements sharing a selector cannot be told apart in the hit list and are skipped.
+
+Cost: HTML -> PPTX reuses the measurement's pages and parses the emitted bytes in-process; PPTX -> HTML launches Chromium once to lay the written Deck out.
+
 ## Renderers
+
+`render` is a diagnostic: neither the agent loop nor CI needs a PPTX render.
 
 | Input | Renderer | Selection |
 | --- | --- | --- |
@@ -26,18 +39,21 @@ Resolution order: `--browser <path>` > `DECKFLIP_BROWSER` > the managed build if
 
 `odiff` (`odiff-bin`), `threshold 0.1`, `antialiasing: true`, per-fixture `ignoreRegions`. Gates are per Slide on `diffPercentage`:
 
-| Comparison | Gate (initial, calibrated on the corpus) |
+| Comparison | Gate |
 | --- | --- |
-| Chromium screenshot of the HTML vs PowerPoint render of the converted PPTX (oracle, Mac, manual) | <= 0.5 % |
-| Chromium screenshot vs LibreOffice render (CI) | <= 2.6 %, originally calibrated on Ubuntu and retained unchanged for macOS, with `RENDER_FONT_SUBSTITUTED` fixtures excluded |
+| Oracle record: digest of the converted fixture vs `expected/oracle.json` (CI) | equal; otherwise the PowerPoint renders show another package and `corpus:oracle` must run again |
+| Chromium screenshot of the HTML vs the committed PowerPoint render (CI) | <= 1.25 %, calibrated on the 41 corpus Slides against PowerPoint for Mac 16.115: median 0.42 %, ceiling 1.14 % (text/alignment, then tables/borders 1.10 %, raster/shadow 1.07 %) |
+| Chromium screenshot vs LibreOffice render (opt-in, `DECKFLIP_LIBREOFFICE_GATE=1`, not CI) | <= 2.6 %, the former CI gate |
 | PPTX -> HTML -> PPTX (untouched) | every part byte-identical; no image gate needed |
 | HTML -> PPTX -> HTML -> PPTX | second PPTX part-identical to the first (idempotence) |
 
-The spike's numbers set expectations: 0.57-0.78 % differing pixels against real PowerPoint for a text-heavy slide, dominated by 1-2 px vertical residuals.
+The spike's numbers set expectations: 0.57-0.78 % differing pixels against real PowerPoint for a text-heavy slide, dominated by 1-2 px vertical residuals; the spike slide measures 0.78 % against the current oracle.
+
+The digest is SHA-256 over the package parts by name, leaving out `docProps/` (timestamps, app version) and `ppt/media/` (rasters are Chromium's own paint, already the other side of the image gate), with media targets in relationship parts reduced to their extension.
 
 ## Corpus
 
-`fixtures/corpus/<category>/<name>/` with `deck.html` (+ assets; a category may keep shared assets in `fixtures/corpus/<category>/_assets/`, which the oracle script skips) or `source.pptx`, and `expected/` holding `chromium/slide-NNN.png` (generated, not committed), `powerpoint/slide-NNN.png` (committed, produced on a Mac with PowerPoint by `npm run corpus:oracle [category[/name] ...]`), `report.json` (committed, the expected entries), and optionally `ignore.json` (`{ "<slide>": [{ "x1", "y1", "x2", "y2" }] }` in CSS px: the comparator's `ignoreRegions` for areas the fixture deliberately renders differently, such as a flattened effect). Categories, each with 3-8 decks:
+`fixtures/corpus/<category>/<name>/` with `deck.html` (+ assets; a category may keep shared assets in `fixtures/corpus/<category>/_assets/`, which the oracle script skips) or `source.pptx`, and `expected/` holding `chromium/slide-NNN.png` (generated, not committed), `powerpoint/slide-NNN.png` and `oracle.json` (committed, the PowerPoint oracle and its Oracle record, produced on a Mac with PowerPoint by `npm run corpus:oracle [category[/name] ...]`), `report.json` (committed, the expected entries, never a `VERIFY_*`), and optionally `ignore.json` (`{ "<slide>": [{ "x1", "y1", "x2", "y2" }] }` in CSS px: the comparator's `ignoreRegions` for areas the fixture deliberately renders differently, such as a flattened effect). Categories, each with 3-8 decks:
 
 - `text`: wrapping at boundaries, mixed sizes in a line, lists (nested, numbered, `inside`/`outside`), alignment, `pre`, RTL, emoji.
 - `shapes`: fills, gradients, borders (uniform, per-side, dashed), radius, shadows, opacity, rotation.
@@ -49,14 +65,14 @@ The spike's numbers set expectations: 0.57-0.78 % differing pixels against real 
 - `roundtrip`: PowerPoint-authored decks with charts, SmartArt, notes, sections, animations, comments, groups, placeholders, embedded fonts, a `.pptm`.
 - `templates`: the skill's `templates/` rendered as-is (the skill must pass its own tool with zero warnings).
 
-Renewal: adding a fixture means adding `deck.html` and running `corpus:oracle` once on a Mac; CI regenerates the Chromium side and refuses fixtures without committed `powerpoint/` images or `report.json`. Oracle images are regenerated wholesale when the PowerPoint version on the oracle machine changes, in one reviewed commit.
+Renewal: adding a fixture, or changing what a fixture emits, means running `corpus:oracle` for it on a Mac with PowerPoint; the script refuses fixtures that fail Verification. CI regenerates the Chromium side and refuses fixtures without committed `powerpoint/` images, `oracle.json` or `report.json`. Oracle images are regenerated wholesale when the PowerPoint version on the oracle machine changes, in one reviewed commit.
 
 ## CI shape
 
 GitHub Actions has one required job, `macos`:
 
-- Install LibreOffice, Liberation, Carlito and Caladea, plus the pinned managed Chromium.
-- Audit production dependencies, typecheck, and run the full test suite, including the LibreOffice corpus gates, font scan, round-trip identity and idempotence.
+- Install the pinned managed Chromium. No LibreOffice: the corpus gates compare with the committed PowerPoint oracle.
+- Audit production dependencies, typecheck, and run the full test suite, including the PowerPoint-oracle corpus gates, Verification of every fixture, font scan, round-trip identity and idempotence.
 - Check determinism with two byte-identical conversions under `SOURCE_DATE_EPOCH`, then build and verify the npm package contents.
 
 The PowerPoint oracle is never run in CI (Microsoft does not support unattended Office); it remains a manual step on the maintainer's Mac. Windows and Ubuntu jobs are deferred until those hosts are supported.

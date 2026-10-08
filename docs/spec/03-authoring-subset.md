@@ -38,7 +38,7 @@ Picture notes: an `img` inside a Text block is emitted as its own picture on top
 | `transform: scale()` | uniform scale folded into size (text: into font size); `data-group` containers retain independent axis scales and flips in the group transform, leaving child geometry and text native |
 | `object-fit: cover/contain`, `object-position` | `a:srcRect` |
 | `clip-path: inset(...)` on `img` | `a:srcRect` |
-| `overflow: hidden` on a container | no-op (children outside are clipped by their own measured boxes; children fully outside are dropped with `DROPPED_OFFCANVAS` info) |
+| `overflow: hidden` on a container | no clipping in PowerPoint: children are emitted at their own measured boxes (children fully outside are dropped with `DROPPED_OFFCANVAS` info); text it hides stays native and whole, with `FLATTEN_OVERFLOW_CLIP` (warning), since PowerPoint cannot clip text |
 | `visibility: hidden`, `display: none` | element not emitted |
 | Text properties | see #12 (`color`, `font-*`, `line-height`, `letter-spacing`, `text-align`, `text-decoration`, `text-transform`, `text-shadow`, `white-space`, `direction`, `list-style-type`, `padding`, `vertical-align`) |
 
@@ -56,4 +56,8 @@ On a text-bearing element these same properties are **flattened** (`FLATTEN_*` w
 - Slide structure faults from #10 (`VALIDATE_SLIDE_SIZE`, `VALIDATE_STRAY_CONTENT`, `VALIDATE_REMOTE_ASSET`, `VALIDATE_MISSING_ASSET`, `VALIDATE_UNKNOWN_META`, `VALIDATE_LIST_CONTENT`).
 - Font faults from #15 (`FONT_UNRESOLVED`, `FONT_GENERIC_ONLY`).
 
-Everything else in CSS is allowed and simply has no effect on the emitted OOXML beyond its influence on measured geometry; `render` diffs reveal any drift. Elements partly outside the Canvas are emitted as measured (PowerPoint clips), with `FLATTEN_OFFCANVAS` as a warning. Animations and transitions (`animation`, `transition`) are flattened to the state after `load` + `fonts.ready` (`FLATTEN_ANIMATION`, info).
+Everything else in CSS is allowed and simply has no effect on the emitted OOXML beyond its influence on measured geometry; Verification reports any drift between that geometry and the PPTX (`VERIFY_*`). Elements partly outside the Canvas are emitted as measured (PowerPoint clips), with `FLATTEN_OFFCANVAS` as a warning. Animations and transitions (`animation`, `transition`) are flattened to the state after `load` + `fonts.ready` (`FLATTEN_ANIMATION`, info). `::before`/`::after` content is not converted: text, counters, images, or an empty string painting a box raise `DROPPED_GENERATED_CONTENT` (warning); `::marker` is the native list marker.
+
+## Layout flags (permitted, `LAYOUT_*` warning)
+
+Converted faithfully, but rarely what an author means: text running past the box painted behind it (`LAYOUT_TEXT_OVERFLOW`), lines of two Text blocks crossing (`LAYOUT_TEXT_OVERLAP`), text below 2:1 contrast against what is painted beneath it (`LAYOUT_TEXT_ILLEGIBLE`), and lines too close to their wrap width for the wrap-width guard to keep PowerPoint's breaks (`LAYOUT_WRAP_RISK`, [04](04-text-mapping.md)). Thresholds are in [08-report-codes.md](08-report-codes.md).

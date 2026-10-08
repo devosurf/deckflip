@@ -74,7 +74,7 @@ body {
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
   color: #ffffff;
 }
-.slide.divider .small { color: #e0e7ff; }
+.slide.divider .small, .slide.divider .lede { color: #e0e7ff; }
 
 /* Bullets */
 .slide.bullets { gap: 32px; }

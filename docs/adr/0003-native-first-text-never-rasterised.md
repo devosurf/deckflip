@@ -5,4 +5,4 @@ Every construct with a DrawingML equivalent is emitted as an editable object, an
 ## Consequences
 
 - Every fallback and approximation is a Report entry with a hint; `--strict` turns any of them into exit 4.
-- Some HTML renders differently in PowerPoint than in Chromium by design (dropped filters, radial-gradient approximation); `render` makes the difference visible.
+- Some HTML renders differently in PowerPoint than in Chromium by design (dropped filters, radial-gradient approximation); the Conversion report names each difference, so `render` is no longer needed to see them (ADR 0007).

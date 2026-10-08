@@ -4,10 +4,11 @@ import { basename, dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Browser, Page } from 'playwright-core';
 import { textBodiesOf } from '../model/index.js';
+import { groupToCanvas, transformedBounds, type Matrix2d } from '../model/geometry.js';
 import type { Box, Canvas, Deck, Element, ImageFill, PictureElement, Slide, TextBody } from '../model/index.js';
 import { entry as reportEntry } from '../report/codes.js';
 import type { Entry } from '../report/types.js';
-import type { BrowserElement, BrowserGroup, BrowserImageFill, BrowserMeasureResult, BrowserPicture, BrowserRaster } from './browser-script.js';
+import type { BrowserCensus, BrowserElement, BrowserImageFill, BrowserMeasureResult, BrowserPicture, BrowserRaster } from './browser-script.js';
 import { loadMedia, reencodeToPng } from './media.js';
 import { FREEZE_ATTR, measureSlideDocument, preloadBackgroundImages } from './browser-script.js';
 import type { LoadedDeck, SlideDocument } from './load.js';
@@ -37,6 +38,8 @@ export interface MeasuredDeckResult {
   entries: Entry[];
   /** each Slide's section as parsed, in Slide order: what the round trip fingerprints against the manifest */
   sections: HtmlNode[];
+  /** each Slide's census, in Slide order: what Verification compares the output against */
+  census: BrowserCensus[];
 }
 
 const SLIDE_SIZE_HINT = 'Do not set width/height on sections, or match {W}x{H} exactly';
@@ -48,6 +51,7 @@ export async function measureDeck(loaded: LoadedDeck, opts: MeasureOptions): Pro
   const entries: Entry[] = [...loaded.entries];
   const slides: Slide[] = [];
   const sections: HtmlNode[] = [];
+  const census: BrowserCensus[] = [];
   const fontFaces = new Map<string, { family: string; file: string; weight?: number; italic?: boolean }>();
 
   try {
@@ -84,6 +88,7 @@ export async function measureDeck(loaded: LoadedDeck, opts: MeasureOptions): Pro
         };
         slides.push(slide);
         sections.push(result.tree);
+        census.push(result.census);
       } finally {
         await page.close();
       }
@@ -104,6 +109,7 @@ export async function measureDeck(loaded: LoadedDeck, opts: MeasureOptions): Pro
     },
     entries,
     sections,
+    census,
   };
 }
 
@@ -241,43 +247,6 @@ async function resolveElements(ctx: PageContext, measured: BrowserElement[], ent
     out.push(element);
   }
   return out;
-}
-
-type Matrix2d = { a: number; b: number; c: number; d: number; e: number; f: number };
-
-/** Compose the group's child-to-parent mapping with its ancestors, including axis reflections. */
-function groupToCanvas(group: BrowserGroup, parent?: Matrix2d): Matrix2d {
-  const { box, childBox } = group;
-  const angle = group.rotation * Math.PI / 180;
-  const sx = (childBox.w === 0 ? 1 : box.w / childBox.w) * (group.flipH ? -1 : 1);
-  const sy = (childBox.h === 0 ? 1 : box.h / childBox.h) * (group.flipV ? -1 : 1);
-  const a = Math.cos(angle) * sx;
-  const b = Math.sin(angle) * sx;
-  const c = -Math.sin(angle) * sy;
-  const d = Math.cos(angle) * sy;
-  const cx = childBox.x + childBox.w / 2;
-  const cy = childBox.y + childBox.h / 2;
-  const e = box.x + box.w / 2 - a * cx - c * cy;
-  const f = box.y + box.h / 2 - b * cx - d * cy;
-  if (!parent) return { a, b, c, d, e, f };
-  return {
-    a: parent.a * a + parent.c * b, b: parent.b * a + parent.d * b,
-    c: parent.a * c + parent.c * d, d: parent.b * c + parent.d * d,
-    e: parent.a * e + parent.c * f + parent.e, f: parent.b * e + parent.d * f + parent.f,
-  };
-}
-
-/** Axis-aligned Canvas bounds of a rotated child rectangle under all ancestor transforms. */
-function transformedBounds(box: Box, rotation: number, transform: Matrix2d): Box {
-  const { a, b, c, d, e, f } = transform;
-  const angle = rotation * Math.PI / 180;
-  const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
-  const cx = a * (box.x + box.w / 2) + c * (box.y + box.h / 2) + e;
-  const cy = b * (box.x + box.w / 2) + d * (box.y + box.h / 2) + f;
-  const w = Math.abs(a * cos + c * sin) * box.w + Math.abs(c * cos - a * sin) * box.h;
-  const h = Math.abs(b * cos + d * sin) * box.w + Math.abs(d * cos - b * sin) * box.h;
-  return { x: cx - w / 2, y: cy - h / 2, w, h };
 }
 
 /** Loads an image fill's bytes: PNG/JPEG as they are; GIF, WebP and SVG re-encoded to PNG (`SUBSTITUTE_IMAGE_FORMAT`), since `a:blipFill` on a shape takes no vector. */

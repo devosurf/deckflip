@@ -13,7 +13,8 @@ env:
 
 jobs:
   macos:
-    # macOS is the supported host; keep all automated gates here. PowerPoint remains a manual oracle.
+    # macOS is the supported host; keep all automated gates here. The corpus gates compare Chromium with the
+    # committed PowerPoint renders, which stay a manual step on a Mac with PowerPoint (npm run corpus:oracle).
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,8 +24,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm audit --omit=dev
-      - name: Install LibreOffice and PowerPoint-compatible fonts
-        run: brew install --cask libreoffice font-liberation font-carlito font-caladea
       - name: Install managed Chromium
         run: node node_modules/playwright-core/cli.js install chromium
       - run: npm run typecheck

@@ -25,7 +25,7 @@ Canvas `1280x720` CSS px = `960x540` pt = `12192000x6858000` EMU; `1 px = 0.75 p
 
 ## Settled outside tickets (during charting)
 
-Node/TypeScript on npm; Playwright-measured layout; own OOXML emitter and parser; native first, raster only where OOXML cannot express the construct, editability over pixel identity; both directions first class; validated authoring subset rather than a component vocabulary; v1 flattens animations; fonts referenced by name, embedding behind a flag; one text box per HTML block with autofit off; 16:9 default with 4:3 and custom via meta, no scaling; single-file `<section>` Deck canonical; LibreOffice diffs in CI with PowerPoint as oracle; Claude Code first via a harness-neutral skill.
+Node/TypeScript on npm; Playwright-measured layout; own OOXML emitter and parser; native first, raster only where OOXML cannot express the construct, editability over pixel identity; both directions first class; validated authoring subset rather than a component vocabulary; v1 flattens animations; fonts referenced by name, embedding behind a flag; one text box per HTML block with autofit off; 16:9 default with 4:3 and custom via meta, no scaling; single-file `<section>` Deck canonical; every conversion verifies its own output, and CI compares Chromium with a PowerPoint oracle bound to the emitted package (LibreOffice optional); Claude Code first via a harness-neutral skill.
 
 ## Not in this spec (out of scope for v1)
 
@@ -40,5 +40,5 @@ Every question below is answered in the linked section; if a builder finds one t
 - Every report code, its severity and hint text: 08.
 - What happens with an existing PPTX, byte for byte: 06.
 - Which font name is written and when conversion refuses: 07.
-- Where Chromium and LibreOffice come from, and what CI runs: 10.
+- Where Chromium comes from, what Verification compares, and what CI runs: 10.
 - Module boundaries, dependency list, milestone order and acceptance tests: 11.

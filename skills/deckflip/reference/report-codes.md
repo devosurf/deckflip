@@ -1,6 +1,6 @@
 # Report codes
 
-Every entry carries `code`, `kind`, `severity`, `slide`, `locator`, `reason` and (except errors) `hint`. `{decl}` in a hint is the offending CSS declaration, `{el}` the element name. Two rules: `VALIDATE_*` and the two `FONT_*` errors are the only `severity: error` codes and stop the conversion (exit 2); every `RASTER_<X>` has a `FLATTEN_<X>` twin with the same trigger for text-bearing elements.
+Every entry carries `code`, `kind`, `severity`, `slide`, `locator`, `reason` and `hint`. `{decl}` in a hint is the offending CSS declaration, `{el}` the element name. Three rules: `VALIDATE_*` and the two `FONT_*` errors stop the conversion (exit 2); `VERIFY_*` errors mean deckflip wrote output that differs from your source, a deckflip defect (exit 5, output kept): report it, do not work around it; every `RASTER_<X>` has a `FLATTEN_<X>` twin with the same trigger for text-bearing elements.
 
 ## VALIDATE_* (kind `error`)
 
@@ -60,6 +60,7 @@ Every entry carries `code`, `kind`, `severity`, `slide`, `locator`, `reason` and
 | `FLATTEN_TEXT_SHADOW_MULTI` | warning | multiple `text-shadow` layers | First shadow kept |
 | `FLATTEN_ANIMATION` | info | `animation`/`transition` present | First frame used |
 | `FLATTEN_OFFCANVAS` | warning | element partly outside the Canvas | Move it inside the Canvas |
+| `FLATTEN_OVERFLOW_CLIP` | warning | `overflow: hidden` (or `clip`, `auto`, `scroll`) hides part of a Text block's text | PowerPoint cannot clip text: size the box to fit its text, or remove the hidden lines |
 | `FLATTEN_MEDIA_POSTER` | warning | `video` without `poster` | Add `poster` so PowerPoint shows a frame |
 
 ## SUBSTITUTE_* (kind `substituted`, info)
@@ -86,5 +87,28 @@ Every entry carries `code`, `kind`, `severity`, `slide`, `locator`, `reason` and
 | `DROPPED_TEXT_EFFECTS` | dropped | warning | WordArt/3D shape edited; effects cannot be re-emitted |
 | `DROPPED_EXTENSION` | dropped | info | unknown `extLst` on an edited shape |
 | `DROPPED_OFFCANVAS` | dropped | info | element fully outside the Canvas; delete it or move it inside |
+| `DROPPED_GENERATED_CONTENT` | dropped | warning | `::before`/`::after` text or a painted box; put it into the HTML as an element |
 | `OVERRIDE_CANVAS_SIZE` | overridden | info | `--size` differs from deck meta |
 | `RENDER_FONT_SUBSTITUTED` | substituted | info | LibreOffice rendered with a substitute for an Office-bundled font |
+
+## LAYOUT_* (kind `flagged`, warning)
+
+The PPTX matches the HTML, but the HTML shows something you rarely intend. Fix the HTML, or accept the entry when it is deliberate (Strict mode then exits 4 with only accepted entries).
+
+| Code | Trigger | Fix |
+| --- | --- | --- |
+| `LAYOUT_TEXT_OVERFLOW` | text runs past the box painted behind it (its own fill/border, or its nearest painting ancestor's) | Give the box room for the text, or shorten the text |
+| `LAYOUT_TEXT_OVERLAP` | lines of two Text blocks cross | Move one clear of the other |
+| `LAYOUT_TEXT_ILLEGIBLE` | text contrast below 2:1 against what is painted behind it (not judged over pictures) | Change the text colour or the background |
+| `LAYOUT_WRAP_RISK` | a line ends so close to its wrap width, with the next word so close to fitting, that no wrap width keeps PowerPoint's breaks on Chromium's | Reword, or change the box width by a few px |
+
+## VERIFY_* (kind `error`): deckflip defects
+
+Verification compares what your source shows with what the written output contains. Any entry here means deckflip got it wrong; the output is written anyway and the exit code is 5. Report it with the report file.
+
+| Code | Meaning |
+| --- | --- |
+| `VERIFY_TEXT_MISSING` | text the source shows (Slide or speaker notes) is not in the output |
+| `VERIFY_TEXT_EXTRA` | the output holds text the source does not show |
+| `VERIFY_GEOMETRY` | an element is misplaced, missized, rotated, missing or unexpected in the output |
+| `VERIFY_STACKING` | overlapping elements are stacked in another order than the source paints them |

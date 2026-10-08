@@ -10,6 +10,8 @@ export const CODE_FAMILIES = [
   'DROPPED',
   'OVERRIDE',
   'RENDER',
+  'LAYOUT',
+  'VERIFY',
 ] as const;
 
 export type CodeFamily = (typeof CODE_FAMILIES)[number];
@@ -266,6 +268,11 @@ export const CODES = {
     severity: 'warning',
     hint: 'PowerPoint clips at the slide edge; move {el} inside {W}x{H}',
   },
+  FLATTEN_OVERFLOW_CLIP: {
+    kind: 'flattened',
+    severity: 'warning',
+    hint: 'PowerPoint cannot clip text: size {el} to fit its text, or remove the lines {decl} hides',
+  },
   FLATTEN_MEDIA_POSTER: {
     kind: 'flattened',
     severity: 'warning',
@@ -386,6 +393,11 @@ export const CODES = {
     severity: 'info',
     hint: 'Delete it or move it inside',
   },
+  DROPPED_GENERATED_CONTENT: {
+    kind: 'dropped',
+    severity: 'warning',
+    hint: 'Put the text or box into the HTML: {decl} content is not converted',
+  },
   OVERRIDE_CANVAS_SIZE: {
     kind: 'overridden',
     severity: 'info',
@@ -395,6 +407,46 @@ export const CODES = {
     kind: 'substituted',
     severity: 'info',
     hint: 'LibreOffice rendered with a substitute for an Office-bundled font',
+  },
+  LAYOUT_TEXT_OVERFLOW: {
+    kind: 'flagged',
+    severity: 'warning',
+    hint: 'Give {el} room for its text or shorten the text; accept it only if the spill is intended',
+  },
+  LAYOUT_TEXT_OVERLAP: {
+    kind: 'flagged',
+    severity: 'warning',
+    hint: 'Move {el} clear of the text it covers; accept it only if the layering is intended',
+  },
+  LAYOUT_TEXT_ILLEGIBLE: {
+    kind: 'flagged',
+    severity: 'warning',
+    hint: 'Raise the contrast between the text colour of {el} and what is painted behind it',
+  },
+  LAYOUT_WRAP_RISK: {
+    kind: 'flagged',
+    severity: 'warning',
+    hint: 'Reword {el} or change its width by a few px so no line ends right at its wrap width; PowerPoint may break it elsewhere',
+  },
+  VERIFY_TEXT_MISSING: {
+    kind: 'error',
+    severity: 'error',
+    hint: 'deckflip lost text it should have converted: report it with this report file',
+  },
+  VERIFY_TEXT_EXTRA: {
+    kind: 'error',
+    severity: 'error',
+    hint: 'deckflip wrote text the source does not show: report it with this report file',
+  },
+  VERIFY_GEOMETRY: {
+    kind: 'error',
+    severity: 'error',
+    hint: 'deckflip placed an element where the source does not show it: report it with this report file',
+  },
+  VERIFY_STACKING: {
+    kind: 'error',
+    severity: 'error',
+    hint: 'deckflip stacked overlapping elements in another order than the source paints them: report it with this report file',
   },
 } as const satisfies Record<string, CodeMeta>;
 

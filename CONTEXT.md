@@ -29,15 +29,35 @@ Replacing an animation, transition, or unsupported construct with a static equiv
 _Avoid_: Degrade, strip, simplify
 
 **Conversion report**:
-The record of everything a conversion flattened or rasterised, and why.
+The record of everything a conversion flattened, rasterised, substituted or dropped, and why; also its Layout flags and Verification errors.
 _Avoid_: Log, warnings, diagnostics
 
 **Report entry**:
-One item in the Conversion report: a stable code, what happened (rasterised, flattened, substituted, dropped, overridden, error), where on which Slide, why, and a hint for making it native.
+One item in the Conversion report: a stable code, what happened (rasterised, flattened, substituted, dropped, overridden, flagged, error), where on which Slide, why, and a hint for making it native.
 _Avoid_: Warning, issue, finding
 
+**Layout flag**:
+A Report entry (kind `flagged`) for something converted faithfully that an author rarely intends: text spilling out of its box, text over text, illegible text, a line PowerPoint may break elsewhere.
+_Avoid_: Lint, layout warning, smell
+
+**Verification**:
+The comparison, after a conversion writes its output, of what the source shows with what the output contains: Visible text, speaker notes, element geometry and stacking. A mismatch is a deckflip defect, never an authoring choice.
+_Avoid_: Validation (that is the authoring check before conversion), self-test, check
+
+**Visible text**:
+The text Chromium lays out on a Slide, read independently of the measurement walk; hidden subtrees, speaker notes, Rasterised elements, Opaque elements, generated content and text wholly off the Canvas excluded.
+_Avoid_: Rendered text, DOM text, content
+
+**PowerPoint oracle**:
+The committed PowerPoint renders of a corpus fixture, with the Oracle record of the package they were rendered from; what the corpus gates compare Chromium against.
+_Avoid_: Reference images, golden PNGs
+
+**Oracle record**:
+The `expected/oracle.json` of a corpus fixture: the digest of the emitted package and the PowerPoint version behind its PowerPoint oracle. Output whose digest differs needs a new PowerPoint run.
+_Avoid_: Golden hash, snapshot
+
 **Strict mode**:
-A conversion or validation run that treats any Report entry as a failure. Successful conversion output and the Conversion report remain available for nonfatal entries; validation errors prevent conversion regardless of mode.
+A conversion or validation run that treats any Report entry as a failure. Successful conversion output and the Conversion report remain available for nonfatal entries; validation errors prevent conversion regardless of mode, and Verification errors fail the conversion (exit 5) regardless of mode.
 _Avoid_: Fail-on-warning, pedantic mode
 
 **Deck file**:

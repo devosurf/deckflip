@@ -10,6 +10,7 @@ const KIND_ORDER: EntryKind[] = [
   'dropped',
   'preserved',
   'overridden',
+  'flagged',
 ];
 
 const SEVERITY_STYLE: Record<'error' | 'warning' | 'info', string> = {
@@ -29,6 +30,7 @@ function countEntries(entries: readonly Entry[]): Record<EntryKind, number> & { 
     dropped: 0,
     preserved: 0,
     overridden: 0,
+    flagged: 0,
     errors: 0,
   };
   for (const entry of entries) {
@@ -76,10 +78,17 @@ export function buildReport(
       dropped: counts.dropped,
       preserved: counts.preserved,
       overridden: counts.overridden,
+      flagged: counts.flagged,
       errors: counts.errors,
     },
     entries,
   };
+}
+
+/** The report with `extra` entries appended and its summary recounted. */
+export function withEntries(report: Report, extra: Entry[]): Report {
+  const { schemaVersion: _schemaVersion, summary, entries, ...base } = report;
+  return buildReport(base, [...entries, ...extra], summary.slides, summary.native);
 }
 
 export function formatSummary(report: Report, opts: { color: boolean }): string {

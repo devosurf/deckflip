@@ -70,7 +70,7 @@ describe.skipIf(!browserAvailable)('measured validation', () => {
         <div class="zoomed" id="zoomed"><p>zoomed text</p></div>
       </section>`,
     ));
-    expect(stripHints(measured.entries)).toEqual([
+    expect(stripHints(measured.entries.filter((entry) => entry.code.startsWith('VALIDATE_')))).toEqual([
       { code: 'VALIDATE_POSITION', kind: 'error', severity: 'error', slide: 1, locator: { selector: 'body > section' }, reason: '@page rule in a stylesheet' },
       { code: 'VALIDATE_POSITION', kind: 'error', severity: 'error', slide: 1, locator: { selector: '#pin' }, reason: 'position: fixed on div#pin' },
       { code: 'VALIDATE_POSITION', kind: 'error', severity: 'error', slide: 1, locator: { selector: '#stick' }, reason: 'position: sticky on div#stick' },

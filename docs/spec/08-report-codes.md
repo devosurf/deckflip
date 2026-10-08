@@ -2,11 +2,12 @@
 
 The complete, stable list of Report entry codes. Codes are never renamed once published; new ones may be added. Every non-error entry carries a `hint`; the templates below are the hints, with `{decl}` replaced by the offending CSS declaration and `{el}` by the element name.
 
-Kinds (extends [01-cli.md](01-cli.md) with `preserved`; `summary` gains a `preserved` count): `error | rasterised | flattened | substituted | dropped | preserved | overridden`.
+Kinds (extends [01-cli.md](01-cli.md) with `preserved` and `flagged`; `summary` gains a count for each): `error | rasterised | flattened | substituted | dropped | preserved | overridden | flagged`.
 
-Two rules hold across families:
+Three rules hold across families:
 
-- `VALIDATE_*` and the two `FONT_*` errors are the only `severity: error` codes. They come from `validate` (and from `convert`, which runs it first) and stop conversion with exit 2.
+- `VALIDATE_*` and the two `FONT_*` errors are the `severity: error` codes that come from `validate` (and from `convert`, which runs it first) and stop conversion with exit 2.
+- `VERIFY_*` are the other `severity: error` codes: Verification found the written output differs from what the source shows, a deckflip defect. They come from `convert` (after the output is written, which it keeps) and from `verify`, and exit 5 whatever Strict mode says.
 - Every `RASTER_<X>` has a `FLATTEN_<X>` twin with the same trigger, used when the element bears text (the effect is dropped, the text stays native).
 
 ## VALIDATE_* (kind `error`, severity `error`)
@@ -67,6 +68,7 @@ Two rules hold across families:
 | `FLATTEN_TEXT_SHADOW_MULTI` | warning | multiple `text-shadow` layers | First shadow kept |
 | `FLATTEN_ANIMATION` | info | `animation`/`transition` present | Final state after load was used |
 | `FLATTEN_OFFCANVAS` | warning | element partly outside the Canvas | PowerPoint clips at the slide edge; move `{el}` inside `{W}x{H}` |
+| `FLATTEN_OVERFLOW_CLIP` | warning | `overflow` other than `visible` on a Text block or an ancestor below the section hides part of its text (a line counts once more than a quarter of it is outside the padding box) | PowerPoint cannot clip text: size `{el}` to fit its text, or remove the lines `{decl}` hides |
 | `FLATTEN_MEDIA_POSTER` | warning | `video` without `poster` | Add `poster` so PowerPoint shows a frame |
 
 ## SUBSTITUTE_* (kind `substituted`, severity `info`)
@@ -98,6 +100,29 @@ Two rules hold across families:
 | `DROPPED_TEXT_EFFECTS` | warning | WordArt/3D shape edited | Effects cannot be re-emitted from HTML |
 | `DROPPED_EXTENSION` | info | unknown `extLst` on an edited shape | none needed |
 | `DROPPED_OFFCANVAS` | info | element fully outside the Canvas | Delete it or move it inside |
+| `DROPPED_GENERATED_CONTENT` | warning | `::before`/`::after` with text, a counter or an image, or an empty string that paints a box; not inside `data-raster` or opaque content | Put the text or box into the HTML: `{decl}` content is not converted |
+
+## LAYOUT_* (kind `flagged`, severity `warning`)
+
+Layout flags: the conversion is faithful, but the Slide shows something an author rarely intends. Read from what Chromium paints; HTML input only, from `validate` and `convert`. Strict mode counts them like any entry; accepting one is exiting 4 with only entries you meant.
+
+| Code | Trigger | Hint |
+| --- | --- | --- |
+| `LAYOUT_TEXT_OVERFLOW` | a line runs past the border box of the Text block when it paints, else of its nearest painting ancestor below the section: more than 1 px sideways or a quarter of the line vertically; clipped text is `FLATTEN_OVERFLOW_CLIP` instead | Give `{el}` room for its text or shorten the text; accept it only if the spill is intended |
+| `LAYOUT_TEXT_OVERLAP` | lines of two Text blocks intersect by more than 2 px both ways; once per pair, at the later block | Move `{el}` clear of the text it covers; accept it only if the layering is intended |
+| `LAYOUT_TEXT_ILLEGIBLE` | WCAG 2 contrast below 2:1 between the text colour (opacity applied) and the colours painted beneath it, composited over white, the worst gradient stop counting; no flag over a picture, an image fill or a blending effect | Raise the contrast between the text colour of `{el}` and what is painted behind it |
+| `LAYOUT_WRAP_RISK` | no wrap width keeps the widest line `t` from its edge and the first wrapped word `t` from fitting, with `t` PowerPoint's calibrated line-width tolerance ([04](04-text-mapping.md)); the midpoint is emitted | Reword `{el}` or change its width by a few px so no line ends right at its wrap width; PowerPoint may break it elsewhere |
+
+## VERIFY_* (kind `error`, severity `error`)
+
+Verification ([10-rendering-and-verification.md](10-rendering-and-verification.md#verification)): the output written by `convert`, or named to `verify`, differs from what the source shows. The output is kept; the exit code is 5. The hint is the same for all: report the defect with the report file.
+
+| Code | Trigger |
+| --- | --- |
+| `VERIFY_TEXT_MISSING` | Visible text (or speaker-notes text) of the source is absent from the output, by word, per Slide |
+| `VERIFY_TEXT_EXTRA` | the output holds text the source does not show |
+| `VERIFY_GEOMETRY` | an element sits more than 0.5 px (plus the wrap-width guard) or 0.1° from where the source shows it, or has no counterpart on the other side |
+| `VERIFY_STACKING` | two overlapping elements are stacked in the output in the other order than Chromium paints them |
 
 ## OVERRIDE_* and RENDER_*
 

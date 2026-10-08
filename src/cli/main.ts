@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { Command, InvalidArgumentError, Option } from 'commander';
 import type { Browser } from 'playwright-core';
 import type { Canvas } from '../model/index.js';
-import { convertHtmlToPptx, convertPptxToHtml, validateHtml, validatePptx } from '../convert.js';
+import { convertHtmlToPptx, convertPptxToHtml, inferKind, validateHtml, validatePptx, verifyConversion } from '../convert.js';
 import { FontCatalog, resolveDeckFonts } from '../fonts/index.js';
 import { loadDeck } from '../html/load.js';
 import { measureDeck } from '../html/measure.js';
@@ -104,11 +104,6 @@ export function parseRasterDpi(value: string): number {
   return dpi;
 }
 
-function inferInputKind(input: string): 'html' | 'pptx' {
-  const extension = extname(input).toLowerCase();
-  return extension === '.pptx' || extension === '.pptm' ? 'pptx' : 'html';
-}
-
 function defaultValidateReportPath(input: string): string {
   const extension = extname(input);
   if (extension.length > 0) {
@@ -122,7 +117,7 @@ async function printSummary(report: Report, color: boolean): Promise<void> {
 }
 
 async function handleConvert(input: string, options: ConvertCliOptions): Promise<number> {
-  const inputKind = inferInputKind(input);
+  const inputKind = inferKind(input);
   const targetKind = options.to ?? (inputKind === 'html' ? 'pptx' : 'html');
   if (targetKind === inputKind) {
     throw new DeckflipError(`cannot convert ${inputKind} to ${targetKind}`, 3);
@@ -133,6 +128,8 @@ async function handleConvert(input: string, options: ConvertCliOptions): Promise
           ...(options.output === undefined ? {} : { output: options.output }),
           ...(options.report === undefined ? {} : { report: options.report }),
           strict: options.strict,
+          ...(options.browser === undefined ? {} : { browserPath: options.browser }),
+          offline: options.offline,
         })
       : await convertHtmlToPptx(input, {
           ...(options.output === undefined ? {} : { output: options.output }),
@@ -155,7 +152,7 @@ async function handleConvert(input: string, options: ConvertCliOptions): Promise
 
 async function handleValidate(input: string, options: ValidateCliOptions): Promise<number> {
   const result =
-    inferInputKind(input) === 'pptx'
+    inferKind(input) === 'pptx'
       ? await validatePptx(input)
       : await validateHtml(input, {
           ...(options.size === undefined ? {} : { size: options.size }),
@@ -176,7 +173,7 @@ async function handleValidate(input: string, options: ValidateCliOptions): Promi
 }
 
 async function handleRender(input: string, options: RenderCliOptions): Promise<number> {
-  const kind = inferInputKind(input);
+  const kind = inferKind(input);
   const slideFilter = options.slides;
   const outputDir = options.output;
   await mkdir(outputDir, { recursive: true });
@@ -219,7 +216,7 @@ async function handleRender(input: string, options: RenderCliOptions): Promise<n
 }
 
 async function handleInspect(input: string): Promise<number> {
-  if (inferInputKind(input) === 'pptx') {
+  if (inferKind(input) === 'pptx') {
     const deck = await parsePptx(new Uint8Array(await readFile(input)));
     const catalog = await FontCatalog.scan({ extraFiles: [] });
     resolveDeckFonts(deck, catalog, { embedFonts: false });
@@ -237,6 +234,21 @@ async function handleInspect(input: string): Promise<number> {
   } finally {
     await browser.close();
   }
+}
+
+async function handleVerify(source: string, output: string, options: VerifyCliOptions): Promise<number> {
+  const result = await verifyConversion(source, output, {
+    ...(options.report === undefined ? {} : { report: options.report }),
+    ...(options.browser === undefined ? {} : { browserPath: options.browser }),
+    offline: options.offline,
+  });
+  if (options.json) {
+    process.stdout.write(`${JSON.stringify(result.report, null, 2)}\n`);
+  }
+  if (!options.quiet) {
+    await printSummary(result.report, options.color !== false);
+  }
+  return result.exitCode;
 }
 
 type ConvertCliOptions = {
@@ -277,17 +289,26 @@ type RenderCliOptions = {
   offline: boolean;
 };
 
+type VerifyCliOptions = {
+  report?: string;
+  json: boolean;
+  quiet: boolean;
+  color?: boolean;
+  browser?: string;
+  offline: boolean;
+};
+
 function buildProgram(): Command {
   const program = new Command();
   program.name('deckflip').version(VERSION).description('HTML slides <-> PowerPoint, built for coding agents.');
   program.exitOverride();
   program.showHelpAfterError();
-  program.addHelpText('after', '\nAgent skill (authoring rules, the validate -> convert --strict -> render -> inspect loop, templates):\n  npx skills add devosurf/deckflip\n\nExit codes: 0 ok · 1 no output produced · 2 validation failed · 3 bad invocation · 4 --strict with a non-empty report\n');
+  program.addHelpText('after', '\nAgent skill (authoring rules, the validate -> convert --strict -> inspect loop, templates):\n  npx skills add devosurf/deckflip\n\nExit codes: 0 ok · 1 no output produced · 2 validation failed · 3 bad invocation · 4 --strict with a non-empty report · 5 output written but Verification failed\n');
 
   program
     .command('convert <input>')
     .description(
-      'Convert HTML or a Deck directory to PPTX, or a PPTX to an HTML Deck with its Asset directory. The direction is inferred from the input unless --to overrides it. Validation runs first; a validation error exits 2 and nothing is written.',
+      'Convert HTML or a Deck directory to PPTX, or a PPTX to an HTML Deck with its Asset directory. The direction is inferred from the input unless --to overrides it. Validation runs first; a validation error exits 2 and nothing is written. The written output is then verified against the input: a mismatch is a deckflip defect, reported as VERIFY_* errors with exit 5.',
     )
     .addOption(new Option('--to <kind>').choices(['pptx', 'html']))
     .option('-o, --output <output>', 'output path')
@@ -338,6 +359,21 @@ function buildProgram(): Command {
     .option('--offline', 'do not download Chromium')
     .action(async (input: string, options: RenderCliOptions) => {
       process.exitCode = await handleRender(input, options);
+    });
+
+  program
+    .command('verify <source> <output>')
+    .description(
+      'Verify a conversion: compare what the source shows with what the output contains (Visible text, speaker notes, element geometry and stacking). One argument is an HTML Deck and the other a PPTX; the source decides the direction. Prints VERIFY_* entries; writes a report only with --report.',
+    )
+    .option('--report <path>', 'report file path')
+    .option('--json', 'print the report JSON to stdout')
+    .option('--quiet', 'suppress the human summary on stderr')
+    .option('--no-color', 'disable ANSI colors')
+    .option('--browser <path>', 'use an existing Chromium or Chrome binary')
+    .option('--offline', 'do not download Chromium')
+    .action(async (source: string, output: string, options: VerifyCliOptions) => {
+      process.exitCode = await handleVerify(source, output, options);
     });
 
   program

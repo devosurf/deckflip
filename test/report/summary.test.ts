@@ -20,6 +20,8 @@ describe('buildReport', () => {
         entry('PRESERVE_UNKNOWN_ID', { reason: 'preserve' }),
         entry('OVERRIDE_CANVAS_SIZE', { reason: 'override' }),
         entry('VALIDATE_ELEMENT', { slide: 3, reason: 'error' }),
+        entry('LAYOUT_TEXT_OVERLAP', { slide: 3, reason: 'flag' }),
+        entry('VERIFY_TEXT_MISSING', { slide: 4, reason: 'defect' }),
       ],
       4,
       11,
@@ -34,7 +36,8 @@ describe('buildReport', () => {
       dropped: 1,
       preserved: 1,
       overridden: 1,
-      errors: 1,
+      flagged: 1,
+      errors: 2,
     });
   });
 });

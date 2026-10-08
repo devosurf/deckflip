@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import JSZip from 'jszip';
 import { chromium } from 'playwright-core';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { Report } from '../../src/report/types.js';
@@ -216,6 +217,31 @@ describe('CLI severity and strict-mode status', () => {
       }
     }
     expect((await readdir(dir)).sort()).toEqual(['malformed.pptx']);
+  });
+
+  it.skipIf(!browserAvailable)('verify exits 0 or 5, writes a report only where asked, and rejects two inputs of one kind', async () => {
+    const dir = await workspace();
+    const input = join(dir, 'deck.html');
+    await writeFile(input, '<!doctype html><html><head><style>body { font-family: Arial }</style></head><body><section><p>KEPT_SENTINEL</p></section></body></html>');
+    const output = join(dir, 'deck.pptx');
+    expect(cli('convert', input, '-o', output).status).toBe(0);
+    const clean = cli('verify', input, output, '--json');
+    expect(clean.status, clean.stderr).toBe(0);
+    expect(JSON.parse(clean.stdout).entries).toEqual([]);
+
+    const zip = await JSZip.loadAsync(await readFile(output));
+    zip.file('ppt/slides/slide1.xml', (await zip.file('ppt/slides/slide1.xml')!.async('string')).replace('KEPT_SENTINEL', ''));
+    await writeFile(output, await zip.generateAsync({ type: 'nodebuffer' }));
+    const destination = join(dir, 'reports', 'verify.json');
+    const failed = cli('verify', input, output, '--json', '--report', destination);
+    expect(failed.status, failed.stderr).toBe(5);
+    const report = await reportAt(destination);
+    expect(JSON.parse(failed.stdout)).toEqual(report);
+    expect(report).toMatchObject({ command: 'verify', input: { path: input, kind: 'html' }, output: { path: output, kind: 'pptx' } });
+    expect(report.entries).toEqual([expect.objectContaining({ code: 'VERIFY_TEXT_MISSING', reason: expect.stringContaining('KEPT_SENTINEL') })]);
+    expect((await readdir(dir)).sort()).toEqual(['deck.html', 'deck.pptx', 'deck.pptx.report.json', 'reports']);
+
+    expect(cli('verify', input, input).status).toBe(3);
   });
 });
 
