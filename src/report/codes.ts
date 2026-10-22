@@ -101,7 +101,12 @@ export const CODES = {
   FONT_NOT_SAFE: {
     kind: 'substituted',
     severity: 'warning',
-    hint: 'Use a safe font, or pass --embed-fonts',
+    hint: 'Use a safe font, or install the Resolved font on every viewing machine; font embedding is not supported',
+  },
+  FONT_EMBED_UNSUPPORTED: {
+    kind: 'error',
+    severity: 'error',
+    hint: 'Remove --embed-fonts and use a safe font such as Arial, or install the Resolved font on every viewing machine',
   },
   FONT_EMBED_RESTRICTED: {
     kind: 'substituted',

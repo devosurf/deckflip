@@ -169,6 +169,7 @@ export interface ConvertToHtmlOptions extends Partial<ChromiumOptions> {
   output?: string;
   report?: string;
   strict?: boolean;
+  embedFonts?: ConvertOptions['embedFonts'];
 }
 
 /**
@@ -186,7 +187,7 @@ export async function convertPptxToHtml(input: string, opts: ConvertToHtmlOption
   const deck = await parsePptx(bytes);
   const source = await indexSource(await OpcReader.load(bytes));
   const catalog = await FontCatalog.scan({ extraFiles: [] });
-  const entries = [...resolveDeckFonts(deck, catalog, { embedFonts: false }), ...sourceEntries(deck, source)];
+  const entries = [...resolveDeckFonts(deck, catalog, { embedFonts: opts.embedFonts ?? false }), ...sourceEntries(deck, source)];
   const base = { ...reportBase(input, outputPath, deck.canvas, undefined, 'convert'), input: { path: input, kind: 'pptx' as const }, output: { path: outputPath, kind: 'html' as const } };
   if (hasError(entries)) {
     const report = buildReport(base, entries, deck.slides.length, nativeCount(deck));
@@ -215,12 +216,12 @@ export async function convertPptxToHtml(input: string, opts: ConvertToHtmlOption
 }
 
 /** `validate deck.pptx` (spec 01): the package parses, and the report lists what a round trip would carry opaquely. */
-export async function validatePptx(input: string, opts: { report?: string } = {}): Promise<{ report: Report; exitCode: 0 | 2 }> {
+export async function validatePptx(input: string, opts: { report?: string; embedFonts?: ConvertOptions['embedFonts'] } = {}): Promise<{ report: Report; exitCode: 0 | 2 }> {
   const bytes = new Uint8Array(await readFile(input));
   const deck = await parsePptx(bytes);
   const source = await indexSource(await OpcReader.load(bytes));
   const catalog = await FontCatalog.scan({ extraFiles: [] });
-  const entries = [...resolveDeckFonts(deck, catalog, { embedFonts: false }), ...sourceEntries(deck, source)];
+  const entries = [...resolveDeckFonts(deck, catalog, { embedFonts: opts.embedFonts ?? false }), ...sourceEntries(deck, source)];
   const base = { ...reportBase(input, undefined, deck.canvas, undefined, 'validate'), input: { path: input, kind: 'pptx' as const } };
   const report = buildReport(base, entries, deck.slides.length, nativeCount(deck));
   if (opts.report !== undefined) await writeSidecar(report, opts.report);

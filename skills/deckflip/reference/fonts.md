@@ -21,10 +21,12 @@ Choose Aptos or Calibri for a "PowerPoint look"; Arial or Georgia when the deck 
 
 1. Name a concrete family first; end every stack with a safe family; never rely on a generic alone. `font-family: Georgia, "Times New Roman", serif` is the pattern.
 2. Prefer the safe set.
-3. A brand font is fine when its file sits next to the deck, declared with `@font-face { src: url("fonts/Brand.woff") }`, and the conversion runs with `--embed-fonts`. Without embedding it is `FONT_NOT_SAFE` (warning): the viewer may substitute.
-4. Read the `FONT_*` entries: `FONT_EMBED_RESTRICTED` means the licence forbids embedding (switch fonts); `FONT_EMBED_FORMAT` means WOFF2/TTC cannot be embedded (provide TTF, OTF or WOFF).
+3. A local `@font-face { src: url("fonts/Brand.woff") }` makes a brand font available for authoring, not portable in the PPTX. It remains `FONT_NOT_SAFE` (warning): the viewer may substitute. Use a safe font or install the Resolved font on every viewing machine.
+4. `FONT_EMBED_UNSUPPORTED` means embedding is not implemented. Remove the embedding request; a different font licence or source format cannot enable it.
 5. `deckflip inspect deck.html` lists `fonts[]` with the resolved file and class (`safe`, `deck-provided`, `installed`).
 
 ## Embedding
 
-`--embed-fonts` embeds every resolved font outside the safe set; `--embed-fonts=Inter,Aptos` embeds exactly the named families. Default off. Embedding requires the font's permission bits to allow installable or editable embedding and a TTF/OTF/WOFF source; the whole file is embedded, no subsetting.
+Embedding is not implemented. Both `convert` and `validate` reject `--embed-fonts` and `--embed-fonts=Inter,Aptos` with `FONT_EMBED_UNSUPPORTED` (exit 2). The Conversion report remains available; conversion creates no output and leaves any existing destination unchanged.
+
+An embedding request never suppresses `FONT_NOT_SAFE`, even when it names an unused fallback in the CSS stack. Only a successfully packaged selected face can satisfy portability once embedding is implemented; option intent and a clean report are not evidence of font payloads in the PPTX.

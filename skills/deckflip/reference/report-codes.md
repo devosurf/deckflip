@@ -1,6 +1,6 @@
 # Report codes
 
-Every entry carries `code`, `kind`, `severity`, `slide`, `locator`, `reason` and `hint`. `{decl}` in a hint is the offending CSS declaration, `{el}` the element name. Three rules: `VALIDATE_*` and the two `FONT_*` errors stop the conversion (exit 2); `VERIFY_*` errors mean deckflip wrote output that differs from your source, a deckflip defect (exit 5, output kept): report it, do not work around it; every `RASTER_<X>` has a `FLATTEN_<X>` twin with the same trigger for text-bearing elements.
+Every entry carries `code`, `kind`, `severity`, `reason` and `hint`; element-level entries also have `slide` and `locator`. `{decl}` in a hint is the offending CSS declaration, `{el}` the element name. Three rules: `VALIDATE_*` and `FONT_*` errors stop the conversion (exit 2); `VERIFY_*` errors mean deckflip wrote output that differs from your source, a deckflip defect (exit 5, output kept): report it, do not work around it; every `RASTER_<X>` has a `FLATTEN_<X>` twin with the same trigger for text-bearing elements.
 
 ## VALIDATE_* (kind `error`)
 
@@ -26,9 +26,10 @@ Every entry carries `code`, `kind`, `severity`, `slide`, `locator`, `reason` and
 | --- | --- | --- | --- |
 | `FONT_UNRESOLVED` | error | no family in the stack is deck-provided or installed | Install the family or add a safe family such as Arial to the stack |
 | `FONT_GENERIC_ONLY` | error | the first resolvable entry is a generic family | Put a concrete family before the generic |
-| `FONT_NOT_SAFE` | warning | resolved font outside the safe set and not embedded | Use a safe font, or pass `--embed-fonts` |
-| `FONT_EMBED_RESTRICTED` | warning | the font's licence bits forbid editable embedding | Choose another font |
-| `FONT_EMBED_FORMAT` | warning | WOFF2 or TTC source cannot be embedded | Provide the family as TTF, OTF or WOFF |
+| `FONT_EMBED_UNSUPPORTED` | error | explicit embedding request; embedding is not implemented | Remove `--embed-fonts`; use a safe font or install the Resolved font on every viewing machine |
+| `FONT_NOT_SAFE` | warning | Resolved font outside the safe set and not embedded, regardless of an embedding request | Use a safe font or install the Resolved font on every viewing machine |
+| `FONT_EMBED_RESTRICTED` | warning | reserved for the embedding milestone: the font's licence bits forbid editable embedding | Choose another font |
+| `FONT_EMBED_FORMAT` | warning | reserved for the embedding milestone: WOFF2 or TTC source cannot be embedded | Provide the family as TTF, OTF or WOFF |
 | `FONT_MISSING_FOR_LAYOUT` | warning | PPTX -> HTML: source font not installed, not embedded | Install it before editing to keep layout faithful |
 
 ## RASTER_* (kind `rasterised`, warning; `RASTER_EXPLICIT` is info)

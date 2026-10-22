@@ -1,4 +1,5 @@
 import { textBodiesOf, type Deck, type DeckFontFace, type ResolvedFont } from '../model/index.js';
+import { entry } from '../report/codes.js';
 import type { Entry, EntryKind, Severity } from '../report/types.js';
 import { FontCatalog, type FontFace } from './scan.js';
 
@@ -57,7 +58,7 @@ const FONT_ENTRY_SPECS: Record<
   FONT_NOT_SAFE: {
     kind: 'substituted',
     severity: 'warning',
-    hint: 'Use a safe font, or pass --embed-fonts',
+    hint: 'Use a safe font, or install the Resolved font on every viewing machine; font embedding is not supported',
   },
 };
 
@@ -68,13 +69,14 @@ type Resolution =
 export function resolveDeckFonts(deck: Deck, catalog: FontCatalog, opts: { embedFonts: false | true | string[] }): Entry[] {
   const deckProvidedFamilies = familySetFromDeckFaces(deck.fontFaces);
   const deckProvidedFiles = fileSetFromDeckFaces(deck.fontFaces);
-  const embeddedFamilies = opts.embedFonts === true ? new Set<string>() : familySetFromList(opts.embedFonts === false ? [] : opts.embedFonts);
-  const embedAll = opts.embedFonts === true;
   const warnings = new Set<string>();
   const emittedStacks = new Set<string>();
   const resolvedFontCache = new Map<string, FontFace | undefined>();
   const stackCache = new Map<string, Resolution>();
   const entries: Entry[] = [];
+  if (opts.embedFonts !== false) {
+    entries.push(entry('FONT_EMBED_UNSUPPORTED', { reason: 'Font embedding is not supported; no font faces were embedded' }));
+  }
 
   for (const slide of deck.slides) {
     for (const element of slide.elements) {
@@ -106,10 +108,7 @@ export function resolveDeckFonts(deck: Deck, catalog: FontCatalog, opts: { embed
             run.style.font = resolvedFont;
   
             if (resolvedFont.class === 'safe') continue;
-            if (embedAll) continue;
-  
-            const isEmbedded = stackContainsEmbeddedFamily(normalizedStack, resolvedFamilyKey, embeddedFamilies);
-            if (isEmbedded || warnings.has(resolvedFamilyKey)) continue;
+            if (warnings.has(resolvedFamilyKey)) continue;
             warnings.add(resolvedFamilyKey);
             entries.push(buildEntryForSafeWarning(slide.index, selector, outcome.font.family));
           }
@@ -178,14 +177,6 @@ function lookupFace(
   return face;
 }
 
-function stackContainsEmbeddedFamily(stack: readonly string[], resolvedFamilyKey: string, embeddedFamilies: ReadonlySet<string>): boolean {
-  if (embeddedFamilies.has(resolvedFamilyKey)) return true;
-  for (const family of stack) {
-    if (embeddedFamilies.has(normalizeName(family))) return true;
-  }
-  return false;
-}
-
 function buildEntry(outcome: Extract<Resolution, { kind: 'error' }>, slide: number, selector: string): Entry {
   const spec = FONT_ENTRY_SPECS[outcome.code];
   const params = outcome.code === 'FONT_GENERIC_ONLY' ? { generic: outcome.generic ?? outcome.family } : { family: outcome.family };
@@ -251,15 +242,6 @@ function fileSetFromDeckFaces(faces: readonly DeckFontFace[]): ReadonlySet<strin
     if (file) files.add(file);
   }
   return files;
-}
-
-function familySetFromList(list: readonly string[]): ReadonlySet<string> {
-  const names = new Set<string>();
-  for (const family of list) {
-    const normalized = normalizeName(family);
-    if (normalized) names.add(normalized);
-  }
-  return names;
 }
 
 function firstConcreteFamily(stack: readonly string[]): string | undefined {

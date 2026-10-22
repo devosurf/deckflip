@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- Keep font portability reports truthful: `convert` and `validate` now reject explicit `--embed-fonts` requests with `FONT_EMBED_UNSUPPORTED` (exit 2), retaining the report without creating or replacing the converted Deck. Non-safe Resolved fonts keep `FONT_NOT_SAFE`, including when a request names only an unused CSS fallback. Help and font references now state that embedding is not implemented (#31).
+
 ## 0.2.0 - 2026-10-08
 
 ### Added

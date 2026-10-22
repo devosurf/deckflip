@@ -16,7 +16,7 @@ Binary and npm package: **`deckflip`** (`npx deckflip <command>`). Checked: free
 ## Flags
 Run-scoped settings are flags; Deck-intrinsic settings live in deck metadata. No config file in v1.
 - `--size 16:9|4:3|<w>x<h>` overrides deck meta; the override is recorded as a report entry (`OVERRIDE_CANVAS_SIZE`).
-- `--embed-fonts` embeds every non-safe font the Deck uses; `--embed-fonts=<name,...>` restricts to a list. Default off; non-safe fonts without embedding yield `FONT_NOT_SAFE`.
+- `--embed-fonts` and `--embed-fonts=<name,...>` request embedding, which is not implemented. Both `convert` and `validate` reject explicit requests with `FONT_EMBED_UNSUPPORTED` (error, exit 2), keeping the report and leaving any destination unchanged. Default off. The request never suppresses `FONT_NOT_SAFE`, including when a named family is only an unused fallback.
 - `--raster-dpi <n>` default `192` (2x Canvas).
 - `--report <path>` overrides the sidecar location; `--strict` (Strict mode); `--json`; `--quiet`; `--no-color`.
 - Chromium: `--browser <path>` uses an existing Chromium/Chrome binary; otherwise the Playwright-managed build is used (download policy in [10-rendering-and-verification.md](10-rendering-and-verification.md)).

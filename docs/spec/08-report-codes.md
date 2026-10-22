@@ -6,7 +6,7 @@ Kinds (extends [01-cli.md](01-cli.md) with `preserved` and `flagged`; `summary` 
 
 Three rules hold across families:
 
-- `VALIDATE_*` and the two `FONT_*` errors are the `severity: error` codes that come from `validate` (and from `convert`, which runs it first) and stop conversion with exit 2.
+- `VALIDATE_*` and `FONT_*` errors come from `validate` (and from `convert`, which runs it first) and stop conversion with exit 2.
 - `VERIFY_*` are the other `severity: error` codes: Verification found the written output differs from what the source shows, a deckflip defect. They come from `convert` (after the output is written, which it keeps) and from `verify`, and exit 5 whatever Strict mode says.
 - Every `RASTER_<X>` has a `FLATTEN_<X>` twin with the same trigger, used when the element bears text (the effect is dropped, the text stays native).
 
@@ -34,9 +34,10 @@ Three rules hold across families:
 | --- | --- | --- | --- |
 | `FONT_UNRESOLVED` | error | no family in the stack is deck-provided or installed | Install `{family}` or add a safe family such as Arial to the stack |
 | `FONT_GENERIC_ONLY` | error | the first resolvable entry is a generic family | Put a concrete family before `{generic}` |
-| `FONT_NOT_SAFE` | warning | Resolved font outside the safe set and not embedded | Use a safe font, or pass `--embed-fonts` |
-| `FONT_EMBED_RESTRICTED` | warning | `fsType` forbids editable embedding | The licence of `{family}` forbids embedding; choose another font |
-| `FONT_EMBED_FORMAT` | warning | WOFF2 or TTC source cannot be embedded | Provide `{family}` as TTF, OTF or WOFF |
+| `FONT_EMBED_UNSUPPORTED` | error | explicit all-font or named-family embedding request; embedding is not implemented | Remove `--embed-fonts` and use a safe font such as Arial, or install the Resolved font on every viewing machine |
+| `FONT_NOT_SAFE` | warning | Resolved font outside the safe set and not embedded; requesting embedding never suppresses it | Use a safe font, or install the Resolved font on every viewing machine; font embedding is not supported |
+| `FONT_EMBED_RESTRICTED` | warning | reserved for the embedding milestone: `fsType` forbids editable embedding | The licence of `{family}` forbids embedding; choose another font |
+| `FONT_EMBED_FORMAT` | warning | reserved for the embedding milestone: WOFF2 or TTC source cannot be embedded | Provide `{family}` as TTF, OTF or WOFF |
 | `FONT_MISSING_FOR_LAYOUT` | warning | PPTX->HTML: source font not installed, not embedded | Install `{family}` before editing to keep layout faithful |
 
 ## RASTER_* (kind `rasterised`, severity `warning`; `RASTER_EXPLICIT` is `info`)

@@ -25,7 +25,7 @@ Canvas `1280x720` CSS px = `960x540` pt = `12192000x6858000` EMU; `1 px = 0.75 p
 
 ## Settled outside tickets (during charting)
 
-Node/TypeScript on npm; Playwright-measured layout; own OOXML emitter and parser; native first, raster only where OOXML cannot express the construct, editability over pixel identity; both directions first class; validated authoring subset rather than a component vocabulary; v1 flattens animations; fonts referenced by name, embedding behind a flag; one text box per HTML block with autofit off; 16:9 default with 4:3 and custom via meta, no scaling; single-file `<section>` Deck canonical; every conversion verifies its own output, and CI compares Chromium with a PowerPoint oracle bound to the emitted package (LibreOffice optional); Claude Code first via a harness-neutral skill.
+Node/TypeScript on npm; Playwright-measured layout; own OOXML emitter and parser; native first, raster only where OOXML cannot express the construct, editability over pixel identity; both directions first class; validated authoring subset rather than a component vocabulary; v1 flattens animations; fonts referenced by name, embedding requests currently rejected until implementation; one text box per HTML block with autofit off; 16:9 default with 4:3 and custom via meta, no scaling; single-file `<section>` Deck canonical; every conversion verifies its own output, and CI compares Chromium with a PowerPoint oracle bound to the emitted package (LibreOffice optional); Claude Code first via a harness-neutral skill.
 
 ## Not in this spec (out of scope for v1)
 

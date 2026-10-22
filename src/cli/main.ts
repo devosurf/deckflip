@@ -134,6 +134,7 @@ async function handleConvert(input: string, options: ConvertCliOptions): Promise
           ...(options.output === undefined ? {} : { output: options.output }),
           ...(options.report === undefined ? {} : { report: options.report }),
           strict: options.strict,
+          embedFonts: options.embedFonts ?? false,
           ...(options.browser === undefined ? {} : { browserPath: options.browser }),
           offline: options.offline,
         })
@@ -154,7 +155,7 @@ async function handleConvert(input: string, options: ConvertCliOptions): Promise
 async function handleValidate(input: string, options: ValidateCliOptions): Promise<number> {
   const result =
     inferKind(input) === 'pptx'
-      ? await validatePptx(input)
+      ? await validatePptx(input, { embedFonts: options.embedFonts ?? false })
       : await validateHtml(input, {
           ...(options.size === undefined ? {} : { size: options.size }),
           embedFonts: options.embedFonts ?? false,
@@ -304,7 +305,7 @@ function buildProgram(): Command {
     .addOption(new Option('--to <kind>').choices(['pptx', 'html']))
     .option('-o, --output <output>', 'output path')
     .option('--size <size>', 'override the canvas size')
-    .option('--embed-fonts [names]', 'embed all safe fonts or a comma-separated list', parseEmbedFonts, false)
+    .option('--embed-fonts [names]', 'unsupported: any embedding request fails validation (exit 2); fonts remain unembedded', parseEmbedFonts, false)
     .option('--raster-dpi <n>', 'raster density for captured subtrees, 96-384', parseRasterDpi, 192)
     .option('--report <path>', 'report sidecar path')
     .option('--strict', 'treat any report entry as a failure')
@@ -323,7 +324,7 @@ function buildProgram(): Command {
       'Check an HTML Deck and report what would be flattened or rasterised, or check that a PPTX parses and report what a round trip keeps opaque. The same report format as convert is written and/or printed; this command does not emit anything else.',
     )
     .option('--size <size>', 'override the canvas size')
-    .option('--embed-fonts [names]', 'embed all safe fonts or a comma-separated list', parseEmbedFonts, false)
+    .option('--embed-fonts [names]', 'unsupported: any embedding request fails validation (exit 2); fonts remain unembedded', parseEmbedFonts, false)
     .option('--raster-dpi <n>', 'raster density for captured subtrees, 96-384', parseRasterDpi, 192)
     .option('--report <path>', 'report sidecar path')
     .option('--strict', 'treat any report entry as a failure')
