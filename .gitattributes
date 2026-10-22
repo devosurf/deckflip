@@ -13,3 +13,7 @@
 *.webp binary
 *.woff binary
 *.woff2 binary
+
+# Preserve the pinned upstream license bytes recorded in the font manifest.
+fixtures/corpus/fonts/_assets/heebo/OFL.txt -text
+fixtures/corpus/fonts/_assets/source-sans-3/LICENSE.md -text
