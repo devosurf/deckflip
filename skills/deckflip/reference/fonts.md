@@ -2,12 +2,14 @@
 
 ## How a stack resolves
 
-For every run, the computed `font-family` stack is resolved to the first family that is either **deck-provided** (a `@font-face` in the Deck with a local `url()`) or **installed** on the machine running the conversion. That family's name is written into the PPTX; the rest of the stack is discarded.
+For every run, the computed `font-family` stack selects the first available deck-provided or installed face. A local `@font-face` binds its CSS alias and weight/style descriptors to an asset. Preferred and legacy names remain matching aliases, but the PPTX uses the selected face's legacy Office family and regular/bold/italic/bold-italic identity.
 
 - Nothing resolves: `FONT_UNRESOLVED` (error). Chromium fell back to a platform default, so the layout is not reproducible.
 - The first resolvable entry is a generic (`sans-serif`, `serif`, `monospace`, `system-ui`, `ui-*`, `cursive`, `fantasy`, `math`, `emoji`): `FONT_GENERIC_ONLY` (error). Put a concrete family before it.
-- Unstyled text is `Arial` (the injected base stylesheet), so it is deterministic.
-- Per-glyph fallback for scripts the family lacks (CJK, emoji) raises no entry: PowerPoint substitutes per script the same way.
+- Unstyled text currently defaults to `Arial`; authored inheritance is preserved.
+- `FONT_IDENTITY_INVALID` (error, exit 2): missing or conflicting legacy names/style bits, an unsupported legacy subfamily, or a variable font whose Office instance identity is not supported. Choose a supported static face; do not edit font tables or remap CSS weights.
+- Authored browser weights stay intact. Unmodified Heebo 500 becomes **Heebo Medium / regular**, 700 **Heebo / bold**, and 800 **Heebo ExtraBold / regular**. Office bold/italic comes from face metadata, not a numeric weight threshold.
+- Per-glyph fallback and PowerPoint font selection are not proven by structural Verification; do not assume Chromium and PowerPoint substitute identically.
 
 ## The safe set
 
@@ -23,7 +25,7 @@ Choose Aptos or Calibri for a "PowerPoint look"; Arial or Georgia when the deck 
 2. Prefer the safe set.
 3. A local `@font-face { src: url("fonts/Brand.woff") }` makes a brand font available for authoring, not portable in the PPTX. It remains `FONT_NOT_SAFE` (warning): the viewer may substitute. Use a safe font or install the Resolved font on every viewing machine.
 4. `FONT_EMBED_UNSUPPORTED` means embedding is not implemented. Remove the embedding request; a different font licence or source format cannot enable it.
-5. `deckflip inspect deck.html` lists `fonts[]` with the resolved file and class (`safe`, `deck-provided`, `installed`).
+5. `deckflip inspect deck.html` lists `fonts[]` with `cssFamily`, matching `aliases`, `asset` (file, SHA-256, collection face index, PostScript name), `office` (family and RIBBI style), metrics, permission bits and class (`safe`, `deck-provided`, `installed`). These identify selected faces, not embedded or renderer-confirmed fonts.
 
 ## Embedding
 

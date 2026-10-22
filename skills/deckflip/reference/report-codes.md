@@ -26,6 +26,7 @@ Every entry carries `code`, `kind`, `severity`, `reason` and `hint`; element-lev
 | --- | --- | --- | --- |
 | `FONT_UNRESOLVED` | error | no family in the stack is deck-provided or installed | Install the family or add a safe family such as Arial to the stack |
 | `FONT_GENERIC_ONLY` | error | the first resolvable entry is a generic family | Put a concrete family before the generic |
+| `FONT_IDENTITY_INVALID` | error | insufficient/conflicting Office identity metadata, unsupported legacy subfamily or variable instance | Choose a supported static face with consistent legacy names/style bits; do not edit font tables or remap weights |
 | `FONT_EMBED_UNSUPPORTED` | error | explicit embedding request; embedding is not implemented | Remove `--embed-fonts`; use a safe font or install the Resolved font on every viewing machine |
 | `FONT_NOT_SAFE` | warning | Resolved font outside the safe set and not embedded, regardless of an embedding request | Use a safe font or install the Resolved font on every viewing machine |
 | `FONT_EMBED_RESTRICTED` | warning | reserved for the embedding milestone: the font's licence bits forbid editable embedding | Choose another font |

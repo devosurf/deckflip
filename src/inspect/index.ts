@@ -84,7 +84,8 @@ function uniqueFonts(deck: Deck): ResolvedFont[] {
             if (run.kind !== 'text' || run.style.font === undefined) {
               continue;
             }
-            fonts.set(run.style.font.file, run.style.font);
+            const { asset } = run.style.font;
+            fonts.set(`${asset.sha256}:${asset.faceIndex}`, run.style.font);
           }
         }
       }

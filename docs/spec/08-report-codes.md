@@ -34,6 +34,7 @@ Three rules hold across families:
 | --- | --- | --- | --- |
 | `FONT_UNRESOLVED` | error | no family in the stack is deck-provided or installed | Install `{family}` or add a safe family such as Arial to the stack |
 | `FONT_GENERIC_ONLY` | error | the first resolvable entry is a generic family | Put a concrete family before `{generic}` |
+| `FONT_IDENTITY_INVALID` | error | selected face has insufficient/conflicting Office identity metadata, an unsupported legacy subfamily, or an unsupported variable instance | Choose a font face with consistent legacy family, subfamily and RIBBI metadata; do not rewrite font tables or remap CSS weights |
 | `FONT_EMBED_UNSUPPORTED` | error | explicit all-font or named-family embedding request; embedding is not implemented | Remove `--embed-fonts` and use a safe font such as Arial, or install the Resolved font on every viewing machine |
 | `FONT_NOT_SAFE` | warning | Resolved font outside the safe set and not embedded; requesting embedding never suppresses it | Use a safe font, or install the Resolved font on every viewing machine; font embedding is not supported |
 | `FONT_EMBED_RESTRICTED` | warning | reserved for the embedding milestone: `fsType` forbids editable embedding | The licence of `{family}` forbids embedding; choose another font |

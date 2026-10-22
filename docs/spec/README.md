@@ -12,7 +12,7 @@ Build-ready spec for `deckflip`: a bidirectional HTML <-> PPTX CLI and agent ski
 | 04 | [Text box mapping](04-text-mapping.md) | box, insets, baseline correction, line spacing, lists, runs, tables |
 | 05 | [Raster fallback](05-raster.md) | granularity, capture, DPI, `data-raster`, fix-it loop |
 | 06 | [Round-trip preservation](06-round-trip.md) | preservation matrix, asset directory, manifest, untouched detection |
-| 07 | [Font policy](07-fonts.md) | resolution, safe set, warnings, embedding, PPTX -> HTML fonts |
+| 07 | [Font policy](07-fonts.md) | CSS matching, selected asset/face, Office family/RIBBI, safe set, truthful portability, embedding dependencies |
 | 08 | [Report codes](08-report-codes.md) | every code with kind, severity, trigger and hint |
 | 09 | [`inspect` output](09-inspect.md) | the JSON shape |
 | 10 | [Rendering, verification and environment](10-rendering-and-verification.md) | supported host, renderers, Chromium policy, comparator gates, corpus, CI |

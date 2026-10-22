@@ -1,0 +1,217 @@
+{
+  "status": "blocked",
+  "issue": 32,
+  "date": "2026-10-22",
+  "tool": {
+    "deckflip": "0.2.0",
+    "powerpoint": "16.115",
+    "powerpointBuild": "1019"
+  },
+  "input": {
+    "fixture": "fixtures/corpus/fonts/office-identity/deck.html",
+    "fontManifest": "fixtures/corpus/fonts/_assets/manifest.json",
+    "packageDigest": "ae0d12e5c4d4e4afad56ff7fefcbb2c9e873ef0ea66487c671dcd81bcdd32db2",
+    "packageSha256": "67a1ef24f537944fd7d5231973a0a4c80d71201d1e9a0a091a41555583cd6b64"
+  },
+  "checks": {
+    "compiledCliExit": 0,
+    "packageFamilyAndRibbi": true,
+    "nativeTextEditSaveReopen": true,
+    "officeFamilyPreservedAfterSave": false,
+    "exactFixtureFontsAvailableInPowerPoint": false,
+    "powerpointOracleAccepted": false
+  },
+  "fontEnvironment": {
+    "mismatchedInstalledFaces": [
+      {
+        "file": "Heebo-Medium.ttf",
+        "sha256": "8a7ca8a6574ded130d3851320d95275167cedf5ad7ba7ae53694caf74d79b4b1",
+        "family": "Heebo Medium",
+        "subfamily": "Regular",
+        "postscriptName": "Heebo-Medium"
+      },
+      {
+        "file": "Heebo-Bold.ttf",
+        "sha256": "ff9e18d0f96e813c1668406a70bddbe7419ad7b926d772a1bfc06c617d9b688a",
+        "family": "Heebo",
+        "subfamily": "Bold",
+        "postscriptName": "Heebo-Bold"
+      },
+      {
+        "file": "Heebo-ExtraBold.ttf",
+        "sha256": "963cf478283eff7f02795bd9819fac6379609c0fe9d1df189a51ed426263dae6",
+        "family": "Heebo ExtraBold",
+        "subfamily": "Regular",
+        "postscriptName": "Heebo-ExtraBold"
+      }
+    ],
+    "missingRegisteredFaces": [
+      "SourceSans3-Regular",
+      "SourceSans3-Bold",
+      "SourceSans3-It",
+      "SourceSans3-BoldIt"
+    ],
+    "developerFontsChanged": false
+  },
+  "powerpointTextObservations": [
+    {
+      "stage": "before",
+      "text": "Heebo Medium editable",
+      "family": "Heebo Medium",
+      "bold": false,
+      "italic": false
+    },
+    {
+      "stage": "before",
+      "text": "Heebo Bold editable",
+      "family": "Heebo",
+      "bold": true,
+      "italic": false
+    },
+    {
+      "stage": "before",
+      "text": "Heebo ExtraBold editable",
+      "family": "Heebo ExtraBold",
+      "bold": false,
+      "italic": false
+    },
+    {
+      "stage": "before",
+      "text": "Source Sans Regular editable",
+      "family": "Source Sans 3",
+      "bold": false,
+      "italic": false
+    },
+    {
+      "stage": "before",
+      "text": "Source Sans Bold editable",
+      "family": "Source Sans 3",
+      "bold": true,
+      "italic": false
+    },
+    {
+      "stage": "before",
+      "text": "Source Sans Italic editable",
+      "family": "Source Sans 3",
+      "bold": false,
+      "italic": true
+    },
+    {
+      "stage": "before",
+      "text": "Source Sans Bold Italic editable",
+      "family": "Source Sans 3",
+      "bold": true,
+      "italic": true
+    },
+    {
+      "stage": "reopened",
+      "text": "Heebo Medium editable edited",
+      "family": "Heebo Medium Medium",
+      "bold": false,
+      "italic": false
+    },
+    {
+      "stage": "reopened",
+      "text": "Heebo Bold editable edited",
+      "family": "Heebo",
+      "bold": true,
+      "italic": false
+    },
+    {
+      "stage": "reopened",
+      "text": "Heebo ExtraBold editable edited",
+      "family": "Heebo ExtraBold ExtraBold",
+      "bold": false,
+      "italic": false
+    },
+    {
+      "stage": "reopened",
+      "text": "Source Sans Regular editable edited",
+      "family": "Source Sans 3",
+      "bold": false,
+      "italic": false
+    },
+    {
+      "stage": "reopened",
+      "text": "Source Sans Bold editable edited",
+      "family": "Source Sans 3",
+      "bold": true,
+      "italic": false
+    },
+    {
+      "stage": "reopened",
+      "text": "Source Sans Italic editable edited",
+      "family": "Source Sans 3",
+      "bold": false,
+      "italic": true
+    },
+    {
+      "stage": "reopened",
+      "text": "Source Sans Bold Italic editable edited",
+      "family": "Source Sans 3",
+      "bold": true,
+      "italic": true
+    }
+  ],
+  "savedPackage": {
+    "sha256": "17b5ae3aa3ecd21c9788d295b3225d206e322deec90227f07c239ecfbbfd6a42",
+    "nativeRuns": [
+      {
+        "text": "Heebo Medium editable edited",
+        "family": "Heebo Medium Medium",
+        "bold": "0",
+        "italic": "0"
+      },
+      {
+        "text": "Heebo Bold editable edited",
+        "family": "Heebo",
+        "bold": "1",
+        "italic": "0"
+      },
+      {
+        "text": "Heebo ExtraBold editable edited",
+        "family": "Heebo ExtraBold ExtraBold",
+        "bold": "0",
+        "italic": "0"
+      },
+      {
+        "text": "Source Sans Regular editable edited",
+        "family": "Source Sans 3",
+        "bold": "0",
+        "italic": "0"
+      },
+      {
+        "text": "Source Sans Bold editable edited",
+        "family": "Source Sans 3",
+        "bold": "1",
+        "italic": "0"
+      },
+      {
+        "text": "Source Sans Italic editable edited",
+        "family": "Source Sans 3",
+        "bold": "0",
+        "italic": "1"
+      },
+      {
+        "text": "Source Sans Bold Italic editable edited",
+        "family": "Source Sans 3",
+        "bold": "1",
+        "italic": "1"
+      }
+    ]
+  },
+  "rendering": {
+    "pdfProduced": false,
+    "attempts": [
+      "Direct AppleScript PDF save returned success without a PDF file",
+      "Existing renderPptxPowerPoint adapter failed with ENOENT for its expected Desktop PDF"
+    ],
+    "oracleRecordWritten": false
+  },
+  "limitations": [
+    "PowerPoint font properties are requested formatting, not proof of the actual glyph face.",
+    "Installed Heebo bytes differ from the unmodified fixture assets. The saved Medium/ExtraBold family changes cannot be attributed to the unmodified-font case from this host.",
+    "Existing corpus Oracle digests passed unchanged; the new font fixture still requires an accepted PowerPoint render."
+  ],
+  "requiredNextStep": "Run the same emitted fixture on a supported PowerPoint Mac/session with the exact pinned unmodified static faces available, without altering the developer font setup; inspect edit/save/reopen output and render it before recording oracle.json."
+}

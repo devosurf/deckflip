@@ -1,5 +1,5 @@
-import { textBodiesOf, type Deck, type DeckFontFace, type ResolvedFont } from '../model/index.js';
-import { entry } from '../report/codes.js';
+import { textBodiesOf, type Deck, type DeckFontFace, type OfficeFontIdentity, type ResolvedFont } from '../model/index.js';
+import { CODES, entry } from '../report/codes.js';
 import type { Entry, EntryKind, Severity } from '../report/types.js';
 import { FontCatalog, type FontFace } from './scan.js';
 
@@ -42,9 +42,10 @@ export const GENERIC_FAMILIES: ReadonlySet<string> = new Set([
 ]);
 
 const FONT_ENTRY_SPECS: Record<
-  'FONT_GENERIC_ONLY' | 'FONT_UNRESOLVED' | 'FONT_NOT_SAFE',
+  'FONT_GENERIC_ONLY' | 'FONT_UNRESOLVED' | 'FONT_NOT_SAFE' | 'FONT_IDENTITY_INVALID',
   { kind: EntryKind; severity: Severity; hint: string }
 > = {
+  FONT_IDENTITY_INVALID: CODES.FONT_IDENTITY_INVALID,
   FONT_GENERIC_ONLY: {
     kind: 'error',
     severity: 'error',
@@ -63,8 +64,8 @@ const FONT_ENTRY_SPECS: Record<
 };
 
 type Resolution =
-  | { kind: 'resolved'; font: FontFace }
-  | { kind: 'error'; code: 'FONT_GENERIC_ONLY' | 'FONT_UNRESOLVED'; stackKey: string; family: string; generic?: string };
+  | { kind: 'resolved'; font: FontFace; office: OfficeFontIdentity; cssFamily: string }
+  | { kind: 'error'; code: 'FONT_GENERIC_ONLY' | 'FONT_UNRESOLVED' | 'FONT_IDENTITY_INVALID'; stackKey: string; family: string; generic?: string; reason?: string };
 
 export function resolveDeckFonts(deck: Deck, catalog: FontCatalog, opts: { embedFonts: false | true | string[] }): Entry[] {
   const deckProvidedFamilies = familySetFromDeckFaces(deck.fontFaces);
@@ -84,6 +85,7 @@ export function resolveDeckFonts(deck: Deck, catalog: FontCatalog, opts: { embed
         for (const paragraph of body.paragraphs) {
           for (const run of paragraph.runs) {
             if (run.kind !== 'text') continue;
+            delete run.style.font;
             const normalizedStack = normalizeStack(run.style.fontStack);
             const outcome = resolveStack(normalizedStack, run.style.weight, run.style.italic, catalog, stackCache, resolvedFontCache);
             if (outcome.kind === 'error') {
@@ -93,11 +95,13 @@ export function resolveDeckFonts(deck: Deck, catalog: FontCatalog, opts: { embed
               continue;
             }
   
-            const resolvedFamilyKey = normalizeName(outcome.font.family);
+            const resolvedFamilyKey = normalizeName(outcome.office.family);
             const resolvedFont: ResolvedFont = {
-              family: outcome.font.family,
-              file: outcome.font.file,
-              class: deckProvidedFamilies.has(resolvedFamilyKey) || deckProvidedFiles.has(outcome.font.file)
+              cssFamily: outcome.cssFamily,
+              aliases: outcome.font.aliases,
+              asset: outcome.font.asset,
+              office: outcome.office,
+              class: deckProvidedFamilies.has(normalizeName(outcome.cssFamily)) || deckProvidedFiles.has(outcome.font.asset.file)
                 ? 'deck-provided'
                 : SAFE_FAMILIES.has(resolvedFamilyKey)
                   ? 'safe'
@@ -110,7 +114,7 @@ export function resolveDeckFonts(deck: Deck, catalog: FontCatalog, opts: { embed
             if (resolvedFont.class === 'safe') continue;
             if (warnings.has(resolvedFamilyKey)) continue;
             warnings.add(resolvedFamilyKey);
-            entries.push(buildEntryForSafeWarning(slide.index, selector, outcome.font.family));
+            entries.push(buildEntryForSafeWarning(slide.index, selector, resolvedFont.office.family));
           }
         }
       }
@@ -146,7 +150,15 @@ function resolveStack(
 
     const face = lookupFace(catalog, resolvedFontCache, family, weight, italic);
     if (face) {
-      const resolved: Resolution = { kind: 'resolved', font: face };
+      if ('error' in face.office) {
+        const error: Resolution = {
+          kind: 'error', code: 'FONT_IDENTITY_INVALID', stackKey: memoKey, family,
+          reason: `${family}: ${face.office.error}`,
+        };
+        stackCache.set(memoKey, error);
+        return error;
+      }
+      const resolved: Resolution = { kind: 'resolved', font: face, office: face.office, cssFamily: family };
       stackCache.set(memoKey, resolved);
       return resolved;
     }
@@ -186,9 +198,9 @@ function buildEntry(outcome: Extract<Resolution, { kind: 'error' }>, slide: numb
     severity: spec.severity,
     slide,
     locator: { selector },
-    reason: outcome.code === 'FONT_GENERIC_ONLY'
+    reason: outcome.reason ?? (outcome.code === 'FONT_GENERIC_ONLY'
       ? `Generic family ${outcome.generic ?? outcome.family} appears before any resolvable concrete family`
-      : `No deck-provided or installed family resolved in stack ${outcome.stackKey}`,
+      : `No deck-provided or installed family resolved in stack ${outcome.stackKey}`),
     hint: substituteHint(spec.hint, params),
   };
 }

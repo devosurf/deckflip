@@ -16,7 +16,20 @@
     "vba": false
   },
   "fonts": [
-    { "family": "Aptos", "class": "safe", "file": "/Library/Fonts/Microsoft/Aptos.ttf", "faces": ["regular", "bold"], "embedded": false }
+    {
+      "cssFamily": "Heebo",
+      "aliases": ["heebo", "heebo medium"],
+      "asset": {
+        "file": "/deck/fonts/Heebo-Medium.ttf",
+        "sha256": "cba4ce1a4c8ebaf36d0ac34d1941bc4d8a0117e343fac28c46a01635a08a92f1",
+        "faceIndex": 0,
+        "postscriptName": "Heebo-Medium"
+      },
+      "office": { "family": "Heebo Medium", "style": "regular" },
+      "class": "deck-provided",
+      "metrics": { "ascender": 1.0478515625, "descender": 0.4208984375 },
+      "fsType": 0
+    }
   ],
   "slides": [
     {
@@ -69,6 +82,6 @@ Element fields:
 | `opaque` | `{ "class": "chart" \| "smartart" \| "ole" \| "vector" \| "text-effects", "parts": ["ppt/charts/chart1.xml", ...] }` |
 | `entries` | codes of report entries attached to this element |
 
-`fonts[].class` is `safe`, `deck-provided`, `installed`, or `missing` (PPTX input only). `deck.master.source` is `built-in` or `preserved`.
+`fonts[]` contains one Resolved font per asset digest/member face, not one per filename or preferred family. `cssFamily` is the matched CSS stack entry; `aliases` contains normalized matching aliases; `office.family` and `office.style` are the legacy Office address. `asset.faceIndex` distinguishes collection members; `asset.sha256` binds the identity to bytes. `class` is `safe`, `deck-provided` or `installed`. These fields report selection, not embedding or renderer evidence. `deck.master.source` is `built-in` or `preserved`.
 
 The document is deterministic for a given input and tool version. Text is the only free-form content; everything else is enumerated, so agents can `jq` it safely.

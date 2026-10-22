@@ -35,9 +35,9 @@ Inline elements flatten to `a:r` runs with `a:rPr` from computed style:
 | CSS / element | rPr |
 | --- | --- |
 | `font-size` | `sz = round(px * 75)` (hundredths of pt) |
-| `font-family` | `a:latin typeface` = the **resolved family** (#15); `a:ea`/`a:cs` same |
-| `font-weight >= 600` / `b`, `strong` | `b="1"` (no intermediate weights: `SUBSTITUTE_FONT_WEIGHT` info when the weight is not 400/700 and the family has no matching face) |
-| `font-style: italic|oblique` | `i="1"` |
+| `font-family` | match a selected face; `a:latin`, `a:ea`, `a:cs` use its **Office font identity** ([07](07-fonts.md), #32), not its CSS alias or preferred family |
+| `font-weight` / `b`, `strong` | selects the face without changing browser weight; `b="1"` only for its Office `bold` / `boldItalic` style |
+| `font-style: italic|oblique` | selects the face; `i="1"` only for its Office `italic` / `boldItalic` style |
 | `text-decoration: underline` / `u` | `u="sng"` |
 | `text-decoration: line-through` / `s`, `del` | `strike="sngStrike"` |
 | `color` | `a:solidFill` with `a:alpha` |
@@ -51,7 +51,7 @@ Inline elements flatten to `a:r` runs with `a:rPr` from computed style:
 | `a[href]` | `a:hlinkClick` (external rel or `hlinksldjump`) |
 | `code`, `kbd` | only the font family they compute to |
 
-Text content is the rendered text: whitespace collapsed per `white-space`, soft hyphens removed, `&nbsp;` preserved as U+00A0, `xml:space="preserve"` on every `a:t`. Emoji and non-Latin scripts are passed through; the font slot is the resolved family, PowerPoint substitutes per script.
+Text content is the rendered text: whitespace collapsed per `white-space`, soft hyphens removed, `&nbsp;` preserved as U+00A0, `xml:space="preserve"` on every `a:t`. Emoji and non-Latin scripts are passed through; the font slots carry the Office family. Structural Verification does not prove identical glyph fallback in Chromium and PowerPoint.
 Hidden subtrees (`display: none`, `visibility: hidden`, and speaker notes) contribute no Slide text runs or line metrics, including inside otherwise visible Text blocks.
 
 Any text-affecting CSS not in the table is flattened with a `FLATTEN_TEXT_*` warning (`-webkit-text-stroke`, `background-clip: text`, `text-decoration-style` other than solid, `font-variant-*` other than small-caps, `text-shadow` with multiple shadows -> first kept).

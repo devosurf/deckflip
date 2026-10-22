@@ -98,6 +98,11 @@ export const CODES = {
     severity: 'error',
     hint: 'Put a concrete family before {generic}',
   },
+  FONT_IDENTITY_INVALID: {
+    kind: 'error',
+    severity: 'error',
+    hint: 'Choose a font face with consistent legacy family, subfamily and RIBBI metadata; do not rewrite font tables or remap CSS weights',
+  },
   FONT_NOT_SAFE: {
     kind: 'substituted',
     severity: 'warning',

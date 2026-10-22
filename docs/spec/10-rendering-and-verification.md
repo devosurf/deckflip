@@ -67,6 +67,8 @@ The digest is SHA-256 over the package parts by name, leaving out `docProps/` (t
 
 Renewal: adding a fixture, or changing what a fixture emits, means running `corpus:oracle` for it on a Mac with PowerPoint; the script refuses fixtures that fail Verification. CI regenerates the Chromium side and refuses fixtures without committed `powerpoint/` images, `oracle.json` or `report.json`. Oracle images are regenerated wholesale when the PowerPoint version on the oracle machine changes, in one reviewed commit.
 
+The #32 `fonts/office-identity` fixture currently exercises the CLI, native package identities and Chromium weights. Its `expected/editability.json` records a blocked PowerPoint attempt, not an accepted Oracle record: the host had different Heebo bytes, lacked the pinned Source Sans 3 faces, changed two Heebo family names after save, and produced no PDF. Existing corpus digests remain unchanged. Do not add an `oracle.json` or enable its visual gate until the same fixture passes on a supported host with the exact unmodified faces; then run `npm run corpus:oracle fonts/office-identity` and add it to the corpus gates.
+
 ## CI shape
 
 GitHub Actions has one required job, `macos`:

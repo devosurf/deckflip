@@ -14,7 +14,7 @@ Node >= 20.16, TypeScript strict, ESM, single npm package `deckflip` with a `bin
 | `pdfjs-dist` + `@napi-rs/canvas` | rasterising LibreOffice PDFs | no poppler dependency |
 | `odiff-bin` (dev) | corpus comparator | SIMD, `diffPercentage`, ignore regions |
 
-Hand-rolled: `[Content_Types].xml` and `.rels` bookkeeping, the XML serializer (fixed attribute order, `xml:space`, escaping), EMU/pt/px math (`1 px = 9525 EMU = 0.75 pt`), EOT wrapping/unwrapping, the platform font-directory scan.
+Hand-rolled: `[Content_Types].xml` and `.rels` bookkeeping, the XML serializer (fixed attribute order, `xml:space`, escaping), EMU/pt/px math (`1 px = 9525 EMU = 0.75 pt`), and the platform font-directory scan. Font embedding remains unimplemented; its format contract waits for #33.
 
 ## Modules
 
@@ -27,7 +27,7 @@ src/
     validate.ts static checks (elements, meta, assets) + measured checks (slide size, fonts)
     measure.ts  Playwright session: computed styles, boxes, line boxes, marker widths -> IDM
     raster.ts   isolated captures
-  fonts/        scan, resolve, classify, metrics, embed (EOT)
+  fonts/        CSS matching, asset/face identity, legacy Office family/RIBBI, classification and metrics
   ooxml/
     opc.ts      package read/write over jszip, part naming, rels
     xml.ts      serializer + saxes-based reader into a small typed tree
@@ -43,6 +43,8 @@ src/
 ```
 
 The **IDM** is the seam: both directions produce it, `inspect` serialises it, tests assert on it. Nothing in `emit/` reads the DOM; nothing in `html/` knows OOXML.
+
+The Resolved font is not a family string: CSS matching aliases, selected asset digest/member face and Office family/RIBBI are separate. `RunStyle.weight` remains the browser's numeric computed weight. Measured text emits the selected face's Office style; unmeasured speaker notes retain authored emphasis and inherit the notes master's font.
 
 ## Pipelines
 
@@ -62,6 +64,6 @@ Part names and rel ids are assigned in emission order; media are content-hash na
 2. **Shapes, pictures, tables, lists, groups**: full native table from [03](03-authoring-subset.md) and [04](04-text-mapping.md). Accept: `shapes`, `pictures`, `tables`, `layout` corpus gates.
 3. **validate, report, raster, skill**: complete code list, isolated raster capture, `--strict`, `skills/deckflip/` with templates passing at zero warnings. Accept: `raster` and `templates` corpus; an agent session producing a deck from the skill alone.
 4. **Parser, PPTX -> HTML, round trip**: `parse`, `htmlout`, manifest, fingerprints, opaque handling. Accept: `roundtrip` corpus part-identity and idempotence gates; foreign decks list every opaque element.
-5. **Fonts embedding, render, inspect polish**: EOT embedding verified in PowerPoint for Mac; LibreOffice/PowerPoint renderers; `inspect` schema frozen. Accept: `fonts` corpus; embedded font opens on Mac. Windows verification is deferred until Windows support resumes under the [supported-host policy](10-rendering-and-verification.md#supported-host).
+5. **Font packaging, pinned assets, render and inspect polish**: supported-PowerPoint format/permission evidence (#33) precedes packaging (#34), asset acquisition (#35) and the portable-default cutover (#36); see [07](07-fonts.md). Accept: the font corpus opens, edits, saves and reopens on the supported PowerPoint host with the required font availability conditions. Windows verification is deferred under the [supported-host policy](10-rendering-and-verification.md#supported-host).
 
 The initial `0.1.0` release includes milestones 1-4: bidirectional conversion and round-trip preservation. Publish `1.0.0` after milestone 5 and the report schema is declared stable.

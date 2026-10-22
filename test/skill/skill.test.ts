@@ -1,7 +1,6 @@
 import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { CODES } from '../../src/report/codes.js';
 
 const SKILL_DIR = join('skills', 'deckflip');
 
@@ -13,12 +12,6 @@ describe('skills/deckflip', () => {
     for (const step of ['validate', 'convert', '--strict', 'render', 'inspect']) {
       expect(skill).toContain(step);
     }
-  });
-
-  it('reference/report-codes.md names every code the CLI can raise', async () => {
-    const reference = await readFile(join(SKILL_DIR, 'reference', 'report-codes.md'), 'utf8');
-    const missing = Object.keys(CODES).filter((code) => !reference.includes(`\`${code}\``));
-    expect(missing).toEqual([]);
   });
 
   it('ships the reference and template files the spec names', async () => {

@@ -5,6 +5,15 @@
 ### Fixed
 
 - Keep font portability reports truthful: `convert` and `validate` now reject explicit `--embed-fonts` requests with `FONT_EMBED_UNSUPPORTED` (exit 2), retaining the report without creating or replacing the converted Deck. Non-safe Resolved fonts keep `FONT_NOT_SAFE`, including when a request names only an unused CSS fallback. Help and font references now state that embedding is not implemented (#31).
+- Separate CSS font aliases, exact selected asset/collection face, and metadata-derived Office family/RIBBI identity. Unmodified Heebo 500/700/800 serializes as Heebo Medium regular / Heebo bold / Heebo ExtraBold regular without changing browser weights. Local `@font-face` aliases retain their asset bindings. Invalid or unsupported identity fails with `FONT_IDENTITY_INVALID`, rather than inventing a family/style (#32).
+
+### Changed
+
+- `inspect` font records now expose `cssFamily`, `aliases`, `asset` (file, SHA-256, face index, PostScript name), and `office` (legacy family and RIBBI style), replacing the ambiguous flat family/file fields. Collection members are no longer collapsed by filename.
+
+### Acceptance pending
+
+- #32 remains open pending exact-font PowerPoint edit/save/reopen and an accepted font-fixture Oracle record. The observed host limitations and saved-family changes are recorded in `fixtures/corpus/fonts/office-identity/expected/editability.json`; structural Verification and package checks are not font-fidelity proof.
 
 ## 0.2.0 - 2026-10-08
 

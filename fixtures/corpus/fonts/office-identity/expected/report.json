@@ -1,0 +1,46 @@
+[
+  {
+    "code": "FONT_NOT_SAFE",
+    "kind": "substituted",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(1)"
+    },
+    "reason": "Resolved font Heebo Medium is not in the safe set",
+    "hint": "Use a safe font, or install the Resolved font on every viewing machine; font embedding is not supported"
+  },
+  {
+    "code": "FONT_NOT_SAFE",
+    "kind": "substituted",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(2)"
+    },
+    "reason": "Resolved font Heebo is not in the safe set",
+    "hint": "Use a safe font, or install the Resolved font on every viewing machine; font embedding is not supported"
+  },
+  {
+    "code": "FONT_NOT_SAFE",
+    "kind": "substituted",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(3)"
+    },
+    "reason": "Resolved font Heebo ExtraBold is not in the safe set",
+    "hint": "Use a safe font, or install the Resolved font on every viewing machine; font embedding is not supported"
+  },
+  {
+    "code": "FONT_NOT_SAFE",
+    "kind": "substituted",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(4)"
+    },
+    "reason": "Resolved font Source Sans 3 is not in the safe set",
+    "hint": "Use a safe font, or install the Resolved font on every viewing machine; font embedding is not supported"
+  }
+]
