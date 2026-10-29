@@ -33,7 +33,6 @@ describe.skipIf(!shouldRunOracle)('spike oracle', () => {
       output: pptxPath,
       embedFonts: false,
       rasterDpi: 192,
-      strict: false,
       offline: true,
       browser: browser!,
     });

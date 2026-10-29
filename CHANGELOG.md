@@ -8,12 +8,14 @@
 - `local()` sources are ignored, so installed fonts never replace supplied bytes; a declared family matches only its own `@font-face` rules, by CSS stretch/style/weight matching. Installed width matching uses `OS/2.usWidthClass`. `unicode-range` subsets are selected by the characters a run uses.
 - New report codes: `FONT_ASSET_UNAVAILABLE` and `FONT_ASSET_UNSUPPORTED` (errors) for faces a Slide needs that cannot be downloaded/pinned or decoded, and `FONT_GLYPH_FALLBACK` (warning), a font audit comparing each drawn text node's selected face and character coverage with the platform fonts Chromium actually used. Missing local stylesheets and font files are `VALIDATE_MISSING_ASSET`. `FONT_EMBED_RESTRICTED` now reports Deck-provided faces whose `fsType` rules out editable embedding.
 - The Conversion report lists each selected face as `fonts`, the same Resolved fonts `inspect` prints, with `asset.source` (`installed`, `file`, `remote` with its pinned copy, or `data`), acquired format and hashes. URLs never include credentials or query values.
+- Severity thresholds for Strict mode on `convert` and `validate` in both directions: `--strict=info|warning|error`. Bare `--strict` retains any-entry failure; warning-level strictness is recommended for the authoring loop. Invalid thresholds exit 3; validation (2) and Verification (5) retain precedence, and threshold-only failures (4) keep conversion output and the report (#40).
 
 ### Changed
 
 - `asset.file` in Resolved fonts moved to `asset.source`; `asset.sha256` is the decoded face's hash. Installed-face weight matching follows CSS Fonts 4 (a 400 request prefers 500 over 300).
 - `render` of an HTML Deck loads the same pinned faces as measurement.
 - The `text/emoji` corpus report now records the CJK and emoji glyphs Verdana lacks as `FONT_GLYPH_FALLBACK`; its package digest is unchanged.
+- Human Conversion report summaries group repeated entries by severity and code, most important first, with occurrence counts, three representative locations plus remaining counts, and distinct hints once per group. JSON and report sidecars retain all occurrences; `--quiet` still suppresses only the human summary (#40).
 
 ### Fixed
 

@@ -45,7 +45,7 @@ describe.skipIf(!browserAvailable)('PPTX -> HTML -> PPTX round trip', () => {
     await browser.close();
   });
 
-  const options = { embedFonts: false as const, rasterDpi: 96, strict: false, offline: true };
+  const options = { embedFonts: false as const, rasterDpi: 96, offline: true };
 
   async function fixture(): Promise<{ dir: string; pptx: Buffer; html: string }> {
     const pptx = await buildPptx({

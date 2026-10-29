@@ -21,7 +21,7 @@ Validate an HTML Deck, convert it (the conversion verifies its own output), and 
 
 ```sh
 npx deckflip@latest validate deck.html --json
-npx deckflip@latest convert deck.html --strict --json -o deck.pptx
+npx deckflip@latest convert deck.html --strict=warning --json -o deck.pptx
 npx deckflip@latest inspect deck.html
 ```
 
@@ -43,7 +43,7 @@ Install the bundled authoring skill and templates for supported coding agents:
 npx skills add devosurf/deckflip
 ```
 
-The skill documents the `validate -> convert --strict -> inspect` loop, the supported HTML/CSS subset, Conversion report codes, font handling, and round-trip editing. Its source is in [`skills/deckflip`](skills/deckflip).
+The skill documents the `validate -> convert --strict=warning -> inspect` loop, the supported HTML/CSS subset, Conversion report codes, font handling, and round-trip editing. Its source is in [`skills/deckflip`](skills/deckflip).
 
 ## Conversion behavior
 
