@@ -198,8 +198,10 @@ describe.skipIf(!browserAvailable)('convert and validate', () => {
       ['FLATTEN_BLEND_MODE', 1],
       ['RASTER_CSS_FILTER', 1],
       ['RASTER_EXPLICIT', 2],
+      ['FONT_NOT_SAFE', 1],
     ]);
-    expect(validated.report.summary).toEqual({ slides: 2, native: 3, rasterised: 2, flattened: 1, substituted: 0, dropped: 0, preserved: 0, overridden: 0, flagged: 0, errors: 0 });
+    expect(validated.report.summary).toEqual({ slides: 2, native: 3, rasterised: 2, flattened: 1, substituted: 1, dropped: 0, preserved: 0, overridden: 0, flagged: 0, errors: 0 });
+    expect(converted.report.entries).toEqual(validated.report.entries);
     expect(validated.report.command).toBe('validate');
     await expect(stat(join(dir, 'deck.pptx'))).rejects.toThrow();
     expect((await stat(join(dir, 'out.pptx'))).size).toBeGreaterThan(0);
@@ -212,7 +214,7 @@ describe.skipIf(!browserAvailable)('convert and validate', () => {
     expect(converted.exitCode).toBe(4);
     expect((await stat(output)).size).toBeGreaterThan(0);
     const sidecar = JSON.parse(await readFile(`${output}.report.json`, 'utf8')) as { entries: unknown[] };
-    expect(sidecar.entries).toHaveLength(3);
+    expect(sidecar.entries).toHaveLength(4);
   });
 
   it('a validation error exits 2 with the report written and no PPTX', async () => {

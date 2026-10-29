@@ -31,6 +31,8 @@
     "deckflip": "bin/deckflip.js"
   },
   "files": [
+    "assets",
+    "NOTICE",
     "bin",
     "CHANGELOG.md",
     "dist",

@@ -332,7 +332,7 @@ export interface OfficeFontIdentity {
 
 export type FontFormat = 'ttf' | 'otf' | 'ttc' | 'woff' | 'woff2';
 
-/** Where a selected face's bytes came from: an installed face, or a Deck-provided `@font-face` source. */
+/** Where a selected face's bytes came from: an installed face, a Deck source, or the pinned bundled default. */
 export type FontSource =
   | { kind: 'installed'; file: string }
   /** a local font file the Deck references; `sha256` is the file's, before any WOFF/WOFF2 decoding */
@@ -340,7 +340,9 @@ export type FontSource =
   /** a downloaded file: `url` keeps no credentials or query values; `pinned` is its frozen copy in the Asset directory */
   | { kind: 'remote'; url: string; format: FontFormat; sha256: string; pinned?: string }
   /** a `data:` URI in the Deck's CSS */
-  | { kind: 'data'; format: FontFormat; sha256: string };
+  | { kind: 'data'; format: FontFormat; sha256: string }
+  /** the package's pinned default; `file` is a basename, never a machine path */
+  | { kind: 'bundled'; family: string; version: string; file: string; format: FontFormat; sha256: string };
 
 export interface FontAsset {
   /** SHA-256 of the face's sfnt bytes, decoded from WOFF/WOFF2 where supplied so: the asset identity */

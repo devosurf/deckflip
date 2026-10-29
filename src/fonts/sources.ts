@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import * as fontkit from 'fontkit';
 import type { Font as FontKitFont, FontCollection as FontKitCollection } from 'fontkit';
 import type { FontFormat, FontSource } from '../model/index.js';
+import { BUNDLED_FONT_MANIFEST, BUNDLED_FONT_ORIGIN, BUNDLED_STYLESHEET_URL, bundledFontFile, bundledFontStylesheet, bundledFontUrl } from '../bundled-fonts.js';
 import { decodeFont, sha256, sniffFontFormat, type DecodedFont } from './sfnt.js';
 
 /** The Asset directory's font pins: the frozen downloads and `sources.json`, which maps each URL to its copy. */
@@ -45,9 +46,11 @@ export type Fetcher = () => Promise<Fetched>;
 /** A source's raw bytes and where they were read from. */
 interface SourceBytes {
   bytes: Buffer;
-  kind: 'file' | 'remote' | 'data';
+  kind: 'file' | 'remote' | 'data' | 'bundled';
   /** `file`: the local path */
   file?: string;
+  /** `bundled`: the package asset's basename, never its absolute path */
+  bundledFile?: string;
   /** `remote`: the frozen copy, when there is an Asset directory */
   pinned?: string;
   /** final response base for a stylesheet, stripped of secrets */
@@ -100,6 +103,7 @@ export class FontSources {
 
   /** A stylesheet's text; `fetch` is the browser's own request, used only for a remote URL not pinned yet. */
   stylesheet(url: string, fetch: Fetcher): Promise<Acquired<AcquiredStylesheet>> {
+    if (url === BUNDLED_STYLESHEET_URL) return Promise.resolve({ ok: true, value: { text: bundledFontStylesheet(), baseUrl: url } });
     let pending = this.sheets.get(url);
     if (!pending) {
       pending = this.bytes(url, 'stylesheet', fetch).then((got) => (got.ok ? { ok: true, value: { text: decodeCss(got.value.bytes), baseUrl: got.value.base ?? url } } : got));
@@ -142,6 +146,17 @@ export class FontSources {
 
   private async bytes(url: string, type: PinRecord['type'], fetch: Fetcher): Promise<Acquired<SourceBytes>> {
     const shown = this.display(url);
+    if (url.startsWith(`${BUNDLED_FONT_ORIGIN}/`)) {
+      const face = BUNDLED_FONT_MANIFEST.fonts.find((face) => bundledFontUrl(face.file) === url);
+      if (type !== 'font' || face === undefined) {
+        return { ok: false, code: 'FONT_ASSET_UNAVAILABLE', reason: `${shown} is not a bundled font asset` };
+      }
+      const bytes = await readFile(bundledFontFile(face.file)).catch(() => undefined);
+      if (bytes === undefined || sha256(bytes) !== face.sha256) {
+        return { ok: false, code: 'FONT_ASSET_UNAVAILABLE', reason: `Bundled default ${BUNDLED_FONT_MANIFEST.family} ${BUNDLED_FONT_MANIFEST.version}/${face.file} is missing or does not match its manifest SHA-256; reinstall deckflip` };
+      }
+      return { ok: true, value: { bytes, kind: 'bundled', bundledFile: face.file } };
+    }
     const scheme = url.slice(0, url.indexOf(':') + 1).toLowerCase();
     if (scheme === 'file:') {
       const file = fileURLToPath(url);
@@ -241,7 +256,8 @@ async function parseFont(got: SourceBytes, shown: string): Promise<Acquired<Acqu
   const source: AcquiredFont['source'] =
     got.kind === 'file' ? { kind: 'file', file: got.file!, format, sha256: acquired }
       : got.kind === 'data' ? { kind: 'data', format, sha256: acquired }
-        : { kind: 'remote', url: shown, format, sha256: acquired, ...(got.pinned === undefined ? {} : { pinned: got.pinned }) };
+        : got.kind === 'bundled' ? { kind: 'bundled', family: BUNDLED_FONT_MANIFEST.family, version: BUNDLED_FONT_MANIFEST.version, file: got.bundledFile!, format, sha256: acquired }
+          : { kind: 'remote', url: shown, format, sha256: acquired, ...(got.pinned === undefined ? {} : { pinned: got.pinned }) };
   return { ok: true, value: { sha256: sha256(decoded.sfnt), sfnt: decoded.sfnt, font, source } };
 }
 

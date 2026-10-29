@@ -36,7 +36,7 @@ On first use, a missing managed browser is installed automatically. `--offline`,
 - Per-Slide attributes on the section: `id` (stable anchor, `<a href="#id">` jumps to it), `data-title` (slide name in PowerPoint's outline), `data-section="Name"` on the first Slide of a PowerPoint section.
 - Speaker notes: `<aside class="notes">` inside the section; `p`, `ul`/`ol`, `strong`/`em`, `a` allowed.
 - Assets live next to the deck and are referenced relatively (`img src="assets/x.png"`). Remote URLs are an error, except stylesheets and `@font-face` fonts (Google Fonts included), which are downloaded once and pinned in `<name>.assets/fonts/`: keep that directory with the deck. `data:` URIs are fine.
-- Fonts: name a concrete family first and end the stack with a safe one (`font-family: Georgia, "Times New Roman", serif`). Safe families need no embedding; webfonts, pinning and `local()` are in `reference/fonts.md`.
+- Fonts: author a concrete safe family for a clean strict Deck (`font-family: Georgia, "Times New Roman", serif`). Unstyled text uses bundled Liberation Sans 2.1.5: reproducible for authoring, but still `FONT_NOT_SAFE`, not embedded. The template explicitly authors Arial. Safe families, webfonts and pinning are in `reference/fonts.md`.
 - Layout is free: flex, grid, absolute, `calc()`, custom properties. Chromium lays the slide out; PowerPoint receives the measured boxes.
 
 ## Authoring rules that avoid entries

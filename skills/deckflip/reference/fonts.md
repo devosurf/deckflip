@@ -2,14 +2,20 @@
 
 ## How a stack resolves
 
-For every run, the computed `font-family` stack selects the first available deck-provided or installed face. A family declared with `@font-face` matches only its rules, by their weight/style descriptors, never an installed face of the same name. Other families match installed faces by preferred or legacy name. The PPTX uses the selected face's legacy Office family and regular/bold/italic/bold-italic identity.
+For every run, the computed `font-family` stack selects the first available supplied or installed face. A family declared with `@font-face` matches only its rules, by their weight/style descriptors, never an installed face of the same name. The bundled default uses supplied faces, not an installed copy. Other families match installed faces by preferred or legacy name. The PPTX uses the selected face's legacy Office family and regular/bold/italic/bold-italic identity.
 
 - Nothing resolves: `FONT_UNRESOLVED` (error). Chromium fell back to a platform default, so the layout is not reproducible.
 - The first resolvable entry is a generic (`sans-serif`, `serif`, `monospace`, `system-ui`, `ui-*`, `cursive`, `fantasy`, `math`, `emoji`): `FONT_GENERIC_ONLY` (error). Put a concrete family before it.
-- Unstyled text currently defaults to `Arial`; authored inheritance is preserved.
+- Unstyled text defaults to bundled **Liberation Sans 2.1.5** (static Regular, Bold, Italic and BoldItalic). A root declaration in the first anonymous cascade layer preserves authored root, body, Slide and text families, including author layers. There is no body default and no bundled fallback appended to explicit stacks: missing families and generics still fail.
 - `FONT_IDENTITY_INVALID` (error, exit 2): missing or conflicting legacy names/style bits, an unsupported legacy subfamily, or a variable font whose Office instance identity is not supported. Choose a supported static face; do not edit font tables or remap CSS weights.
 - Authored browser weights stay intact. Unmodified Heebo 500 becomes **Heebo Medium / regular**, 700 **Heebo / bold**, and 800 **Heebo ExtraBold / regular**. Office bold/italic comes from face metadata, not a numeric weight threshold.
 - Per-glyph fallback and PowerPoint font selection are not proven by structural Verification; do not assume Chromium and PowerPoint substitute identically. `FONT_GLYPH_FALLBACK` (warning) names characters the selected face lacks and the fonts Chromium drew them with instead.
+
+## Default is not safe
+
+The bundled default needs no font installation or network for authoring. Its manifest-pinned bytes are the ones Chromium measures, but it remains `deck-provided` and raises `FONT_NOT_SAFE`: reproducible authoring does not embed fonts or make Liberation Sans available on the recipient's PowerPoint installation.
+
+For a clean strict Deck, explicitly author a safe family. The supplied template already sets Arial on `body`; keep that declaration or choose another installed safe font. Bundling is not a reason to suppress portability entries or request embedding, which remains unimplemented.
 
 ## Webfonts
 
@@ -33,10 +39,10 @@ Choose Aptos or Calibri for a "PowerPoint look"; Arial or Georgia when the deck 
 ## Rules for the agent
 
 1. Name a concrete family first; end every stack with a safe family; never rely on a generic alone. `font-family: Georgia, "Times New Roman", serif` is the pattern.
-2. Prefer the safe set.
+2. Prefer the safe set for a clean strict Deck; the bundled default is not in it.
 3. An `@font-face` font, local (`src: url("fonts/Brand.woff2")`) or hosted, makes a brand font available for authoring, not portable in the PPTX. It remains `FONT_NOT_SAFE` (warning): the viewer may substitute. Use a safe font or install the Resolved font on every viewing machine.
 4. `FONT_EMBED_UNSUPPORTED` means embedding is not implemented. Remove the embedding request; a different font licence or source format cannot enable it.
-5. `deckflip inspect deck.html` lists `fonts[]` with `cssFamily`, matching `aliases`, `asset` (SHA-256, collection face index, PostScript name, and `source`: `installed`, `file`, `remote` with its pinned copy, or `data`), `office` (family and RIBBI style), metrics, permission bits and class (`safe`, `deck-provided`, `installed`); `convert --json` reports the same list as `fonts`. These identify selected faces, not embedded or renderer-confirmed fonts.
+5. `deckflip inspect deck.html` lists `fonts[]` with `cssFamily`, matching `aliases`, `asset` (SHA-256, collection face index, PostScript name, and `source`: `installed`, `file`, `remote` with its pinned copy, `data`, or `bundled`), `office` (family and RIBBI style), metrics, permission bits and class (`safe`, `deck-provided`, `installed`); `convert --json` reports the same list as `fonts`. Bundled provenance includes `kind: 'bundled'`, `family: 'Liberation Sans'`, `version: '2.1.5'`, `file` (basename), `format: 'ttf'` and `sha256` of the supplied bytes. These identify selected faces, not embedded or renderer-confirmed fonts.
 
 ## Embedding
 
