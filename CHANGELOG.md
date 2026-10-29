@@ -18,6 +18,8 @@
 ### Fixed
 
 - `@font-face` rules in linked local stylesheets were invisible to font resolution (Chromium blocks their CSSOM), so the selected face could differ from the measured one; remote and imported rules were ignored the same way.
+- Resolve the Chromium installer from the installed Playwright dependency instead of the current directory, with shell-quoted absolute recovery commands that work for packed/global installs and paths containing spaces (#39).
+- Give HTML `inspect` the same `--browser` / `--offline` options and explicit flag > `DECKFLIP_BROWSER` > managed-browser precedence as other Chromium commands. PPTX inspection remains browser-independent. Help now documents browser environment variables and offline/CI download policy (#39).
 
 ## 0.3.0 - 2026-10-29
 

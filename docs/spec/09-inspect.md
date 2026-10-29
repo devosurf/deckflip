@@ -2,6 +2,14 @@
 
 `deckflip inspect <input>` prints one JSON document: the Intermediate Deck Model (see [11-architecture.md](11-architecture.md)) serialised, for either input kind. For HTML input it is a dry run of `convert` (measurement pass included, no PPTX written); for PPTX input it is the parse result. Identical shape both ways, so an agent can compare "what I wrote" against "what came out".
 
+## Browser options
+
+`deckflip inspect <input> [--browser <path>] [--offline]` uses the shared Chromium launcher for HTML input: explicit `--browser` > `DECKFLIP_BROWSER` > Playwright-managed browser. An invalid override fails rather than falling back. `--offline`, `DECKFLIP_OFFLINE=1`, or `CI=true` prevents automatic downloads; an existing browser still works. If the managed browser is missing, exit 1 prints `Chromium is not installed. Run <install command>.` without downloading. `PLAYWRIGHT_BROWSERS_PATH` selects the managed cache; use the same value when running the printed recovery command. See [the CLI browser environment contract](01-cli.md#browser-environment).
+
+PPTX input is parsed directly: it never launches or requires Chromium, even with a missing managed browser or invalid `--browser` / `DECKFLIP_BROWSER` paths.
+
+## JSON output
+
 ```json
 {
   "schemaVersion": 1,

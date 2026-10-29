@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { chromium } from 'playwright-core';
 import type { Browser, Page } from 'playwright-core';
 import { DeckflipError } from '../report/types.js';
@@ -21,11 +22,16 @@ interface LoadedDeck {
   documents: SlideDocument[];
 }
 
-const PLAYWRIGHT_CLI = resolve('node_modules', 'playwright-core', 'cli.js');
-const INSTALL_COMMAND = 'node node_modules/playwright-core/cli.js install chromium';
+const PLAYWRIGHT_CLI = join(dirname(createRequire(import.meta.url).resolve('playwright-core/package.json')), 'cli.js');
+// The CLI host is macOS: quote both executable paths for a copyable POSIX-shell recovery command.
+const INSTALL_COMMAND = `${shellQuote(process.execPath)} ${shellQuote(PLAYWRIGHT_CLI)} install chromium`;
 // GPU rasterisation can vary edge channels by one level across processes under load. Media names are
 // content-hashed, so Deck conversion uses software rendering to keep captured PNG bytes deterministic.
 const CHROMIUM_ARGS = ['--disable-gpu'];
+
+function shellQuote(value: string): string {
+  return `'${value.replaceAll("'", "'\\''")}'`;
+}
 
 function installManagedChromium(): Promise<void> {
   return new Promise((resolvePromise, rejectPromise) => {

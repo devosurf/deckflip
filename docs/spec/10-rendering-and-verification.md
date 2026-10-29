@@ -33,7 +33,7 @@ Discovery: `--soffice <path>`, else `DECKFLIP_SOFFICE`, else `soffice` on `PATH`
 
 Layout must be reproducible across machines, so the tool pins a Chromium build: the Playwright-managed revision that `playwright-core` in the installed `deckflip` version expects.
 
-Resolution order: `--browser <path>` > `DECKFLIP_BROWSER` > the managed build if present > download the managed build (`playwright install chromium`, run in-process on first use with a one-line stderr notice). `--offline` / `DECKFLIP_OFFLINE=1` / `CI=true` disable the download and exit 1 with the exact install command. A system Chrome/Edge is used only through `--browser`; the report records the browser version (`tool.browser`) so drift is visible.
+Resolution order: `--browser <path>` > `DECKFLIP_BROWSER` > the managed build if present > download the managed build on first use with a one-line stderr notice. Invalid overrides fail rather than falling back. `--offline` / `DECKFLIP_OFFLINE=1` / `CI=true` disable the download and exit 1 with the exact install command. `PLAYWRIGHT_BROWSERS_PATH` selects the cache for installation and launch. The installer is resolved from the installed `playwright-core` dependency, not the current directory; the printed command shell-quotes absolute Node and installer paths so global installations and paths containing spaces work. A system Chrome/Edge is used only through `--browser` or `DECKFLIP_BROWSER`; the report records the browser version (`tool.browser`) so drift is visible. HTML `inspect` uses this same policy; PPTX `inspect` never requires Chromium.
 
 ## Comparator and gates
 
