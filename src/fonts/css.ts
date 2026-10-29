@@ -10,7 +10,7 @@ export interface CssFontFaceRule {
   src?: { start: number; end: number };
 }
 
-export type CssItem = { kind: 'import'; url: string } | { kind: 'font-face'; rule: CssFontFaceRule };
+export type CssItem = { kind: 'import'; url: string; target: { start: number; end: number } } | { kind: 'font-face'; rule: CssFontFaceRule };
 
 export type FontFaceSource = { kind: 'url'; url: string; formats: string[] } | { kind: 'local'; name: string };
 
@@ -34,7 +34,18 @@ export function scanStylesheet(text: string): CssItem[] {
     if (lower === 'import') {
       const end = preludeEnd(text, after);
       const url = importUrl(text.slice(after, end));
-      if (url !== undefined) items.push({ kind: 'import', url });
+      if (url !== undefined) {
+        let start = after;
+        while (start < end) {
+          if (/\s/.test(text[start]!)) start += 1;
+          else if (text.startsWith('/*', start)) start = skipOpaque(text, start);
+          else break;
+        }
+        const targetEnd = text[start] === '"' || text[start] === "'"
+          ? skipOpaque(text, start)
+          : parenEnd(text, text.indexOf('(', start) + 1) + 1;
+        items.push({ kind: 'import', url, target: { start, end: targetEnd } });
+      }
       i = end + 1;
     } else if (lower === 'font-face') {
       const open = preludeEnd(text, after);
@@ -99,6 +110,20 @@ export function parseWeightRange(value: string | undefined): [number, number] {
   const weights = words.map((word) => (word === 'normal' ? 400 : word === 'bold' ? 700 : Number(word)));
   if (weights.length === 0 || weights.length > 2 || weights.some((w) => !Number.isFinite(w) || w < 1 || w > 1000)) return [400, 400];
   const [a, b = a] = weights as [number, number?];
+  return [Math.min(a, b!), Math.max(a, b!)];
+}
+
+const STRETCH_WIDTHS: Record<string, number> = {
+  'ultra-condensed': 50, 'extra-condensed': 62.5, condensed: 75, 'semi-condensed': 87.5,
+  normal: 100, 'semi-expanded': 112.5, expanded: 125, 'extra-expanded': 150, 'ultra-expanded': 200,
+};
+
+/** CSS Fonts width keywords and percentage ranges, defaulting to normal (100%). */
+export function parseStretchRange(value: string | undefined): [number, number] {
+  const words = stripComments(value ?? '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const percentages = words.map((word) => STRETCH_WIDTHS[word] ?? (/^(?:\d+(?:\.\d*)?|\.\d+)%$/.test(word) ? Number(word.slice(0, -1)) : NaN));
+  if (percentages.length === 0 || percentages.length > 2 || percentages.some((width) => !Number.isFinite(width) || width <= 0)) return [100, 100];
+  const [a, b = a] = percentages as [number, number?];
   return [Math.min(a, b!), Math.max(a, b!)];
 }
 
@@ -197,6 +222,26 @@ function declarationEnd(text: string, start: number, end: number): number {
 }
 
 function findTopLevel(text: string, start: number, end: number, char: string): number {
+  const stop = scanEnd(text, start, end, '([{', ')]}', char);
+  return stop === end ? -1 : stop;
+}
+
+/** Index of the `;` or brace that ends an at-rule prelude, or the text length. */
+function preludeEnd(text: string, start: number): number {
+  return scanEnd(text, start, text.length, '(', ')', ';{}');
+}
+
+/** Index of the `}` closing the block whose content starts at `start`, or the text length. */
+function blockEnd(text: string, start: number): number {
+  return scanEnd(text, start, text.length, '{', '}', '}');
+}
+
+function parenEnd(text: string, start: number): number {
+  return scanEnd(text, start, text.length, '(', ')', ')');
+}
+
+/** Scan balanced components, skipping strings, comments and unquoted URLs. */
+function scanEnd(text: string, start: number, end: number, opens: string, closes: string, stops: string): number {
   let depth = 0;
   let i = start;
   while (i < end) {
@@ -205,74 +250,13 @@ function findTopLevel(text: string, start: number, end: number, char: string): n
       i = skipped;
       continue;
     }
-    const c = text[i]!;
-    if (c === '(' || c === '[' || c === '{') depth += 1;
-    else if (c === ')' || c === ']' || c === '}') depth -= 1;
-    else if (c === char && depth <= 0) return i;
+    const char = text[i]!;
+    if (depth <= 0 && stops.includes(char)) return i;
+    if (opens.includes(char)) depth += 1;
+    else if (closes.includes(char)) depth -= 1;
     i += 1;
   }
-  return -1;
-}
-
-/** Index of the `;` or `{` that ends an at-rule prelude, or the text length. */
-function preludeEnd(text: string, start: number): number {
-  let depth = 0;
-  let i = start;
-  while (i < text.length) {
-    const skipped = skipOpaque(text, i);
-    if (skipped !== i) {
-      i = skipped;
-      continue;
-    }
-    const c = text[i]!;
-    if (c === '(') depth += 1;
-    else if (c === ')') depth -= 1;
-    else if ((c === ';' || c === '{') && depth <= 0) return i;
-    else if (c === '}' && depth <= 0) return i;
-    i += 1;
-  }
-  return text.length;
-}
-
-/** Index of the `}` closing the block whose content starts at `start`, or the text length. */
-function blockEnd(text: string, start: number): number {
-  let depth = 0;
-  let i = start;
-  while (i < text.length) {
-    const skipped = skipOpaque(text, i);
-    if (skipped !== i) {
-      i = skipped;
-      continue;
-    }
-    const c = text[i]!;
-    if (c === '{') depth += 1;
-    else if (c === '}') {
-      if (depth === 0) return i;
-      depth -= 1;
-    }
-    i += 1;
-  }
-  return text.length;
-}
-
-function parenEnd(text: string, start: number): number {
-  let depth = 0;
-  let i = start;
-  while (i < text.length) {
-    const skipped = skipOpaque(text, i);
-    if (skipped !== i) {
-      i = skipped;
-      continue;
-    }
-    const c = text[i]!;
-    if (c === '(') depth += 1;
-    else if (c === ')') {
-      if (depth === 0) return i;
-      depth -= 1;
-    }
-    i += 1;
-  }
-  return text.length;
+  return end;
 }
 
 /** The `)` of an unquoted `url(`, honouring escapes. */

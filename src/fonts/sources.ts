@@ -36,6 +36,8 @@ export interface AcquiredFont {
 export interface Fetched {
   status: number;
   body: Buffer;
+  /** final response URL after redirects; absent for local test fetchers */
+  url?: string;
 }
 
 export type Fetcher = () => Promise<Fetched>;
@@ -48,19 +50,25 @@ interface SourceBytes {
   file?: string;
   /** `remote`: the frozen copy, when there is an Asset directory */
   pinned?: string;
+  /** final response base for a stylesheet, stripped of secrets */
+  base?: string;
 }
 
-interface PinRecord {
-  /** SHA-256 of the full URL: the lookup key, so credentials in a URL never reach the disk */
+export interface AcquiredStylesheet {
+  text: string;
+  baseUrl: string;
+}
+
+type PinRecord = {
+  /** SHA-256 of the full URL: credentials never reach disk */
   key: string;
   /** the URL's display form */
   url: string;
   type: 'stylesheet' | 'font';
-  /** under `fonts/` */
-  file: string;
-  /** of the file's bytes */
-  sha256: string;
-}
+} & (
+  | { state: 'pinned'; file: string; sha256: string; base?: string }
+  | { state: 'failed'; failure: AcquisitionFailure }
+);
 
 interface PinFile {
   schemaVersion: 1;
@@ -69,7 +77,7 @@ interface PinFile {
 
 export class FontSources {
   private readonly fonts = new Map<string, Promise<Acquired<AcquiredFont>>>();
-  private readonly sheets = new Map<string, Promise<Acquired<string>>>();
+  private readonly sheets = new Map<string, Promise<Acquired<AcquiredStylesheet>>>();
   private dirty = false;
 
   private constructor(
@@ -91,10 +99,10 @@ export class FontSources {
   }
 
   /** A stylesheet's text; `fetch` is the browser's own request, used only for a remote URL not pinned yet. */
-  stylesheet(url: string, fetch: Fetcher): Promise<Acquired<string>> {
+  stylesheet(url: string, fetch: Fetcher): Promise<Acquired<AcquiredStylesheet>> {
     let pending = this.sheets.get(url);
     if (!pending) {
-      pending = this.bytes(url, 'stylesheet', fetch).then((got) => (got.ok ? { ok: true, value: decodeCss(got.value.bytes) } : got));
+      pending = this.bytes(url, 'stylesheet', fetch).then((got) => (got.ok ? { ok: true, value: { text: decodeCss(got.value.bytes), baseUrl: got.value.base ?? url } } : got));
       this.sheets.set(url, pending);
     }
     return pending;
@@ -113,6 +121,15 @@ export class FontSources {
   /** How reasons name a source: a path relative to the Deck, a URL without credentials or query values, or `data:`. */
   display(url: string): string {
     return displaySource(url, this.deckDir);
+  }
+
+  /** Freeze earlier remote failures only after the declaration successfully loaded a later pinned source. */
+  freezeFailure(url: string, failure: AcquisitionFailure): void {
+    if (this.pinDir === undefined || !/^https?:/i.test(url)) return;
+    const key = sha256(Buffer.from(url, 'utf8'));
+    if (this.pins.has(key)) return;
+    this.pins.set(key, { key, url: this.display(url), type: 'font', state: 'failed', failure });
+    this.dirty = true;
   }
 
   /** Writes `sources.json` when this run pinned something new. */
@@ -149,12 +166,13 @@ export class FontSources {
     const key = sha256(Buffer.from(url, 'utf8'));
     const pin = this.pins.get(key);
     if (pin !== undefined && this.pinDir !== undefined) {
+      if (pin.state === 'failed') return { ok: false, ...pin.failure };
       const pinned = join(this.pinDir, pin.file);
       const bytes = await readFile(pinned).catch(() => undefined);
       if (bytes === undefined || sha256(bytes) !== pin.sha256) {
         return { ok: false, code: 'FONT_ASSET_UNAVAILABLE', reason: `The pinned copy of ${shown} is missing or was modified; remove its entry from ${FONT_PINS_DIR}/${FONT_PINS_FILE} to download it again` };
       }
-      return { ok: true, value: { bytes, kind: 'remote', pinned } };
+      return { ok: true, value: { bytes, kind: 'remote', pinned, ...(pin.base === undefined ? {} : { base: pin.base }) } };
     }
 
     let fetched: Fetched;
@@ -167,7 +185,8 @@ export class FontSources {
     if (fetched.status < 200 || fetched.status >= 300) {
       return { ok: false, code: 'FONT_ASSET_UNAVAILABLE', reason: `${shown} returned HTTP ${fetched.status} and is not pinned in the Asset directory` };
     }
-    if (this.pinDir === undefined) return { ok: true, value: { bytes: fetched.body, kind: 'remote' } };
+    const base = type === 'stylesheet' ? stylesheetBase(fetched.url ?? url) : undefined;
+    if (this.pinDir === undefined) return { ok: true, value: { bytes: fetched.body, kind: 'remote', ...(base === undefined ? {} : { base }) } };
 
     const digest = sha256(fetched.body);
     const format = type === 'font' ? sniffFontFormat(fetched.body) : undefined;
@@ -178,9 +197,9 @@ export class FontSources {
     } catch (error) {
       return { ok: false, code: 'FONT_ASSET_UNAVAILABLE', reason: `${shown} could not be pinned in the Asset directory (${(error as NodeJS.ErrnoException).code ?? 'error'})` };
     }
-    this.pins.set(key, { key, url: shown, type, file: name, sha256: digest });
+    this.pins.set(key, { key, url: shown, type, state: 'pinned', file: name, sha256: digest, ...(base === undefined ? {} : { base }) });
     this.dirty = true;
-    return { ok: true, value: { bytes: fetched.body, kind: 'remote', pinned } };
+    return { ok: true, value: { bytes: fetched.body, kind: 'remote', pinned, ...(base === undefined ? {} : { base }) } };
   }
 }
 
@@ -237,19 +256,18 @@ export function decodeDataUrl(url: string): Buffer | undefined {
 
 /** `%XX` escapes as their bytes, everything else as UTF-8: a `data:` payload is bytes, not necessarily UTF-8. */
 function percentDecode(text: string): Buffer {
-  const bytes: number[] = [];
+  const bytes = Buffer.allocUnsafe(Buffer.byteLength(text));
+  let at = 0;
+  let start = 0;
   for (let i = 0; i < text.length; i += 1) {
-    if (text[i] === '%' && /^[0-9a-f]{2}$/i.test(text.slice(i + 1, i + 3))) {
-      bytes.push(parseInt(text.slice(i + 1, i + 3), 16));
-      i += 2;
-    } else {
-      const code = text.codePointAt(i)!;
-      if (code > 0xffff) i += 1;
-      if (code < 0x80) bytes.push(code);
-      else bytes.push(...Buffer.from(String.fromCodePoint(code), 'utf8'));
-    }
+    if (text[i] !== '%' || !/^[0-9a-f]{2}$/i.test(text.slice(i + 1, i + 3))) continue;
+    at += bytes.write(text.slice(start, i), at, 'utf8');
+    bytes[at++] = parseInt(text.slice(i + 1, i + 3), 16);
+    i += 2;
+    start = i + 1;
   }
-  return Buffer.from(bytes);
+  at += bytes.write(text.slice(start), at, 'utf8');
+  return bytes.subarray(0, at);
 }
 
 function decodeCss(bytes: Buffer): string {
@@ -261,12 +279,22 @@ function parsePins(text: string): PinRecord[] {
   try {
     const parsed = JSON.parse(text) as Partial<PinFile>;
     if (parsed.schemaVersion !== 1 || !Array.isArray(parsed.sources)) return [];
-    return parsed.sources.filter((record): record is PinRecord =>
-      typeof record?.key === 'string' && typeof record.file === 'string' && typeof record.sha256 === 'string' &&
-      typeof record.url === 'string' && (record.type === 'stylesheet' || record.type === 'font') && !record.file.includes('/') && !record.file.includes('\\'));
+    return parsed.sources.filter((record): record is PinRecord => {
+      if (typeof record?.key !== 'string' || typeof record.url !== 'string' || (record.type !== 'stylesheet' && record.type !== 'font')) return false;
+      if (record.state === 'failed') return record.type === 'font' && typeof record.failure?.reason === 'string' &&
+        ['FONT_ASSET_UNAVAILABLE', 'FONT_ASSET_UNSUPPORTED', 'VALIDATE_MISSING_ASSET'].includes(record.failure.code);
+      return record.state === 'pinned' && typeof record.file === 'string' && typeof record.sha256 === 'string' &&
+        (record.base === undefined || typeof record.base === 'string') && !record.file.includes('/') && !record.file.includes('\\');
+    });
   } catch {
     return [];
   }
+}
+
+/** A repeatable redirect base without credentials, query or fragment. */
+function stylesheetBase(url: string): string {
+  const parsed = new URL(url);
+  return `${parsed.protocol}//${parsed.host}${parsed.pathname}`;
 }
 
 async function writeAtomic(file: string, data: string | Buffer): Promise<void> {

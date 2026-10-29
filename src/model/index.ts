@@ -294,6 +294,8 @@ export interface RunStyle {
   font?: ResolvedFont;
   /** numeric computed `font-weight` */
   weight: number;
+  /** computed `font-stretch` percentage; absent at normal (100) */
+  stretch?: number;
   /** CSS px */
   size: number;
   bold: boolean;

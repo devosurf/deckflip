@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { inflateSync } from 'node:zlib';
 import woff2Decompress from 'wawoff2/decompress.js';
 
-export type FontFormat = 'ttf' | 'otf' | 'ttc' | 'woff' | 'woff2';
+import type { FontFormat } from '../model/index.js';
 
 /** The container format by signature, not by file extension or `format()` hint; undefined for anything else (EOT, SVG, text). */
 export function sniffFontFormat(bytes: Uint8Array): FontFormat | undefined {
@@ -54,7 +54,8 @@ function decodeWoff(woff: Buffer): Buffer {
   const flavor = woff.readUInt32BE(4);
   const numTables = woff.readUInt16BE(12);
   if (woff.length < 44 + numTables * 20) throw new Error('truncated WOFF table directory');
-  const tables: Array<{ tag: string; data: Buffer }> = [];
+  const tables: Array<{ tag: string; offset: number; compLength: number; origLength: number }> = [];
+  let size = 12 + numTables * 16;
   for (let i = 0; i < numTables; i += 1) {
     const at = 44 + i * 20;
     const tag = woff.toString('latin1', at, at + 4);
@@ -62,43 +63,36 @@ function decodeWoff(woff: Buffer): Buffer {
     const compLength = woff.readUInt32BE(at + 8);
     const origLength = woff.readUInt32BE(at + 12);
     if (offset + compLength > woff.length) throw new Error(`truncated WOFF table ${tag}`);
-    const stored = woff.subarray(offset, offset + compLength);
-    const data = compLength < origLength ? inflateSync(stored) : Buffer.from(stored);
-    if (data.length !== origLength) throw new Error(`WOFF table ${tag} does not inflate to its original length`);
-    tables.push({ tag, data });
+    tables.push({ tag, offset, compLength, origLength });
+    size += (origLength + 3) & ~3;
   }
-  return buildSfnt(flavor, tables.sort((a, b) => (a.tag < b.tag ? -1 : a.tag > b.tag ? 1 : 0)));
-}
-
-function buildSfnt(flavor: number, tables: Array<{ tag: string; data: Buffer }>): Buffer {
-  const numTables = tables.length;
+  tables.sort((a, b) => (a.tag < b.tag ? -1 : a.tag > b.tag ? 1 : 0));
+  const out = Buffer.alloc(size);
   const pow2 = 2 ** Math.floor(Math.log2(Math.max(numTables, 1)));
-  const header = Buffer.alloc(12 + numTables * 16);
-  header.writeUInt32BE(flavor, 0);
-  header.writeUInt16BE(numTables, 4);
-  header.writeUInt16BE(pow2 * 16, 6);
-  header.writeUInt16BE(Math.log2(pow2), 8);
-  header.writeUInt16BE(numTables * 16 - pow2 * 16, 10);
-  const bodies: Buffer[] = [];
-  let offset = header.length;
+  out.writeUInt32BE(flavor, 0);
+  out.writeUInt16BE(numTables, 4);
+  out.writeUInt16BE(pow2 * 16, 6);
+  out.writeUInt16BE(Math.log2(pow2), 8);
+  out.writeUInt16BE(numTables * 16 - pow2 * 16, 10);
+  let offset = 12 + numTables * 16;
   let headOffset: number | undefined;
-  tables.forEach(({ tag, data }, i) => {
-    const body = tag === 'head' ? Buffer.from(data) : data;
-    if (tag === 'head' && body.length >= 12) {
-      body.writeUInt32BE(0, 8);
+  for (const [i, table] of tables.entries()) {
+    const { tag, compLength, origLength } = table;
+    const stored = woff.subarray(table.offset, table.offset + compLength);
+    const data = compLength < origLength ? inflateSync(stored) : stored;
+    if (data.length !== origLength) throw new Error(`WOFF table ${tag} does not inflate to its original length`);
+    data.copy(out, offset);
+    if (tag === 'head' && origLength >= 12) {
+      out.writeUInt32BE(0, offset + 8);
       headOffset = offset;
     }
     const at = 12 + i * 16;
-    header.write(tag, at, 'latin1');
-    header.writeUInt32BE(tableChecksum(body), at + 4);
-    header.writeUInt32BE(offset, at + 8);
-    header.writeUInt32BE(body.length, at + 12);
-    const padded = Buffer.alloc((body.length + 3) & ~3);
-    body.copy(padded);
-    bodies.push(padded);
-    offset += padded.length;
-  });
-  const out = Buffer.concat([header, ...bodies]);
+    out.write(tag, at, 'latin1');
+    out.writeUInt32BE(tableChecksum(out.subarray(offset, offset + origLength)), at + 4);
+    out.writeUInt32BE(offset, at + 8);
+    out.writeUInt32BE(origLength, at + 12);
+    offset += (origLength + 3) & ~3;
+  }
   if (headOffset !== undefined) {
     out.writeUInt32BE((0xb1b0afba - tableChecksum(out)) >>> 0, headOffset + 8);
   }
@@ -110,9 +104,9 @@ function tableChecksum(bytes: Buffer): number {
   const whole = bytes.length & ~3;
   for (let i = 0; i < whole; i += 4) sum = (sum + bytes.readUInt32BE(i)) >>> 0;
   if (whole < bytes.length) {
-    const tail = Buffer.alloc(4);
-    bytes.copy(tail, 0, whole);
-    sum = (sum + tail.readUInt32BE(0)) >>> 0;
+    let tail = 0;
+    for (let i = whole; i < bytes.length; i += 1) tail |= bytes[i]! << (24 - (i - whole) * 8);
+    sum = (sum + (tail >>> 0)) >>> 0;
   }
   return sum;
 }

@@ -2,7 +2,7 @@ import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, join } from 'node:path';
 import type { Browser } from 'playwright-core';
 import { emitPptx } from './emit/index.js';
-import { auditRenderedFonts, FontCatalog, resolveDeckFonts, resolvedFontsOf } from './fonts/index.js';
+import { auditVisibleFonts, FontCatalog, resolveDeckFonts, resolvedFontsOf } from './fonts/index.js';
 import type { BrowserCensus } from './html/browser-script.js';
 import { loadDeck } from './html/load.js';
 import { measureDeck, type MeasuredDeckResult } from './html/measure.js';
@@ -111,7 +111,7 @@ async function runHtmlPipeline(
   try {
     const measured = await measureDeck(loaded, { browser, rasterDpi: opts.rasterDpi });
     const catalog = await FontCatalog.scan({ declared: measured.fonts.declared });
-    const fontEntries = [...resolveDeckFonts(measured.deck, catalog, { embedFonts: opts.embedFonts }), ...auditRenderedFonts(measured.renderedText, catalog)];
+    const fontEntries = [...resolveDeckFonts(measured.deck, catalog, { embedFonts: opts.embedFonts }), ...auditVisibleFonts(measured.visibleText, catalog)];
     const roundTrip = await resolveRoundTrip(measured.deck, measured.sections, loaded.deckFile);
     const entries = [...baseEntries, ...measured.entries, ...fontEntries, ...roundTrip.entries];
     const base = { ...reportBase(input, outputPath, loaded.canvas, chromiumVersion(browser), mode), fonts: resolvedFontsOf(measured.deck) };

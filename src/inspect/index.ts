@@ -1,7 +1,7 @@
 // IDM -> inspect JSON (docs/spec/09-inspect.md). Structure only: an agent checks bounds, kinds and provenance
 // without rendering. The full schema is frozen in milestone 5; today's shape is the subset convert already knows.
 
-import { resolvedFontsOf } from '../fonts/resolve.js';
+import { resolvedFontsOf } from '../fonts/index.js';
 import type { Deck, Element, ResolvedFont, TextBody } from '../model/index.js';
 
 export interface InspectElement {

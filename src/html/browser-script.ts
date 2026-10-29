@@ -1,3 +1,4 @@
+import type { Page } from 'playwright-core';
 import type { Align, AutonumScheme, Box, Bullet, Color, CornerRadius, Fill, GroupElement, ImageFill, ImagePlacement, Insets, Line, OpaqueClass, OpaqueElement, Paragraph, PictureElement, Run, RunStyle, ShapeElement, TableCell, TableElement, TableRow, TextBody } from '../model/index.js';
 import type { HtmlChild, HtmlNode } from '../roundtrip/fingerprint.js';
 
@@ -63,17 +64,19 @@ export interface BrowserMeasureResult {
   shapes: BrowserElement[];
   entries: BrowserEntry[];
   /** every text node of the Visible text, in document order, as the font audit reads it; the nodes stay on `window` for CDP */
-  renderedText: BrowserRenderedText[];
+  visibleText: BrowserVisibleText[];
   census: BrowserCensus;
 }
 
-/** A laid-out text node: what it asks of fonts. Its index matches `window.__deckflipRenderedText`. */
-export interface BrowserRenderedText {
+/** A laid-out text node: what it asks of fonts. Its index matches `window.__deckflipVisibleText`. */
+export interface BrowserVisibleText {
   /** the text's owner, as the Census names it */
   selector: string;
   fontStack: string[];
   weight: number;
   italic: boolean;
+  /** Computed CSS width percentage, omitted at normal (100%). */
+  stretch?: number;
   text: string;
 }
 
@@ -99,8 +102,13 @@ export interface BrowserCensus {
 /** Marks the stylesheet measure.ts injects to freeze animations; `validateDocument` lifts it while reading `transition`. */
 export const FREEZE_ATTR = 'data-deckflip-freeze';
 
-/** Where the page script leaves the text nodes of `renderedText`, for measure.ts to look up through CDP. */
-export const RENDERED_TEXT_GLOBAL = '__deckflipRenderedText';
+/** Where the page script leaves the Visible text nodes, for measure.ts to look up through CDP. */
+export const VISIBLE_TEXT_GLOBAL = '__deckflipVisibleText';
+
+/** Install the identity helper serialised esbuild page functions can reference. */
+export async function preparePageScript(page: Page): Promise<void> {
+  await page.evaluate('globalThis.__name = globalThis.__name || ((fn) => fn)');
+}
 
 /** Natural sizes of every `background-image: url()` in the document, keyed by resolved URL; `null` when it did not load. */
 export type BackgroundImageSizes = Record<string, { width: number; height: number } | null>;
@@ -145,7 +153,7 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
       tree: { tag: 'section', attrs: {}, children: [] },
       shapes: [],
       entries: [],
-      renderedText: [],
+      visibleText: [],
       census: { text: [], notes: '', stacking: [] },
     };
   }
@@ -196,14 +204,15 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
   const clipped = reportClippedText(shownText);
   reportGeneratedContent();
   reportLayoutFlags(shownText, clipped);
+  const visible = readVisibleText();
   return {
     meta,
     sectionBox,
     tree,
     shapes,
     entries,
-    renderedText: renderedText(),
-    census: { text: visibleText(), notes: notesText(), stacking: stackingOrder() },
+    visibleText: visible.nodes,
+    census: { text: visible.text, notes: notesText(), stacking: stackingOrder() },
   };
 
   /** Every text node Chromium shows on the Canvas, with its owner and its line rectangles: what the layout checks read. */
@@ -449,36 +458,15 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
   }
 
   /**
-   * The font audit's view (#34): each text node of the Visible text with the font request its element computes.
-   * The nodes stay on `window.__deckflipRenderedText` (`RENDERED_TEXT_GLOBAL`), in the same order, so measure.ts
-   * can ask Chromium which platform fonts drew each one.
+   * Visible text (Verification and font audit): every laid-out text node of the Slide, in document order,
+   * independently of the native measurement walk. Hidden, notes, rasterised, opaque and off-Canvas text is left
+   * out, as is generated content. Census runs retain whitespace and split at breaks and blocks; the audit keeps
+   * each nonblank node on `window.__deckflipVisibleText` (`VISIBLE_TEXT_GLOBAL`) for Chromium's font lookup.
    */
-  function renderedText(): BrowserRenderedText[] {
-    const out: BrowserRenderedText[] = [];
-    const nodes: Text[] = [];
-    const walker = document.createTreeWalker(section!, NodeFilter.SHOW_TEXT);
-    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-      const parent = node.parentElement;
-      if (!parent || !showsText(parent) || !isLaidOut(node as Text)) continue;
-      const owner = textOwner(parent);
-      const text = applyTextTransform(parent, removeSoftHyphens(node.textContent ?? ''));
-      if (!owner || !hasVisibleText(text)) continue;
-      const cs = getComputedStyle(parent);
-      out.push({ selector: cssPath(owner), fontStack: fontStackOf(cs), weight: parseFontWeight(cs.fontWeight), italic: /italic|oblique/i.test(cs.fontStyle), text });
-      nodes.push(node as Text);
-    }
-    (window as unknown as Record<string, unknown>).__deckflipRenderedText = nodes;
-    return out;
-  }
-
-  /**
-   * Visible text (Verification): every laid-out text node of the Slide, in document order, as Chromium shows
-   * it. Hidden, notes, rasterised, opaque and off-Canvas text is left out, as is generated content, which no
-   * text node holds. Runs of one owner are cut where a line break or a block intervenes, so neighbouring
-   * words never fuse.
-   */
-  function visibleText(): BrowserCensus['text'] {
+  function readVisibleText(): { text: BrowserCensus['text']; nodes: BrowserVisibleText[] } {
     const out: BrowserCensus['text'] = [];
+    const texts: BrowserVisibleText[] = [];
+    const nodes: Text[] = [];
     let current: BrowserCensus['text'][number] | undefined;
     const walker = document.createTreeWalker(section!, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
@@ -497,9 +485,19 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
         current = { owner: { selector, ...(shapeId ? { shapeId } : {}) }, text: '' };
         out.push(current);
       }
-      current.text += applyTextTransform(parent, removeSoftHyphens(node.textContent ?? ''));
+      const text = applyTextTransform(parent, removeSoftHyphens(node.textContent ?? ''));
+      current.text += text;
+      if (!hasVisibleText(text)) continue;
+      const cs = getComputedStyle(parent);
+      const stretch = parseFontStretch(cs.fontStretch);
+      texts.push({
+        selector, fontStack: fontStackOf(cs), weight: parseFontWeight(cs.fontWeight),
+        italic: /italic|oblique/i.test(cs.fontStyle), ...(stretch === undefined ? {} : { stretch }), text,
+      });
+      nodes.push(node as Text);
     }
-    return out.filter((run) => hasVisibleText(run.text));
+    (window as unknown as Record<string, unknown>).__deckflipVisibleText = nodes;
+    return { text: out.filter((run) => hasVisibleText(run.text)), nodes: texts };
   }
 
   function showsText(el: HTMLElement): boolean {
@@ -2590,6 +2588,7 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
   function sameStyle(a: RunStyle, b: RunStyle): boolean {
     return a.fontStack.join('\u0000') === b.fontStack.join('\u0000')
       && a.weight === b.weight
+      && a.stretch === b.stretch
       && a.size === b.size
       && a.bold === b.bold
       && a.italic === b.italic
@@ -2686,6 +2685,7 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
     const cs = getComputedStyle(el);
     const fontStack = fontStackOf(cs);
     const weight = parseFontWeight(cs.fontWeight);
+    const stretch = parseFontStretch(cs.fontStretch);
     const size = px(cs.fontSize);
     const italic = /italic|oblique/i.test(cs.fontStyle);
     const underline = hasTextDecoration(el, 'underline');
@@ -2699,6 +2699,7 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
     return {
       fontStack,
       weight,
+      ...(stretch === undefined ? {} : { stretch }),
       size,
       bold: weight >= 600,
       italic,
@@ -2792,6 +2793,12 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
     }
     const parsed = parseInt(value, 10);
     return Number.isNaN(parsed) ? 400 : parsed;
+  }
+
+  /** Chromium computes `font-stretch` as a percentage; omit its normal width. */
+  function parseFontStretch(value: string): number | undefined {
+    const percentage = parseFloat(value);
+    return Number.isFinite(percentage) && percentage !== 100 ? percentage : undefined;
   }
 
   function resolveAlign(value: string, rtl: boolean): Align {

@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { chromium, type Browser } from 'playwright-core';
 import { afterAll, afterEach, beforeAll, expect, it } from 'vitest';
-import { auditRenderedFonts, FontCatalog, resolveDeckFonts, resolvedFontsOf } from '../../src/fonts/index.js';
+import { auditVisibleFonts, FontCatalog, resolveDeckFonts, resolvedFontsOf } from '../../src/fonts/index.js';
 import { loadDeck } from '../../src/html/load.js';
 import { measureDeck } from '../../src/html/measure.js';
 import { textBodiesOf, type Deck } from '../../src/model/index.js';
@@ -36,13 +36,17 @@ interface FontHost {
 }
 
 /** A local stand-in for a font CDN: fixed bodies by path, 404 otherwise. */
-async function host(files: Record<string, { type: string; body: string | Buffer }>): Promise<FontHost> {
+async function host(files: Record<string, { type: string; body: string | Buffer; redirect?: string }>): Promise<FontHost> {
   const requests: string[] = [];
   const server: Server = createServer((request, response) => {
     requests.push(request.url ?? '');
     const file = files[(request.url ?? '').split('?')[0]!];
     if (!file) {
       response.writeHead(404).end();
+      return;
+    }
+    if (file.redirect) {
+      response.writeHead(302, { location: file.redirect }).end();
       return;
     }
     response.writeHead(200, { 'content-type': file.type, 'access-control-allow-origin': '*' }).end(file.body);
@@ -85,7 +89,7 @@ async function measureFonts(input: string, system: readonly string[] | false = f
   const entries: Entry[] = [
     ...measured.entries,
     ...resolveDeckFonts(measured.deck, catalog, { embedFonts: false }),
-    ...auditRenderedFonts(measured.renderedText, catalog),
+    ...auditVisibleFonts(measured.visibleText, catalog),
   ];
   return { deck: measured.deck, entries, fonts: resolvedFontsOf(measured.deck) };
 }
@@ -258,10 +262,14 @@ it('reuses pinned downloads when the host is unreachable and fails when nothing 
   expect(files).toEqual(expect.arrayContaining([expect.stringMatching(/^[0-9a-f]{64}\.css$/), expect.stringMatching(/^[0-9a-f]{64}\.woff2$/), 'sources.json']));
   expect(await readFile(join(pins, 'sources.json'), 'utf8')).not.toContain(SECRET);
 
-  await cdn.close();
   const requested = cdn.requests.length;
-  const offline = await measureFonts(join(pinned, 'deck.html'));
+  const repeated = await measureFonts(join(pinned, 'deck.html'));
   expect(cdn.requests).toHaveLength(requested);
+  expect(withoutPortability(repeated.entries)).toEqual([]);
+  expect(runs(repeated.deck).map((run) => [run.box, run.font?.asset])).toEqual(runs(online.deck).map((run) => [run.box, run.font?.asset]));
+
+  await cdn.close();
+  const offline = await measureFonts(join(pinned, 'deck.html'));
   expect(withoutPortability(offline.entries)).toEqual([]);
   expect(runs(offline.deck).map((run) => [run.box, run.font?.asset])).toEqual(runs(online.deck).map((run) => [run.box, run.font?.asset]));
 
@@ -270,4 +278,92 @@ it('reuses pinned downloads when the host is unreachable and fails when nothing 
     code: 'FONT_ASSET_UNAVAILABLE', severity: 'error',
     reason: `Stylesheet ${cdn.origin}/css2?… could not be downloaded and is not pinned in the Asset directory`,
   }));
+});
+
+it('matches declared stretch before weight and carries non-normal computed stretch', async () => {
+  const dir = await deckDir({
+    'deck.html': page(`<style>
+      @font-face { font-family: Brand; font-weight: 400; src: url("medium.ttf"); }
+      @font-face { font-family: Brand; font-weight: 700; font-stretch: condensed; src: url("bold.ttf"); }
+      </style>`,
+    line(60, 'font-family: Brand, Arial; font-weight: 700', 'Normal width synthetic bold') +
+    line(160, 'font-family: Brand, Arial; font-weight: 700; font-stretch: condensed', 'Condensed width bold')),
+    'medium.ttf': await readFile(MEDIUM),
+    'bold.ttf': await readFile(BOLD),
+  });
+  const measured = await measureFonts(join(dir, 'deck.html'));
+  expect(measured.entries.filter((entry) => entry.code.startsWith('FONT_') && entry.code !== 'FONT_NOT_SAFE')).toEqual([]);
+  expect(runs(measured.deck).map((run) => run.font?.office)).toEqual([
+    { family: 'Heebo Medium', style: 'regular' }, { family: 'Heebo', style: 'bold' },
+  ]);
+});
+
+it('reports imported stylesheets Chromium never requests with the importing sheet as referrer', async () => {
+  const cdn = await host({});
+  const data = `data:text/css,${encodeURIComponent('@font-face { font-family: Brand; src: local("Arial"); }')}`;
+  const blocked = `http://deck:${SECRET}@127.0.0.1:${new URL(cdn.origin).port}/blocked.css`;
+  const dir = await deckDir({
+    'deck.html': page('<link rel="stylesheet" href="fonts.css">', line(60, 'font-family: Brand, Arial', 'Unrewritable import')),
+    'fonts.css': `@import url("${data}"); @import url("${blocked}");`,
+  });
+  const { entries } = await measureFonts(join(dir, 'deck.html'));
+  expect(entries).toEqual(expect.arrayContaining([
+    expect.objectContaining({ code: 'FONT_ASSET_UNSUPPORTED', reason: expect.stringContaining('Stylesheet data:text/css in fonts.css declares fonts') }),
+    expect.objectContaining({ code: 'FONT_ASSET_UNAVAILABLE', reason: expect.stringContaining(`stylesheet ${cdn.origin}/blocked.css in fonts.css`) }),
+  ]));
+  expect(JSON.stringify(entries)).not.toContain(SECRET);
+});
+
+it('freezes failed earlier remote sources only when a later source was pinned', async () => {
+  const files: Parameters<typeof host>[0] = {
+    '/second.ttf': { type: 'font/ttf', body: await readFile(MEDIUM) },
+  };
+  const cdn = await host(files);
+  const html = page(`<style>@font-face { font-family: Brand; font-weight: 500; src: url("${cdn.origin}/first.ttf"), url("${cdn.origin}/second.ttf"); }</style>`,
+    line(60, 'font-family: Brand, Arial; font-weight: 500', 'Frozen source order'));
+  const pinned = await deckDir({ 'deck.html': html });
+  const first = await measureFonts(join(pinned, 'deck.html'));
+  expect(withoutPortability(first.entries)).toEqual([]);
+  files['/first.ttf'] = { type: 'font/ttf', body: await readFile(BOLD) };
+  const requested = cdn.requests.length;
+  const second = await measureFonts(join(pinned, 'deck.html'));
+  expect(cdn.requests).toHaveLength(requested);
+  expect(withoutPortability(second.entries)).toEqual([]);
+  expect(runs(second.deck).map((run) => [run.box, run.font?.asset])).toEqual(runs(first.deck).map((run) => [run.box, run.font?.asset]));
+
+  delete files['/first.ttf'];
+  delete files['/second.ttf'];
+  const recovering = await deckDir({ 'deck.html': html });
+  const failed = await measureFonts(join(recovering, 'deck.html'));
+  expect(failed.entries).toContainEqual(expect.objectContaining({ code: 'FONT_ASSET_UNAVAILABLE' }));
+  files['/first.ttf'] = { type: 'font/ttf', body: await readFile(MEDIUM) };
+  const recovered = await measureFonts(join(recovering, 'deck.html'));
+  expect(withoutPortability(recovered.entries)).toEqual([]);
+  expect(runs(recovered.deck)[0]!.font?.office.family).toBe('Heebo Medium');
+});
+
+it('resolves redirected stylesheet imports and fonts against the final URL online and offline', async () => {
+  const cdn = await host({
+    '/fonts.css': { type: 'text/css', body: '', redirect: '/v3/css/fonts.css?token=hidden' },
+    '/v3/css/fonts.css': { type: 'text/css', body: '@import "./nested.css"; @font-face { font-family: Direct; font-weight: 500; src: url("../fonts/medium.ttf"); }' },
+    '/v3/css/nested.css': { type: 'text/css', body: '@font-face { font-family: Imported; font-weight: 700; src: url("../fonts/bold.ttf"); }' },
+    '/v3/fonts/medium.ttf': { type: 'font/ttf', body: await readFile(MEDIUM) },
+    '/v3/fonts/bold.ttf': { type: 'font/ttf', body: await readFile(BOLD) },
+  });
+  const dir = await deckDir({
+    'deck.html': page(`<link rel="stylesheet" href="${cdn.origin}/fonts.css">`,
+      line(60, 'font-family: Direct, Arial; font-weight: 500', 'Redirected direct face') +
+      line(160, 'font-family: Imported, Arial; font-weight: 700', 'Redirected imported face')),
+  });
+  const online = await measureFonts(join(dir, 'deck.html'));
+  expect(withoutPortability(online.entries)).toEqual([]);
+  expect(runs(online.deck).map((run) => run.font?.office.family)).toEqual(['Heebo Medium', 'Heebo']);
+  expect(cdn.requests).toEqual(expect.arrayContaining(['/v3/css/nested.css', '/v3/fonts/medium.ttf', '/v3/fonts/bold.ttf']));
+  const pins = JSON.parse(await readFile(join(dir, 'deck.assets/fonts/sources.json'), 'utf8'));
+  expect(pins.sources).toContainEqual(expect.objectContaining({ url: `${cdn.origin}/fonts.css`, base: `${cdn.origin}/v3/css/fonts.css` }));
+  expect(JSON.stringify(pins)).not.toContain('hidden');
+  await cdn.close();
+  const offline = await measureFonts(join(dir, 'deck.html'));
+  expect(withoutPortability(offline.entries)).toEqual([]);
+  expect(runs(offline.deck).map((run) => [run.box, run.font?.asset])).toEqual(runs(online.deck).map((run) => [run.box, run.font?.asset]));
 });

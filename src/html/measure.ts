@@ -6,12 +6,12 @@ import type { Browser, Page } from 'playwright-core';
 import { textBodiesOf } from '../model/index.js';
 import { groupToCanvas, transformedBounds, type Matrix2d } from '../model/geometry.js';
 import type { Box, Canvas, Deck, Element, ImageFill, PictureElement, ShapeElement, Slide, TextBody } from '../model/index.js';
-import type { PlatformFontUsage, RenderedText } from '../fonts/audit.js';
+import type { PlatformFontUsage, VisibleText } from '../fonts/audit.js';
 import { entry as reportEntry } from '../report/codes.js';
 import type { Entry } from '../report/types.js';
-import type { BrowserCensus, BrowserElement, BrowserImageFill, BrowserMeasureResult, BrowserPicture, BrowserRaster, BrowserRenderedText } from './browser-script.js';
+import type { BrowserCensus, BrowserElement, BrowserImageFill, BrowserMeasureResult, BrowserPicture, BrowserRaster, BrowserVisibleText } from './browser-script.js';
 import { loadMedia, reencodeToPng } from './media.js';
-import { FREEZE_ATTR, measureSlideDocument, preloadBackgroundImages, RENDERED_TEXT_GLOBAL } from './browser-script.js';
+import { FREEZE_ATTR, measureSlideDocument, preloadBackgroundImages, preparePageScript, VISIBLE_TEXT_GLOBAL } from './browser-script.js';
 import { DeckFontSession, type DeckFonts } from './fonts.js';
 import type { LoadedDeck, SlideDocument } from './load.js';
 import { readNotes } from './notes.js';
@@ -45,7 +45,7 @@ export interface MeasuredDeckResult {
   /** each Slide's declared `@font-face` faces, as Chromium loaded them */
   fonts: DeckFonts;
   /** every text node Chromium drew, with the platform fonts it drew it with: what the font audit reads */
-  renderedText: RenderedText[];
+  visibleText: VisibleText[];
 }
 
 const SLIDE_SIZE_HINT = 'Do not set width/height on sections, or match {W}x{H} exactly';
@@ -59,7 +59,7 @@ export async function measureDeck(loaded: LoadedDeck, opts: MeasureOptions): Pro
   const slides: Slide[] = [];
   const sections: HtmlNode[] = [];
   const census: BrowserCensus[] = [];
-  const renderedText: RenderedText[] = [];
+  const visibleText: VisibleText[] = [];
 
   let fonts: DeckFonts;
   try {
@@ -77,7 +77,7 @@ export async function measureDeck(loaded: LoadedDeck, opts: MeasureOptions): Pro
 
         const measuredElements = await resolveElements({ page, slide: document.index, canvas: loaded.canvas, origin: { x: result.sectionBox.x, y: result.sectionBox.y }, rasterDpi: opts.rasterDpi ?? 192 }, result.shapes, entries);
 
-        renderedText.push(...await readRenderedText(page, document.index, result.renderedText));
+        visibleText.push(...await readVisibleText(page, document.index, result.visibleText));
         const notes = readNotes(result.tree);
         const slide: Slide = {
           index: document.index,
@@ -114,12 +114,12 @@ export async function measureDeck(loaded: LoadedDeck, opts: MeasureOptions): Pro
     sections,
     census,
     fonts,
-    renderedText,
+    visibleText,
   };
 }
 
-/** The platform fonts Chromium drew each rendered text node with (CDP `CSS.getPlatformFontsForNode`). */
-async function readRenderedText(page: Page, slide: number, texts: BrowserRenderedText[]): Promise<RenderedText[]> {
+/** The platform fonts Chromium drew each Visible text node with (CDP `CSS.getPlatformFontsForNode`). */
+async function readVisibleText(page: Page, slide: number, texts: BrowserVisibleText[]): Promise<VisibleText[]> {
   if (texts.length === 0) return [];
   const cdp = await page.context().newCDPSession(page);
   try {
@@ -130,7 +130,7 @@ async function readRenderedText(page: Page, slide: number, texts: BrowserRendere
     await cdp.send('DOM.enable');
     await cdp.send('CSS.enable');
     await cdp.send('DOM.getDocument', { depth: 0 });
-    const { result } = await cdp.send('Runtime.evaluate', { expression: `window.${RENDERED_TEXT_GLOBAL}` });
+    const { result } = await cdp.send('Runtime.evaluate', { expression: `window.${VISIBLE_TEXT_GLOBAL}` });
     const objectIds = new Map<number, string>();
     if (result.objectId !== undefined) {
       const { result: properties } = await cdp.send('Runtime.getProperties', { objectId: result.objectId, ownProperties: true });
@@ -138,7 +138,7 @@ async function readRenderedText(page: Page, slide: number, texts: BrowserRendere
         if (/^\d+$/.test(property.name) && property.value?.objectId !== undefined) objectIds.set(Number(property.name), property.value.objectId);
       }
     }
-    return await Promise.all(texts.map(async (text, index): Promise<RenderedText> => {
+    return await Promise.all(texts.map(async (text, index): Promise<VisibleText> => {
       const objectId = objectIds.get(index);
       let fonts: PlatformFontUsage[] = [];
       if (objectId !== undefined) {
@@ -212,9 +212,7 @@ async function measureDocumentPage(page: Page, slideDoc: SlideDocument, fonts: D
         animation.currentTime = 0;
       }
     });
-    // esbuild-transpiled builds (tsx, vitest) wrap nested function declarations in a `__name` helper that only
-    // exists in the Node bundle; the serialised page script needs an identity shim for it.
-    await page.evaluate('globalThis.__name = globalThis.__name || ((fn) => fn)');
+    await preparePageScript(page);
     await page.evaluate(preloadBackgroundImages);
     return await page.evaluate(measureSlideDocument, [...blockedImages]);
   } finally {

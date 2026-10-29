@@ -1,7 +1,7 @@
 import { textBodiesOf, type Deck, type FontClass, type ResolvedFont } from '../model/index.js';
 import { CODES, entry } from '../report/codes.js';
 import type { Entry, EntryKind, Severity } from '../report/types.js';
-import { FontCatalog, matchScore, type DeclaredFontFace, type FontFace } from './scan.js';
+import { FontCatalog, compareScores, fontAssetKey, matchScore, type DeclaredFontFace, type FontFace } from './scan.js';
 
 export const SAFE_FAMILIES: ReadonlySet<string> = new Set([
   'arial',
@@ -69,6 +69,8 @@ export interface FontRequest {
   /** computed `font-family`, quotes stripped */
   stack: readonly string[];
   weight: number;
+  /** computed `font-stretch` percentage; absent at normal (100) */
+  stretch?: number;
   italic: boolean;
   /** the characters shown, after `text-transform` */
   text: string;
@@ -88,7 +90,7 @@ export type Resolution =
 export function resolveFont(request: FontRequest, catalog: FontCatalog, installedCache = new Map<string, FontFace | undefined>()): Resolution {
   const stack = normalizeStack(request.stack);
   const stackKey = stack.join('\u0001');
-  const codePoints = countableCodePoints(request.text);
+  let codePoints: number[] | undefined;
   for (const family of stack) {
     if (GENERIC_FAMILIES.has(normalizeName(family))) {
       // Chromium always resolves a generic, so the layout is machine-dependent whatever follows it.
@@ -97,14 +99,15 @@ export function resolveFont(request: FontRequest, catalog: FontCatalog, installe
 
     const declared = catalog.declared(request.slide, family);
     if (declared.length > 0) {
-      const pick = selectDeclared(declared, request.weight, request.italic, codePoints);
+      codePoints ??= countableCodePoints(request.text);
+      const pick = selectDeclared(declared, request.weight, request.italic, codePoints, request.stretch ?? 100);
       if (pick === 'unavailable') return { kind: 'unavailable' };
       if (pick === undefined) continue;
       return resolved(pick.loaded!.face, family, 'deck-provided', stackKey, request, pick.unicodeRange);
     }
 
-    const key = `${normalizeName(family)}|${request.weight}|${request.italic}`;
-    if (!installedCache.has(key)) installedCache.set(key, catalog.find(family, request.weight, request.italic));
+    const key = `${normalizeName(family)}|${request.stretch ?? 100}|${request.weight}|${request.italic}`;
+    if (!installedCache.has(key)) installedCache.set(key, catalog.find(family, request.weight, request.italic, request.stretch));
     const face = installedCache.get(key);
     if (face) return resolved(face, family, face.aliases.some((alias) => SAFE_FAMILIES.has(alias)) ? 'safe' : 'installed', stackKey, request);
   }
@@ -128,7 +131,7 @@ export function resolveDeckFonts(deck: Deck, catalog: FontCatalog, opts: { embed
           for (const run of paragraph.runs) {
             if (run.kind !== 'text') continue;
             delete run.style.font;
-            const outcome = resolveFont({ slide: slide.index, stack: run.style.fontStack, weight: run.style.weight, italic: run.style.italic, text: run.text }, catalog, installedCache);
+            const outcome = resolveFont({ slide: slide.index, stack: run.style.fontStack, weight: run.style.weight, stretch: run.style.stretch ?? 100, italic: run.style.italic, text: run.text }, catalog, installedCache);
             if (outcome.kind === 'unavailable') continue;
             if (outcome.kind === 'error') {
               if (emittedStacks.has(outcome.stackKey)) continue;
@@ -139,7 +142,7 @@ export function resolveDeckFonts(deck: Deck, catalog: FontCatalog, opts: { embed
 
             const resolvedFont = outcome.font;
             run.style.font = resolvedFont;
-            const assetKey = `${resolvedFont.asset.sha256}:${resolvedFont.asset.faceIndex}`;
+            const assetKey = fontAssetKey(resolvedFont.asset);
             const permission = resolvedFont.class === 'deck-provided' ? embeddingRestriction(resolvedFont.fsType) : undefined;
             if (permission !== undefined && !restricted.has(assetKey)) {
               restricted.add(assetKey);
@@ -175,7 +178,7 @@ export function resolvedFontsOf(deck: Deck): ResolvedFont[] {
           for (const run of paragraph.runs) {
             if (run.kind !== 'text' || run.style.font === undefined) continue;
             const { asset } = run.style.font;
-            fonts.set(`${asset.sha256}:${asset.faceIndex}`, run.style.font);
+            fonts.set(fontAssetKey(asset), run.style.font);
           }
         }
       }
@@ -206,12 +209,12 @@ export function formatUnicodeRange(ranges: ReadonlyArray<readonly [number, numbe
 }
 
 /**
- * Of the declared faces whose style and weight descriptors match best, the loaded one covering most code points
+ * Of the declared faces whose stretch, style and weight descriptors match best, the loaded one covering most code points
  * (the later rule on a tie, as Chromium tries later rules first). Undefined when none covers any, so CSS moves on
  * to the next family; `unavailable` when a face that would have covered them failed to load.
  */
-function selectDeclared(faces: readonly DeclaredFontFace[], weight: number, italic: boolean, codePoints: readonly number[]): DeclaredFontFace | 'unavailable' | undefined {
-  const scored = faces.map((face) => ({ face, score: matchScore(face.weight, face.italic, weight, italic) }));
+function selectDeclared(faces: readonly DeclaredFontFace[], weight: number, italic: boolean, codePoints: readonly number[], stretch: number): DeclaredFontFace | 'unavailable' | undefined {
+  const scored = faces.map((face) => ({ face, score: matchScore(face.weight, face.italic, weight, italic, face.stretch, stretch) }));
   const best = scored.reduce((min, { score }) => (compareScores(score, min) < 0 ? score : min), scored[0]!.score);
   const group = scored.filter(({ score }) => compareScores(score, best) === 0).map(({ face }) => face);
   const loaded = group.filter((face) => face.state === 'loaded').sort((a, b) => b.order - a.order);
@@ -235,17 +238,10 @@ function selectDeclared(faces: readonly DeclaredFontFace[], weight: number, ital
   return group.some((face) => face.state === 'failed' && codePoints.some((codePoint) => inUnicodeRange(face, codePoint))) ? 'unavailable' : undefined;
 }
 
-function compareScores(left: readonly number[], right: readonly number[]): number {
-  for (let i = 0; i < left.length; i += 1) {
-    if (left[i] !== right[i]) return left[i]! - right[i]!;
-  }
-  return 0;
-}
-
 function resolved(face: FontFace, cssFamily: string, fontClass: FontClass, stackKey: string, request: FontRequest, unicodeRange?: DeclaredFontFace['unicodeRange']): Resolution {
   if ('error' in face.office) {
     return {
-      kind: 'error', code: 'FONT_IDENTITY_INVALID', stackKey: `${stackKey}|${request.weight}|${request.italic}`, family: cssFamily,
+      kind: 'error', code: 'FONT_IDENTITY_INVALID', stackKey: `${stackKey}|${request.stretch ?? 100}|${request.weight}|${request.italic}`, family: cssFamily,
       reason: `${cssFamily}: ${face.office.error}`,
     };
   }

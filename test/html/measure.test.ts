@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright-core';
@@ -115,6 +115,54 @@ describe.skipIf(!browserAvailable)('measureDeck', () => {
       expect(rtl.text?.paragraphs[0]!.runs.map((run) => (run.kind === 'text' ? run.text : 'break'))).toEqual(['אבג ד\u00A0ה']);
     } finally {
       await browser.close();
+    }
+  });
+
+  it('shares Visible text eligibility without losing Census whitespace or merging width-distinct runs', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'deckflip-visible-text-'));
+    const file = join(dir, 'deck.html');
+    await writeFile(file, `<!doctype html><html><head><title>Visible text</title><style>
+      * { margin: 0; padding: 0 } body { font: 20px/28px Arial } section { padding: 40px }
+      #text { text-transform: uppercase }
+      #text::before { content: 'GENERATED_SENTINEL' }
+      .hidden { display: none } .ghost { visibility: hidden }
+      #off { position: absolute; left: 1400px; top: 40px }
+    </style></head><body><section>
+      <p id="text" data-shape-id="text-owner">a<span> </span><span>b</span><br>c<span style="font-stretch: condensed">d</span><span style="font-stretch: 100%">e</span><span class="hidden">HIDDEN_SENTINEL</span><span class="ghost">GHOST_SENTINEL</span></p>
+      <p id="other">soft\u00ADhyphen</p>
+      <p id="off">OFF_CANVAS_SENTINEL</p>
+      <aside class="notes">NOTES_SENTINEL</aside>
+    </section></body></html>`, 'utf8');
+    const browser = await chromium.launch();
+    try {
+      const loaded = await loadDeck(file, {});
+      const measured = await measureDeck(loaded, { browser });
+      expect(measured.census[0]!.text.map(({ owner, text }) => ({
+        selector: owner.selector, text: text.replace(/\s+/g, ' ').trim(),
+      }))).toEqual([
+        { selector: '#text', text: 'A B CDE' },
+        { selector: '#other', text: 'softhyphen' },
+      ]);
+      expect(measured.census[0]!.text[0]!.owner.shapeId).toBe('text-owner');
+      expect(measured.census[0]!.notes).toBe('NOTES_SENTINEL');
+      expect(measured.visibleText.map(({ selector, text, stretch }) => ({ selector, text, stretch }))).toEqual([
+        { selector: '#text', text: 'A', stretch: undefined },
+        { selector: '#text', text: 'B', stretch: undefined },
+        { selector: '#text', text: 'C', stretch: undefined },
+        { selector: '#text', text: 'D', stretch: 75 },
+        { selector: '#text', text: 'E', stretch: undefined },
+        { selector: '#other', text: 'softhyphen', stretch: undefined },
+      ]);
+      for (const node of measured.visibleText) {
+        if (node.text !== 'D') expect(node).not.toHaveProperty('stretch');
+      }
+      const runs = shapeByName(measured.deck, 'p#text').text!.paragraphs[0]!.runs
+        .filter((run) => run.kind === 'text');
+      expect(runs.find((run) => run.text === 'D')?.style.stretch).toBe(75);
+      expect(runs.find((run) => run.text === 'E')?.style).not.toHaveProperty('stretch');
+    } finally {
+      await browser.close();
+      await rm(dir, { recursive: true, force: true });
     }
   });
 

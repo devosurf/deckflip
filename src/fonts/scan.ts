@@ -1,17 +1,19 @@
 import * as fontkit from 'fontkit';
-import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, type Dirent } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Font as FontKitFont, FontCollection as FontKitCollection, Os2Table } from 'fontkit';
 import type { FontAsset, FontMetrics, OfficeFontIdentity, OfficeFontStyle } from '../model/index.js';
+import { decodeFont, sha256 } from './sfnt.js';
 
 export interface FontFace {
   aliases: string[];
   asset: FontAsset;
   office: OfficeFontIdentity | { error: string };
   weight: number;
+  /** CSS width percentage from OS/2.usWidthClass; absent at normal (100). */
+  stretch?: number;
   italic: boolean;
   fsType: number;
   metrics: FontMetrics;
@@ -25,6 +27,8 @@ export interface DeclaredFontFace {
   family: string;
   /** inclusive `font-weight` descriptor range */
   weight: readonly [number, number];
+  /** inclusive `font-stretch` descriptor range; absent at normal ([100, 100]) */
+  stretch?: readonly [number, number];
   italic: boolean;
   /** inclusive code point ranges; absent for every code point */
   unicodeRange?: ReadonlyArray<readonly [number, number]>;
@@ -82,7 +86,7 @@ export class FontCatalog {
     for (const families of declaredBySlide.values()) {
       for (const faces of families.values()) {
         for (const face of faces) {
-          if (face.loaded) this.fonts.set(fontKey(face.loaded.face.asset), face.loaded.font);
+          if (face.loaded) this.fonts.set(fontAssetKey(face.loaded.face.asset), face.loaded.font);
         }
       }
     }
@@ -93,14 +97,16 @@ export class FontCatalog {
    * for host discovery; false or explicit system files isolate a catalog.
    */
   static async scan(opts: { declared?: ReadonlyMap<number, readonly DeclaredFontFace[]>; system?: boolean | readonly string[] } = {}): Promise<FontCatalog> {
-    const system = typeof opts.system === 'object' ? scanFiles(opts.system)
+    const system = typeof opts.system === 'object' ? await scanFiles(opts.system)
       : opts.system === false ? { faces: [], skipped: 0 } : await scanSystemFaces();
     const bySlide = new Map<number, Map<string, DeclaredFontFace[]>>();
     for (const [slide, faces] of opts.declared ?? []) {
       const families = new Map<string, DeclaredFontFace[]>();
       for (const face of faces) {
         const key = normalizeName(face.family);
-        families.set(key, [...(families.get(key) ?? []), face]);
+        const family = families.get(key);
+        if (family) family.push(face);
+        else families.set(key, [face]);
       }
       bySlide.set(slide, families);
     }
@@ -108,13 +114,15 @@ export class FontCatalog {
   }
 
   /** The installed face CSS matching selects for `family` among its preferred and legacy family names. */
-  find(family: string, weight: number, italic: boolean): FontFace | undefined {
+  find(family: string, weight: number, italic: boolean, stretch = 100): FontFace | undefined {
     const familyKey = normalizeName(family);
     if (!familyKey) return undefined;
-    const matches = this.installed.filter((face) => face.aliases.includes(familyKey));
-    if (matches.length === 0) return undefined;
-    const sorted = [...matches].sort((left, right) => compareFaces(left, right, weight, italic));
-    return cloneFace(sorted[0]!);
+    let best: CatalogFace | undefined;
+    for (const face of this.installed) {
+      if (!face.aliases.includes(familyKey)) continue;
+      if (!best || compareFaces(face, best, weight, italic, stretch) < 0) best = face;
+    }
+    return best && cloneFace(best);
   }
 
   /** The `@font-face` rules declaring `family` in Slide `slide`'s document; empty when it declares none. */
@@ -124,7 +132,7 @@ export class FontCatalog {
 
   /** Whether the selected face has a glyph for `codePoint`; installed fonts are opened on first use. */
   hasGlyph(face: FontFace, codePoint: number): boolean {
-    const key = fontKey(face.asset);
+    const key = fontAssetKey(face.asset);
     if (!this.fonts.has(key)) this.fonts.set(key, openInstalled(face.asset));
     return this.fonts.get(key)?.hasGlyphForCodePoint(codePoint) ?? false;
   }
@@ -135,12 +143,24 @@ export function faceFromFont(font: FontKitFont, asset: Omit<FontAsset, 'postscri
   return buildFace(font, asset)?.face;
 }
 
-/** CSS font matching's style and weight steps (CSS Fonts 4 §5.2): lower sorts first. */
-export function matchScore(weight: readonly [number, number], italic: boolean, requestedWeight: number, requestedItalic: boolean): [number, number, number] {
-  return [italic === requestedItalic ? 0 : 1, ...weightScore(weight, requestedWeight)];
+/** CSS font matching's stretch, style and weight steps (CSS Fonts 4 §5.2): lower sorts first. */
+export function matchScore(
+  weight: readonly [number, number], italic: boolean, requestedWeight: number, requestedItalic: boolean,
+  stretch: readonly [number, number] = [100, 100], requestedStretch = 100,
+): [number, number, number, number, number] {
+  return [...stretchScore(stretch, requestedStretch), italic === requestedItalic ? 0 : 1, ...weightScore(weight, requestedWeight)];
 }
 
-function fontKey(asset: FontAsset): string {
+/** Lexicographic comparison shared by installed and declared CSS face matching. */
+export function compareScores(left: readonly number[], right: readonly number[]): number {
+  for (let i = 0; i < left.length; i += 1) {
+    if (left[i] !== right[i]) return left[i]! - right[i]!;
+  }
+  return 0;
+}
+
+/** Identity of a selected member face, independent of its source or CSS aliases. */
+export function fontAssetKey(asset: Pick<FontAsset, 'sha256' | 'faceIndex'>): string {
   return `${asset.sha256}:${asset.faceIndex}`;
 }
 
@@ -156,12 +176,12 @@ function openInstalled(asset: FontAsset): FontKitFont | undefined {
 
 async function scanSystemFaces(): Promise<ScanResult> {
   if (!systemScanPromise) {
-    systemScanPromise = Promise.resolve().then(() => scanFiles(collectSystemFontFiles()));
+    systemScanPromise = scanFiles(collectSystemFontFiles());
   }
   return systemScanPromise;
 }
 
-function scanFiles(files: readonly string[]): ScanResult {
+async function scanFiles(files: readonly string[]): Promise<ScanResult> {
   const faces: CatalogFace[] = [];
   let skipped = 0;
   let order = 0;
@@ -178,7 +198,7 @@ function scanFiles(files: readonly string[]): ScanResult {
       continue;
     }
 
-    const parsed = scanFontFile(resolved);
+    const parsed = await scanFontFile(resolved);
     skipped += parsed.skipped;
     for (const face of parsed.faces) {
       faces.push({ ...face.face, aliases: face.aliases, order: order++, file: resolved });
@@ -188,12 +208,12 @@ function scanFiles(files: readonly string[]): ScanResult {
   return { faces, skipped };
 }
 
-function scanFontFile(file: string): { faces: BuiltFace[]; skipped: number } {
+async function scanFontFile(file: string): Promise<{ faces: BuiltFace[]; skipped: number }> {
   try {
-    const bytes = readFileSync(file);
-    const sha256 = createHash('sha256').update(bytes).digest('hex');
+    const { sfnt } = await decodeFont(readFileSync(file));
+    const digest = sha256(sfnt);
     const source = { kind: 'installed' as const, file };
-    const opened = fontkit.create(bytes);
+    const opened = fontkit.create(sfnt);
     if (isCollection(opened)) {
       if (opened.type === 'DFont') {
         return { faces: [], skipped: 1 };
@@ -201,13 +221,13 @@ function scanFontFile(file: string): { faces: BuiltFace[]; skipped: number } {
 
       const faces: BuiltFace[] = [];
       for (const [faceIndex, font] of opened.fonts.entries()) {
-        const built = buildFace(font, { sha256, faceIndex, source });
+        const built = buildFace(font, { sha256: digest, faceIndex, source });
         if (built) faces.push(built);
       }
       return { faces, skipped: faces.length === 0 ? 1 : 0 };
     }
 
-    const built = buildFace(opened, { sha256, faceIndex: 0, source });
+    const built = buildFace(opened, { sha256: digest, faceIndex: 0, source });
     return built ? { faces: [built], skipped: 0 } : { faces: [], skipped: 1 };
   } catch {
     return { faces: [], skipped: 1 };
@@ -232,6 +252,7 @@ function buildFace(font: FontLike, asset: Omit<FontAsset, 'postscriptName'>): Bu
   const subfamily = cleanName(font.subfamilyName) ?? '';
   const os2 = font['OS/2'];
   const weight = normalizeWeight(os2.usWeightClass, subfamily);
+  const stretch = WIDTH_CLASS_STRETCH[os2.usWidthClass] ?? 100;
   const italic = normalizeItalic(os2.fsSelection.italic, font.head?.macStyle?.italic, subfamily);
   const fsType = normalizeFsType(os2.fsType);
   const unitsPerEm = Number(font.unitsPerEm);
@@ -247,6 +268,7 @@ function buildFace(font: FontLike, asset: Omit<FontAsset, 'postscriptName'>): Bu
       asset: { ...asset, postscriptName: cleanName(font.postscriptName) ?? '' },
       office: officeIdentity(font),
       weight,
+      ...(stretch === 100 ? {} : { stretch }),
       italic,
       fsType,
       metrics: {
@@ -288,6 +310,11 @@ function officeIdentity(font: FontLike): FontFace['office'] {
   return { family, style };
 }
 
+/** OpenType OS/2.usWidthClass values correspond to CSS's named width percentages. */
+const WIDTH_CLASS_STRETCH: Readonly<Record<number, number>> = {
+  1: 50, 2: 62.5, 3: 75, 4: 87.5, 5: 100, 6: 112.5, 7: 125, 8: 150, 9: 200,
+};
+
 function normalizeWeight(weight: number | undefined, subfamily: string): number {
   if (weight !== undefined && Number.isFinite(weight) && weight >= 1 && weight <= 1000) {
     return weight;
@@ -328,20 +355,26 @@ function cloneFace(face: CatalogFace): FontFace {
     asset: face.asset,
     office: face.office,
     weight: face.weight,
+    ...(face.stretch === undefined ? {} : { stretch: face.stretch }),
     italic: face.italic,
     fsType: face.fsType,
     metrics: { ...face.metrics },
   };
 }
 
-function compareFaces(left: CatalogFace, right: CatalogFace, requestedWeight: number, requestedItalic: boolean): number {
-  const leftScore = matchScore([left.weight, left.weight], left.italic, requestedWeight, requestedItalic);
-  const rightScore = matchScore([right.weight, right.weight], right.italic, requestedWeight, requestedItalic);
-  for (let i = 0; i < leftScore.length; i += 1) {
-    if (leftScore[i] !== rightScore[i]) return leftScore[i]! - rightScore[i]!;
-  }
-  if (left.order !== right.order) return left.order - right.order;
-  return left.file.localeCompare(right.file);
+function compareFaces(left: CatalogFace, right: CatalogFace, requestedWeight: number, requestedItalic: boolean, requestedStretch: number): number {
+  const leftStretch = left.stretch ?? 100;
+  const rightStretch = right.stretch ?? 100;
+  const leftScore = matchScore([left.weight, left.weight], left.italic, requestedWeight, requestedItalic, [leftStretch, leftStretch], requestedStretch);
+  const rightScore = matchScore([right.weight, right.weight], right.italic, requestedWeight, requestedItalic, [rightStretch, rightStretch], requestedStretch);
+  return compareScores(leftScore, rightScore) || left.order - right.order || left.file.localeCompare(right.file);
+}
+
+/** At or below normal prefer narrower widths first; above normal prefer wider widths first. */
+function stretchScore([lo, hi]: readonly [number, number], requested: number): [number, number] {
+  if (lo <= requested && requested <= hi) return [0, 0];
+  const above = lo > requested;
+  return [above === (requested > 100) ? 1 : 2, above ? lo - requested : requested - hi];
 }
 
 /**

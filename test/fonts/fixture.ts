@@ -9,6 +9,8 @@ export interface FontMutation {
   macStyle?: number;
   /** OS/2 embedding permissions */
   fsType?: number;
+  /** OS/2 width class (1–9) */
+  widthClass?: number;
 }
 
 /** Mutates temporary metadata copies; never writes the licensed source fixture. */
@@ -40,6 +42,7 @@ export async function mutateFont(source: string, destination: string, mutation: 
   if (mutation.fsSelection !== undefined) bytes.writeUInt16BE(mutation.fsSelection, tables.get('OS/2')!.offset + 62);
   if (mutation.macStyle !== undefined) bytes.writeUInt16BE(mutation.macStyle, tables.get('head')!.offset + 44);
   if (mutation.fsType !== undefined) bytes.writeUInt16BE(mutation.fsType, tables.get('OS/2')!.offset + 8);
+  if (mutation.widthClass !== undefined) bytes.writeUInt16BE(mutation.widthClass, tables.get('OS/2')!.offset + 6);
   const adjustment = tables.get('head')!.offset + 8;
   bytes.writeUInt32BE(0, adjustment);
   for (const table of tables.values()) bytes.writeUInt32BE(checksum(bytes, table.offset, table.length), table.record + 4);

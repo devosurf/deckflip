@@ -9,12 +9,13 @@ import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { Page, Route } from 'playwright-core';
 import { faceFromFont, type DeclaredFontFace, type FontFace } from '../fonts/scan.js';
-import { cssUrl, parseFamily, parseItalic, parseSrc, parseUnicodeRange, parseWeightRange, scanStylesheet, replaceRanges } from '../fonts/css.js';
+import { cssUrl, parseFamily, parseItalic, parseSrc, parseStretchRange, parseUnicodeRange, parseWeightRange, scanStylesheet, replaceRanges } from '../fonts/css.js';
 import { decodeDataUrl, FontSources, type AcquiredFont, type AcquisitionFailure, type Acquired, type Fetched } from '../fonts/sources.js';
 import { entry } from '../report/codes.js';
 import type { Entry } from '../report/types.js';
 import { assetsDirFor } from '../roundtrip/index.js';
 import type { LoadedDeck } from './load.js';
+import { preparePageScript } from './browser-script.js';
 
 /** Where rewritten `@font-face` sources point; never resolved, every request is answered here. */
 const FONT_ORIGIN = 'https://fonts.deckflip.invalid';
@@ -33,6 +34,7 @@ interface Declaration {
   family: string;
   weight: [number, number];
   italic: boolean;
+  stretch?: [number, number];
   unicodeRange?: Array<[number, number]>;
   /** the rule's stylesheet, or the Slide document for inline rules, in display form */
   stylesheet: string;
@@ -41,11 +43,9 @@ interface Declaration {
 }
 
 /** One rewritten source: the URL it stands for, or why it cannot load. */
-interface Slot {
-  declaration: Declaration;
-  url?: string;
-  failure?: AcquisitionFailure;
-}
+type Slot =
+  | { kind: 'url'; url: string }
+  | { kind: 'failed'; failure: AcquisitionFailure };
 
 type SheetItem = { kind: 'import'; url: string } | { kind: 'face'; declaration: Declaration };
 
@@ -92,7 +92,7 @@ export class DeckFontSession {
    * and records the Slide's declared faces in cascade order.
    */
   async settle(page: Page, slide: number): Promise<void> {
-    await page.evaluate('globalThis.__name = globalThis.__name || ((fn) => fn)');
+    await preparePageScript(page);
     const sheets = await page.evaluate(collectPageSheets);
     const documentUrl = page.url();
     const documentShown = this.documents.get(page) ?? this.sources.display(documentUrl);
@@ -112,23 +112,28 @@ export class DeckFontSession {
 
     const ordered: Declaration[] = [];
     const visiting = new Set<string>();
-    const walkSheet = (url: string) => {
+    const walkSheet = (url: string, referrer: string) => {
       if (visiting.has(url)) return;
+      const items = this.sheets.get(url);
+      if (items === undefined) {
+        if (!this.sheetFailures.has(url)) this.unreadable(url, slide, referrer);
+        return;
+      }
       visiting.add(url);
-      for (const item of this.sheets.get(url) ?? []) {
-        if (item.kind === 'import') walkSheet(item.url);
+      const shown = this.sources.display(url);
+      for (const item of items) {
+        if (item.kind === 'import') walkSheet(item.url, shown);
         else ordered.push(item.declaration);
       }
       visiting.delete(url);
     };
     for (const sheet of sheets) {
       if (sheet.items === null) {
-        if (sheet.href !== null && this.sheets.has(sheet.href)) walkSheet(sheet.href);
-        else if (sheet.href !== null && !this.sheetFailures.has(sheet.href)) this.unreadable(sheet.href, slide, documentShown);
+        if (sheet.href !== null) walkSheet(sheet.href, documentShown);
         continue;
       }
       for (const item of sheet.items) {
-        if (item.kind === 'import') walkSheet(item.href);
+        if (item.kind === 'import') walkSheet(item.href, documentShown);
         else {
           const declaration = inline.get(item.path.join('.'));
           if (declaration) ordered.push(declaration);
@@ -189,13 +194,16 @@ export class DeckFontSession {
     const shown = this.sources.display(url);
     const items: SheetItem[] = [];
     const edits: Array<{ start: number; end: number; value: string }> = [];
-    for (const item of scanStylesheet(got.value)) {
+    for (const item of scanStylesheet(got.value.text)) {
       if (item.kind === 'import') {
-        const imported = absoluteUrl(item.url, url);
-        if (imported) items.push({ kind: 'import', url: imported });
+        const imported = absoluteUrl(item.url, got.value.baseUrl);
+        if (imported) {
+          items.push({ kind: 'import', url: imported });
+          edits.push({ ...item.target, value: cssUrl(imported) });
+        }
         continue;
       }
-      const declaration = item.rule.src ? this.declare(item.rule.descriptors, url, shown) : undefined;
+      const declaration = item.rule.src ? this.declare(item.rule.descriptors, got.value.baseUrl, shown) : undefined;
       if (!declaration || !item.rule.src) continue;
       items.push({ kind: 'face', declaration });
       edits.push({ ...item.rule.src, value: this.srcValue(declaration) });
@@ -205,7 +213,7 @@ export class DeckFontSession {
       status: 200,
       contentType: 'text/css; charset=utf-8',
       headers: { 'access-control-allow-origin': '*' },
-      body: replaceRanges(got.value, edits),
+      body: replaceRanges(got.value.text, edits),
     });
   }
 
@@ -213,9 +221,9 @@ export class DeckFontSession {
     const slot = this.slots.get(id);
     if (!slot) return route.fulfill({ status: 404, body: '' });
     const userAgent = route.request().headers()['user-agent'];
-    const outcome: Acquired<AcquiredFont> = slot.failure
+    const outcome: Acquired<AcquiredFont> = slot.kind === 'failed'
       ? { ok: false, ...slot.failure }
-      : await this.sources.font(slot.url!, () => fetchedFrom(page.request.fetch(slot.url!, {
+      : await this.sources.font(slot.url, () => fetchedFrom(page.request.fetch(slot.url, {
         timeout: FETCH_TIMEOUT_MS,
         ...(userAgent === undefined ? {} : { headers: { 'user-agent': userAgent } }),
       })));
@@ -235,10 +243,12 @@ export class DeckFontSession {
     const src = descriptors.get('src');
     if (family === undefined || src === undefined) return undefined;
     const unicodeRange = parseUnicodeRange(descriptors.get('unicode-range'));
+    const stretch = parseStretchRange(descriptors.get('font-stretch'));
     const declaration: Declaration = {
       family,
       weight: parseWeightRange(descriptors.get('font-weight')),
       italic: parseItalic(descriptors.get('font-style')),
+      ...(stretch[0] === 100 && stretch[1] === 100 ? {} : { stretch }),
       ...(unicodeRange === undefined ? {} : { unicodeRange }),
       stylesheet,
       slots: [],
@@ -248,13 +258,13 @@ export class DeckFontSession {
       if (source.kind === 'local') continue;
       if (source.formats.length > 0 && !source.formats.some((format) => SUPPORTED_FORMATS.has(format))) continue;
       const url = absoluteUrl(source.url, baseUrl);
-      if (url) declaration.slots.push(this.slot({ declaration, url }));
+      if (url) declaration.slots.push(this.slot({ kind: 'url', url }));
     }
     if (declaration.slots.length === 0) {
       const reason = sources.some((source) => source.kind === 'local')
         ? 'lists only local() sources; deckflip measures supplied font files, never installed faces'
         : 'has no url() source in a format deckflip loads (TrueType, OpenType, WOFF, WOFF2)';
-      declaration.slots.push(this.slot({ declaration, failure: { code: 'FONT_ASSET_UNSUPPORTED', reason } }));
+      declaration.slots.push(this.slot({ kind: 'failed', failure: { code: 'FONT_ASSET_UNSUPPORTED', reason } }));
     }
     return declaration;
   }
@@ -275,6 +285,7 @@ export class DeckFontSession {
       family: declaration.family,
       weight: declaration.weight,
       italic: declaration.italic,
+      ...(declaration.stretch === undefined ? {} : { stretch: declaration.stretch }),
       ...(declaration.unicodeRange === undefined ? {} : { unicodeRange: declaration.unicodeRange }),
       order,
       state: 'unused',
@@ -283,7 +294,15 @@ export class DeckFontSession {
     const served = tried.filter((outcome) => outcome.ok).at(-1);
     if (served?.ok) {
       const loaded = this.loadedFace(served.value);
-      if (loaded) return { ...base, state: 'loaded', loaded };
+      if (loaded) {
+        for (const id of declaration.slots) {
+          const outcome = this.outcomes.get(id);
+          if (outcome === served) break;
+          const slot = this.slots.get(id);
+          if (outcome && !outcome.ok && slot?.kind === 'url') this.sources.freezeFailure(slot.url, outcome);
+        }
+        return { ...base, state: 'loaded', loaded };
+      }
       this.fail(declaration, slide, { code: 'FONT_ASSET_UNSUPPORTED', reason: 'has no usable family name or metrics' });
       return { ...base, state: 'failed' };
     }
@@ -322,9 +341,9 @@ function absoluteUrl(url: string, base: string): string | undefined {
   }
 }
 
-async function fetchedFrom(pending: Promise<{ status(): number; body(): Promise<Buffer> }>): Promise<Fetched> {
+async function fetchedFrom(pending: Promise<{ status(): number; body(): Promise<Buffer>; url(): string }>): Promise<Fetched> {
   const response = await pending;
-  return { status: response.status(), body: await response.body() };
+  return { status: response.status(), body: await response.body(), url: response.url() };
 }
 
 /** Page script: the document's stylesheets in order; inline ones with their `@import` and `@font-face` rules. */

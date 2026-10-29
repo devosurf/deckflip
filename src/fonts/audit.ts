@@ -8,6 +8,7 @@ import { entry } from '../report/codes.js';
 import type { Entry } from '../report/types.js';
 import { countableCodePoints, inUnicodeRange, resolveFont } from './resolve.js';
 import type { FontCatalog, FontFace } from './scan.js';
+import { fontAssetKey } from './scan.js';
 
 /** One font Chromium drew glyphs of a text node with. */
 export interface PlatformFontUsage {
@@ -19,13 +20,15 @@ export interface PlatformFontUsage {
 }
 
 /** A text node Chromium drew on a Slide: what it asks of fonts, and the fonts Chromium drew it with. */
-export interface RenderedText {
+export interface VisibleText {
   slide: number;
   /** the text's owner, as the Census names it */
   selector: string;
   fontStack: string[];
   weight: number;
   italic: boolean;
+  /** Computed CSS width percentage, omitted at normal (100%). */
+  stretch?: number;
   text: string;
   fonts: PlatformFontUsage[];
 }
@@ -33,12 +36,15 @@ export interface RenderedText {
 const MAX_LISTED = 8;
 
 /** `FONT_GLYPH_FALLBACK` once per owner and selected face whose text Chromium drew with anything but that face. */
-export function auditRenderedFonts(rendered: readonly RenderedText[], catalog: FontCatalog): Entry[] {
+export function auditVisibleFonts(visible: readonly VisibleText[], catalog: FontCatalog): Entry[] {
   const entries: Entry[] = [];
   const reported = new Set<string>();
   const installedCache = new Map<string, FontFace | undefined>();
-  for (const node of rendered) {
-    const outcome = resolveFont({ slide: node.slide, stack: node.fontStack, weight: node.weight, italic: node.italic, text: node.text }, catalog, installedCache);
+  for (const node of visible) {
+    const outcome = resolveFont({
+      slide: node.slide, stack: node.fontStack, weight: node.weight, italic: node.italic,
+      ...(node.stretch === undefined ? {} : { stretch: node.stretch }), text: node.text,
+    }, catalog, installedCache);
     if (outcome.kind !== 'resolved') continue;
     const { face, font } = outcome;
     const declared = font.class === 'deck-provided' ? catalog.declared(node.slide, font.cssFamily) : [];
@@ -49,7 +55,7 @@ export function auditRenderedFonts(rendered: readonly RenderedText[], catalog: F
       !(used.postScriptName === face.asset.postscriptName && used.isCustomFont === (font.class === 'deck-provided')));
     if (missing.length === 0 && others.length === 0) continue;
 
-    const key = `${node.slide}\u0000${node.selector}\u0000${face.asset.sha256}:${face.asset.faceIndex}`;
+    const key = `${node.slide}\u0000${node.selector}\u0000${fontAssetKey(face.asset)}`;
     if (reported.has(key)) continue;
     reported.add(key);
     // PostScript names: family names come localized (PingFang SC is `蘋方-簡` on some hosts).
