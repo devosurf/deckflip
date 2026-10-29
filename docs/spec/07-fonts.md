@@ -21,6 +21,8 @@ Font selection originated in [#15](https://github.com/devosurf/deckflip/issues/1
 | **Deck-provided** | `@font-face` with local file | `FONT_NOT_SAFE` (warning); embedding is not implemented |
 | **Other installed** | anything else | `FONT_NOT_SAFE` (warning); embedding is not implemented |
 
+Safe-family classification for an installed face uses its preferred or legacy metadata aliases, not only its Office family: for example, Aptos SemiBold remains part of the safe Aptos family. A Deck-provided CSS alias never makes an asset safe. The safe set describes availability, not supported identity: every selected face still passes the Office-identity checks above, and conflicting metadata produces `FONT_IDENTITY_INVALID` even for a safe family.
+
 The Office-bundled families are safe for the viewer (PowerPoint) but not for a LibreOffice render: `render --renderer libreoffice` adds `RENDER_FONT_SUBSTITUTED` (info) for them, since LibreOffice substitutes the metric-compatible Carlito/Caladea for Calibri/Cambria where installed. CI no longer renders with LibreOffice ([ADR 0007](../adr/0007-verification-and-powerpoint-oracle.md)). [INFERENCE: the Office-bundled list is from product knowledge, not the #3 sources; the spec marks it "verify on a clean Office for Mac install" as a build-phase check.]
 
 ## Embedding

@@ -103,7 +103,7 @@ export function resolveDeckFonts(deck: Deck, catalog: FontCatalog, opts: { embed
               office: outcome.office,
               class: deckProvidedFamilies.has(normalizeName(outcome.cssFamily)) || deckProvidedFiles.has(outcome.font.asset.file)
                 ? 'deck-provided'
-                : SAFE_FAMILIES.has(resolvedFamilyKey)
+                : outcome.font.aliases.some((alias) => SAFE_FAMILIES.has(alias))
                   ? 'safe'
                   : 'installed',
               metrics: { ...outcome.font.metrics },

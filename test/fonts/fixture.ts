@@ -2,12 +2,13 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 export interface FontMutation {
   removeNameIds?: number[];
+  preferredFamily?: string;
   fsSelection?: number;
   macStyle?: number;
 }
 
-/** Deliberately malformed temporary copies; never writes the licensed source fixture. */
-export async function malformedFont(source: string, destination: string, mutation: FontMutation): Promise<void> {
+/** Mutates temporary metadata copies; never writes the licensed source fixture. */
+export async function mutateFont(source: string, destination: string, mutation: FontMutation): Promise<void> {
   const bytes = await readFile(source);
   const count = bytes.readUInt16BE(4);
   const tables = new Map<string, { record: number; offset: number; length: number }>();
@@ -19,8 +20,18 @@ export async function malformedFont(source: string, destination: string, mutatio
   }
   const name = tables.get('name')!.offset;
   for (let index = 0; index < bytes.readUInt16BE(name + 2); index++) {
-    const id = name + 6 + index * 12 + 6;
+    const record = name + 6 + index * 12;
+    const id = record + 6;
     if (mutation.removeNameIds?.includes(bytes.readUInt16BE(id))) bytes.writeUInt16BE(255, id);
+    if (bytes.readUInt16BE(id) === 16 && mutation.preferredFamily !== undefined) {
+      const platform = bytes.readUInt16BE(record);
+      const unicode = platform === 0 || platform === 3;
+      const value = Buffer.from(mutation.preferredFamily, unicode ? 'utf16le' : 'latin1');
+      if (unicode) value.swap16();
+      if (value.length > bytes.readUInt16BE(record + 8)) throw new Error('Replacement family exceeds the fixture name slot');
+      value.copy(bytes, name + bytes.readUInt16BE(name + 4) + bytes.readUInt16BE(record + 10));
+      bytes.writeUInt16BE(value.length, record + 8);
+    }
   }
   if (mutation.fsSelection !== undefined) bytes.writeUInt16BE(mutation.fsSelection, tables.get('OS/2')!.offset + 62);
   if (mutation.macStyle !== undefined) bytes.writeUInt16BE(mutation.macStyle, tables.get('head')!.offset + 44);

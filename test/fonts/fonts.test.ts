@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path';
 import { afterEach, expect, it } from 'vitest';
 import { FontCatalog, resolveDeckFonts } from '../../src/fonts/index.js';
 import type { Deck, DeckFontFace, RunStyle, ShapeElement } from '../../src/model/index.js';
-import { fontCollection, malformedFont, type FontMutation } from './fixture.js';
+import { fontCollection, mutateFont, type FontMutation } from './fixture.js';
 
 const medium = resolve('fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf');
 const directories: string[] = [];
@@ -24,7 +24,7 @@ it.each(invalid)('fails explicitly when $label instead of inventing an Office id
   const dir = await mkdtemp(join(tmpdir(), 'deckflip-invalid-font-'));
   directories.push(dir);
   const file = join(dir, 'invalid.ttf');
-  await malformedFont(medium, file, mutation);
+  await mutateFont(medium, file, mutation);
   const catalog = await FontCatalog.scan({ extraFiles: [file], system: false });
   const { entries, run } = resolveForStack(catalog, ['Heebo'], [], 500);
   expect(entries).toContainEqual(expect.objectContaining({ code: 'FONT_IDENTITY_INVALID', severity: 'error', kind: 'error' }));
@@ -50,6 +50,33 @@ it('resolves preferred and legacy installed aliases from a controlled catalog, n
     expect(entries).toContainEqual(expect.objectContaining({ code: 'FONT_NOT_SAFE' }));
   }
   expect(catalog.find('Arial', 400, false)).toBeUndefined();
+});
+
+it('keeps an installed safe preferred family safe when its Office family differs', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'deckflip-safe-font-'));
+  directories.push(dir);
+  const file = join(dir, 'safe-medium.ttf');
+  await mutateFont(medium, file, { preferredFamily: 'Aptos' });
+  const catalog = await FontCatalog.scan({ system: [file] });
+  for (const family of ['Aptos', 'Heebo Medium']) {
+    const { run, entries } = resolveForStack(catalog, [family], [], 500);
+    expect(run.font).toMatchObject({
+      cssFamily: family, class: 'safe', asset: { file },
+      office: { family: 'Heebo Medium', style: 'regular' },
+    });
+    expect(entries).toEqual([]);
+  }
+});
+
+it('does not treat a deck-provided CSS alias as proof of a safe installed face', async () => {
+  const fontFaces: DeckFontFace[] = [{ family: 'Aptos', file: medium, weight: 500 }];
+  const catalog = await FontCatalog.scan({ deckFaces: fontFaces, system: false });
+  const { run, entries } = resolveForStack(catalog, ['Aptos'], fontFaces, 500);
+  expect(run.font).toMatchObject({
+    cssFamily: 'Aptos', class: 'deck-provided',
+    office: { family: 'Heebo Medium', style: 'regular' },
+  });
+  expect(entries).toContainEqual(expect.objectContaining({ code: 'FONT_NOT_SAFE', severity: 'warning' }));
 });
 
 it('rejects a variable instance instead of labeling it with the default face identity', async () => {

@@ -83,7 +83,6 @@ Three rules hold across families:
 | `SUBSTITUTE_OPACITY` | `opacity` | Folded into fill/line/text alpha |
 | `SUBSTITUTE_IMAGE_FORMAT` | WebP/AVIF source | Re-encoded to PNG |
 | `SUBSTITUTE_LIST_STYLE` | unsupported `list-style-type` or `reversed` | Emitted as decimal numbering |
-| `SUBSTITUTE_FONT_WEIGHT` | weight without a matching face | Nearest of regular/bold used |
 
 ## PRESERVE_* (kind `preserved`)
 

@@ -7,11 +7,13 @@
 - Keep font portability reports truthful: `convert` and `validate` now reject explicit `--embed-fonts` requests with `FONT_EMBED_UNSUPPORTED` (exit 2), retaining the report without creating or replacing the converted Deck. Non-safe Resolved fonts keep `FONT_NOT_SAFE`, including when a request names only an unused CSS fallback. Help and font references now state that embedding is not implemented (#31).
 - Separate CSS font aliases, exact selected asset/collection face, and metadata-derived Office family/RIBBI identity. Unmodified Heebo 500/700/800 serializes as Heebo Medium regular / Heebo bold / Heebo ExtraBold regular without changing browser weights. Local `@font-face` aliases retain their asset bindings. Invalid or unsupported identity fails with `FONT_IDENTITY_INVALID`, rather than inventing a family/style (#32).
 - Normalize local `@font-face` weight keywords (`normal`/`bold`) and oblique styles, including angle-qualified descriptors, before matching faces. Regular/upright text no longer selects a later bold/slanted face because its descriptor was discarded. CLI/PPTX regressions cover all four Office styles; the accepted font fixture's Oracle package digest is unchanged (#32).
+- Keep installed safe-family variants safe through their preferred and legacy metadata aliases, even when Office addresses them under a separate family such as Aptos SemiBold or Calibri Light. Deck-provided CSS aliases still raise portability warnings; safe-family membership never bypasses Office-identity validation (#32).
 - Keep fresh PPTX application metadata conformant: omit the optional `AppVersion`, whose `XX.YYYY` format cannot hold SemVer, and retain the full producer version in `Application`. PowerPoint for Mac 16.114.2 rejected packages containing `AppVersion=0.2.0`; the compiled CLI output now opens there. Preserved source metadata is unchanged.
 
 ### Changed
 
 - `inspect` font records now expose `cssFamily`, `aliases`, `asset` (file, SHA-256, face index, PostScript name), and `office` (legacy family and RIBBI style), replacing the ambiguous flat family/file fields. Collection members are no longer collapsed by filename.
+- Remove the unused `SUBSTITUTE_FONT_WEIGHT` report code and references to the retired regular/bold weight-remapping policy.
 
 ### Acceptance
 

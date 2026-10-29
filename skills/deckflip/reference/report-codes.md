@@ -75,7 +75,6 @@ Every entry carries `code`, `kind`, `severity`, `reason` and `hint`; element-lev
 | `SUBSTITUTE_OPACITY` | `opacity` | Folded into fill/line/text alpha |
 | `SUBSTITUTE_IMAGE_FORMAT` | WebP/GIF source | Re-encoded to PNG |
 | `SUBSTITUTE_LIST_STYLE` | unsupported `list-style-type` or `reversed` | Emitted as decimal numbering |
-| `SUBSTITUTE_FONT_WEIGHT` | weight without a matching face | Nearest of regular/bold used |
 
 ## PRESERVE_* and DROPPED_* (round trips), OVERRIDE_*, RENDER_*
 

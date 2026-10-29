@@ -318,11 +318,6 @@ export const CODES = {
     severity: 'info',
     hint: 'Emitted as decimal numbering',
   },
-  SUBSTITUTE_FONT_WEIGHT: {
-    kind: 'substituted',
-    severity: 'info',
-    hint: 'Nearest of regular/bold used',
-  },
   PRESERVE_OPAQUE_CHART: {
     kind: 'preserved',
     severity: 'info',

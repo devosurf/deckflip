@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url';
 import JSZip from 'jszip';
 import { afterEach, expect, it } from 'vitest';
 import { parseXml, type XmlNode } from '../../src/ooxml/xml.js';
-import { malformedFont } from '../fonts/fixture.js';
+import { mutateFont } from '../fonts/fixture.js';
 
 const directories: string[] = [];
 afterEach(async () => {
@@ -105,7 +105,7 @@ it('rejects inconsistent selected metadata without falling back or replacing the
   directories.push(dir);
   const file = join(dir, 'broken.ttf');
   const source = resolve('fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf');
-  await malformedFont(source, file, { macStyle: 1 });
+  await mutateFont(source, file, { macStyle: 1 });
   const input = join(dir, 'deck.html');
   await writeFile(input, `<!doctype html><html><head><style>
     @font-face { font-family: Broken; font-weight: 500; src: url('${pathToFileURL(file).href}'); }
