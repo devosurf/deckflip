@@ -148,10 +148,12 @@ export function buildRunProperties(style: RunStyle | undefined, ctx: TextEmissio
   if (measured) {
     attrs.sz = pxToHundredthsPt(effectiveStyle.size);
   }
-  if (effectiveStyle.bold) {
+  // Unmeasured speaker notes inherit their font from the notes master, retaining authored emphasis.
+  const officeStyle = measured ? effectiveStyle.font?.office.style : undefined;
+  if (officeStyle === undefined ? effectiveStyle.bold : officeStyle === 'bold' || officeStyle === 'boldItalic') {
     attrs.b = 1;
   }
-  if (effectiveStyle.italic) {
+  if (officeStyle === undefined ? effectiveStyle.italic : officeStyle === 'italic' || officeStyle === 'boldItalic') {
     attrs.i = 1;
   }
   if (effectiveStyle.underline) {
@@ -196,7 +198,7 @@ export function buildEndParaRPr(sizePx: number, deckLang: string): XmlNode {
 }
 
 export function effectiveTypeface(style: RunStyle): string {
-  return style.font?.family ?? style.fontStack[0] ?? 'Arial';
+  return style.font?.office.family ?? style.fontStack[0] ?? 'Arial';
 }
 
 export function colorNode(color: Color): XmlNode {

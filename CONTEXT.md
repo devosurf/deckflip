@@ -101,8 +101,20 @@ An element or Slide whose Fingerprint still matches the Manifest, so its origina
 _Avoid_: Unchanged, pristine, clean
 
 **Resolved font**:
-The first family in a `font-family` stack that Chromium could actually use on the authoring machine; the name written into the PPTX.
+The selected font asset and face for a text run, together with its CSS match and Office font identity. A Resolved font identifies a face, not proof of embedding, glyph fallback or fidelity.
 _Avoid_: Effective font, fallback font, used font
+
+**CSS font alias**:
+A family name used to match authored text to a selected face; it may be a declared webfont name, a preferred family or a legacy family. It need not be the name written into the PPTX.
+_Avoid_: Export family
+
+**Selected font face**:
+The exact font asset and member face selected for a text run, distinct from its CSS font aliases and Office font identity.
+_Avoid_: Font name
+
+**Office font identity**:
+The legacy family and regular, bold, italic or bold-italic style-linking position that PowerPoint uses to address a selected face.
+_Avoid_: CSS weight, preferred family
 
 **Safe font**:
 A family present on every supported PowerPoint installation on Windows and macOS, so it needs no embedding.

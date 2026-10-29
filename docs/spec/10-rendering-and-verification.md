@@ -67,6 +67,10 @@ The digest is SHA-256 over the package parts by name, leaving out `docProps/` (t
 
 Renewal: adding a fixture, or changing what a fixture emits, means running `corpus:oracle` for it on a Mac with PowerPoint; the script refuses fixtures that fail Verification. CI regenerates the Chromium side and refuses fixtures without committed `powerpoint/` images, `oracle.json` or `report.json`. Oracle images are regenerated wholesale when the PowerPoint version on the oracle machine changes, in one reviewed commit.
 
+The #32 `fonts/office-identity` fixture covers CLI/package identity, authored Chromium weights and an accepted PowerPoint visual gate. On 2026-10-27, an isolated QA Mac running PowerPoint 16.114.2 (bundle 16.114.26102345) with the exact unmodified static faces from `fonts/_assets/manifest.json` edited, saved and reopened all seven native text objects without family/RIBBI changes. Both the original and reopened PDF exports used the seven expected faces without substitution or wrapping. `expected/editability.json` preserves the earlier blocked attempts and this accepted follow-up.
+
+For that font-only Oracle, the compiled CLI emitted the package locally, QA PowerPoint exported the unchanged input to PDF, and the project's `rasterisePdf` adapter produced the 96 DPI PNG. The Oracle record binds that input's digest, not the edited Deck; its Chromium difference is 0.56%, below the unchanged 1.25% gate. Existing corpus Oracle records and developer fonts were not changed. Renew this fixture only on a host with those exact installed faces, using `npm run corpus:oracle fonts/office-identity` there; a developer Mac with different fonts is not an acceptance substitute.
+
 ## CI shape
 
 GitHub Actions has one required job, `macos`:

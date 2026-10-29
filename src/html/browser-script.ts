@@ -3170,12 +3170,9 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
         const weightValue = fontFace.style.getPropertyValue('font-weight').trim();
         const styleValue = fontFace.style.getPropertyValue('font-style').trim();
         if (weightValue) {
-          const parsed = parseInt(weightValue, 10);
-          if (!Number.isNaN(parsed)) {
-            face.weight = parsed;
-          }
+          face.weight = parseFontWeight(weightValue);
         }
-        if (styleValue === 'italic') {
+        if (/italic|oblique/i.test(styleValue)) {
           face.italic = true;
         }
         faces.push(face);

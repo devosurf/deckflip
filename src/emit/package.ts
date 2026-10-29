@@ -110,9 +110,9 @@ function buildAppXml(appVersion: string, slideCount: number): XmlNode {
       xmlns: 'http://schemas.openxmlformats.org/officeDocument/2006/extended-properties',
       'xmlns:vt': 'http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes',
     },
-    el('Application', {}, 'deckflip'),
+    // AppVersion only permits XX.YYYY; retain SemVer in the free-form producer name instead.
+    el('Application', {}, `deckflip ${appVersion}`),
     el('Slides', {}, String(slideCount)),
-    el('AppVersion', {}, appVersion),
   );
 }
 

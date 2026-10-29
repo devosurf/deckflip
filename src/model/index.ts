@@ -328,10 +328,28 @@ export interface FontMetrics {
 
 export type FontClass = 'safe' | 'deck-provided' | 'installed';
 
-export interface ResolvedFont {
-  /** the family name written into `a:latin/@typeface` */
+/** The four Office style-linking positions, also used by embeddedFont slots. */
+export type OfficeFontStyle = 'regular' | 'bold' | 'italic' | 'boldItalic';
+
+export interface OfficeFontIdentity {
   family: string;
+  style: OfficeFontStyle;
+}
+
+export interface FontAsset {
   file: string;
+  sha256: string;
+  /** Zero-based face in a collection; zero for a standalone font. */
+  faceIndex: number;
+  postscriptName: string;
+}
+
+export interface ResolvedFont {
+  /** The matched CSS stack entry, not the name serialized to Office. */
+  cssFamily: string;
+  aliases: string[];
+  asset: FontAsset;
+  office: OfficeFontIdentity;
   class: FontClass;
   metrics: FontMetrics;
   /** OS/2 fsType; embedding permission */

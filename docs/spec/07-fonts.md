@@ -1,14 +1,17 @@
 # Font policy
 
-Decided in [#15](https://github.com/devosurf/deckflip/issues/15).
+Font selection originated in [#15](https://github.com/devosurf/deckflip/issues/15); Office identity is separated in [#32](https://github.com/devosurf/deckflip/issues/32) under the [#30 font cutover](https://github.com/devosurf/deckflip/issues/30).
 
-## Resolution (authoring machine)
+## Resolution and Office identity
 
-- For every run, the computed `font-family` stack is resolved to the first family that is either **deck-provided** (declared by a `@font-face` in the Deck with a local `url()`; Chromium loads exactly that file) or **installed** on the authoring machine. That family is the **Resolved font**; its name goes into `a:latin/@typeface` (and `ea`/`cs`). The rest of the stack is discarded.
-- Installed fonts are enumerated by a pure-Node scan of the platform font directories (`get-system-fonts`-style walk; macOS `/System/Library/Fonts`, `/Library/Fonts`, `~/Library/Fonts`; Windows `%WINDIR%\Fonts` + per-user `LocalAppData\Microsoft\Windows\Fonts`; Linux `fc-list --format` when available, else `/usr/share/fonts`, `~/.fonts`, `~/.local/share/fonts`) with `fontkit` parsing `name`, `OS/2`, `hhea`. No native addon. The scan is cached per run. The same file supplies the metrics for the baseline correction (#12) and the `fsType` bits for embedding.
-- If nothing in the stack resolves, Chromium fell back to a platform default and the layout is not reproducible: `FONT_UNRESOLVED` (error, `validate` exit 2; hint names the safe set).
-- If the first resolvable entry is a generic family (`sans-serif`, `serif`, `monospace`, `system-ui`, `ui-*`, `cursive`, `fantasy`, `math`, `emoji`): `FONT_GENERIC_ONLY` (error). Generics resolve differently per machine; the hint says to put a concrete family before the generic. The injected base stylesheet sets `body { font-family: Arial }` so unstyled text is deterministic.
-- If Chromium's actually-used font (per-glyph fallback for scripts the family lacks, e.g. CJK or emoji) differs from the Resolved font, no entry: PowerPoint performs the same per-script substitution.
+- For every run, the computed `font-family` stack selects the first available concrete family. Local `@font-face` declarations bind their CSS alias and weight/style descriptors to the source asset; they take precedence over installed faces. Preferred and legacy family names remain case-insensitive matching aliases.
+- A **Resolved font** separates `cssFamily` and `aliases`, `asset` (`file`, SHA-256, zero-based collection `faceIndex`, PostScript name), and `office` (`family`, `style`). Metrics and `fsType` come from that selected face. Collection members sharing a file remain distinct.
+- The Office family is legacy name ID 1, not preferred name ID 16. Legacy subfamily ID 2 and consistent `OS/2.fsSelection` / `head.macStyle` determine `regular`, `bold`, `italic` or `boldItalic`. Serialization writes this family to `a:latin`, `a:ea` and `a:cs`, and derives `b`/`i` from the Office style. This same family/style identifies the future embedding slot; it is not evidence of embedded payloads. See the [OpenType naming contract](https://learn.microsoft.com/en-us/typography/opentype/spec/name#name-ids).
+- Authored browser weights and styles are not rewritten. Unmodified Heebo 500 emits **Heebo Medium / regular**, 700 emits **Heebo / bold**, and 800 emits **Heebo ExtraBold / regular**. No font tables are modified.
+- Missing legacy family/subfamily or PostScript identity, conflicting style metadata, and unsupported legacy subfamilies produce `FONT_IDENTITY_INVALID` (error, exit 2). Variable fonts also fail explicitly: a supported exact-instance-to-Office mapping has not been established. Conversion does not silently choose the next fallback or create/replace output.
+- Installed fonts are still enumerated by a pure-Node platform-directory scan with `fontkit`, cached per process. This is transitional: pinned assets and a redistributable default are later #30 milestones, not implemented by #32.
+- Nothing resolves: `FONT_UNRESOLVED` (error). A generic reached before a concrete match: `FONT_GENERIC_ONLY` (error). The current injected `body { font-family: Arial }` supplies a base default without overriding authored inheritance.
+- Per-glyph fallback is not proven to be identical in Chromium and PowerPoint. Structural Verification checks text and geometry, not selected glyph faces. Supported-PowerPoint evidence remains separate.
 
 ## Classification and warnings
 
@@ -17,6 +20,8 @@ Decided in [#15](https://github.com/devosurf/deckflip/issues/15).
 | **Safe** | Arial, Courier New, Georgia, Times New Roman, Trebuchet MS, Verdana (the researched Windows/macOS overlap) plus the Office-bundled families installed by every supported desktop PowerPoint on both platforms: Aptos (all faces), Calibri, Cambria, Candara, Consolas, Constantia, Corbel, Franklin Gothic, Century Gothic, Segoe UI is **not** in the set (Windows only) | none |
 | **Deck-provided** | `@font-face` with local file | `FONT_NOT_SAFE` (warning); embedding is not implemented |
 | **Other installed** | anything else | `FONT_NOT_SAFE` (warning); embedding is not implemented |
+
+Safe-family classification for an installed face uses its preferred or legacy metadata aliases, not only its Office family: for example, Aptos SemiBold remains part of the safe Aptos family. A Deck-provided CSS alias never makes an asset safe. The safe set describes availability, not supported identity: every selected face still passes the Office-identity checks above, and conflicting metadata produces `FONT_IDENTITY_INVALID` even for a safe family.
 
 The Office-bundled families are safe for the viewer (PowerPoint) but not for a LibreOffice render: `render --renderer libreoffice` adds `RENDER_FONT_SUBSTITUTED` (info) for them, since LibreOffice substitutes the metric-compatible Carlito/Caladea for Calibri/Cambria where installed. CI no longer renders with LibreOffice ([ADR 0007](../adr/0007-verification-and-powerpoint-oracle.md)). [INFERENCE: the Office-bundled list is from product knowledge, not the #3 sources; the spec marks it "verify on a clean Office for Mac install" as a build-phase check.]
 
@@ -28,12 +33,9 @@ The Resolved font keeps its `FONT_NOT_SAFE` entry regardless of the request. Nam
 
 ### Planned embedding milestone (not implemented)
 
-Once embedding lands, only successful packaging of the selected face may satisfy portability. Integrate that result into the existing font policy rather than maintaining a separate warning policy based on option intent. A clean report alone is not proof: inspect the embedded-font list, relationships and payloads in the emitted PPTX.
+Only successful packaging of the selected face may satisfy portability. Integrate that result into the existing font policy, not a parallel policy based on option intent. Inspect the embedded-font list, relationships and payloads; a clean report is not proof.
 
-- Selection: `--embed-fonts` will request every Resolved font of class deck-provided or other-installed; `--embed-fonts=<name,...>` will restrict embedding to the named families (safe ones included). Default off.
-- Permission: embed only when `OS/2.fsType` is `0` (installable) or `8` (editable). `4` (preview/print) and `2` (restricted) are not embedded: `FONT_EMBED_RESTRICTED` (warning) and the font stays a `FONT_NOT_SAFE` warning. No read-only downgrade: editability outranks fidelity.
-- Payload: `p:embeddedFontLst/p:embeddedFont` with `regular`/`bold`/`italic`/`boldItalic` entries for each face actually used, each a part `ppt/fonts/font<n>.fntdata` of content type `application/x-fontdata`, containing the face wrapped as **uncompressed EOT** (EOT header + sfnt, no MTX, no XOR). No subsetting in v1 ("embed all characters"). Accepted source formats: TTF, OTF, WOFF (inflated to sfnt); WOFF2 and TTC faces are `FONT_EMBED_FORMAT` (warning, not embedded). Variable fonts embed the whole file (PowerPoint picks the default instance; `SUBSTITUTE_FONT_WEIGHT` info when a non-default weight was used).
-- Verification: the EOT-wrapped payload opening in PowerPoint for Mac is the first acceptance test of the embedding milestone; the flag is off by default so nothing else depends on it. Windows verification is deferred under the [supported-host policy](10-rendering-and-verification.md#supported-host).
+The supported payload/permission/format matrix depends on the isolated PowerPoint compatibility experiment [#33](https://github.com/devosurf/deckflip/issues/33). Packaging [#34](https://github.com/devosurf/deckflip/issues/34) waits for that evidence, asset acquisition #35 waits for #34, and the portable-default cutover #36 waits for #31–#35. Earlier EOT/variable-font proposals are not an implemented or proven contract. Do not uninstall the developer's fonts to simulate a recipient.
 
 ## PPTX -> HTML
 
@@ -46,4 +48,4 @@ Once embedding lands, only successful packaging of the selected face may satisfy
 1. Name a concrete family first; end every stack with a safe family; never rely on a generic alone.
 2. Prefer the safe set. Use Aptos/Calibri when a "PowerPoint look" is wanted, Arial/Georgia when the deck must also look identical in viewers without Office fonts, such as LibreOffice.
 3. A local `@font-face` makes a brand font available for authoring, not portable in the PPTX. It remains `FONT_NOT_SAFE`: choose a safe font or install the Resolved font on every viewing machine. Remove an explicit embedding request if `FONT_EMBED_UNSUPPORTED` is reported.
-4. `inspect` lists `fonts[]` with the resolved file and class; those fields are not evidence of embedding.
+4. `inspect` lists each selected asset/face with its CSS aliases, Office family/style, metrics, permission bits and class; those fields are not evidence of embedding or renderer fidelity.

@@ -12,8 +12,10 @@ const created = new Date('2024-01-02T03:04:05.000Z');
 
 function resolvedFont(): ResolvedFont {
   return {
-    family: 'Resolved',
-    file: '/fonts/resolved.ttf',
+    cssFamily: 'Resolved',
+    aliases: ['Resolved'],
+    asset: { file: '/fonts/resolved.ttf', sha256: 'fixture', faceIndex: 0, postscriptName: 'Resolved-Regular' },
+    office: { family: 'Resolved', style: 'regular' },
     class: 'installed',
     metrics: { ascender: 1854 / 2048, descender: 434 / 2048 },
     fsType: 0,

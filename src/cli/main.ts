@@ -224,7 +224,7 @@ async function handleInspect(input: string): Promise<number> {
   const browser = await launchChromium({ offline: false });
   try {
     const measured = await measureDeck(loaded, { browser });
-    const catalog = await FontCatalog.scan({ extraFiles: measured.deck.fontFaces.map((face) => face.file) });
+    const catalog = await FontCatalog.scan({ deckFaces: measured.deck.fontFaces });
     resolveDeckFonts(measured.deck, catalog, { embedFonts: false });
     process.stdout.write(`${JSON.stringify(inspectDeck(measured.deck), null, 2)}\n`);
     return 0;

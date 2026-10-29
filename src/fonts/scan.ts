@@ -1,14 +1,16 @@
 import * as fontkit from 'fontkit';
+import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, type Dirent } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, type Dirent } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Font as FontKitFont, FontCollection as FontKitCollection, Os2Table } from 'fontkit';
-import type { FontMetrics } from '../model/index.js';
+import type { DeckFontFace, FontAsset, FontMetrics, OfficeFontIdentity, OfficeFontStyle } from '../model/index.js';
 
 export interface FontFace {
-  family: string;
-  file: string;
+  aliases: string[];
+  asset: FontAsset;
+  office: OfficeFontIdentity | { error: string };
   weight: number;
   italic: boolean;
   fsType: number;
@@ -29,9 +31,9 @@ type FontLike = FontKitFont & {
 };
 
 interface CatalogFace extends FontFace {
-  aliases: string[];
   source: FaceSource;
   order: number;
+  declaredFamily?: string;
 }
 
 interface ScanResult {
@@ -62,20 +64,32 @@ export class FontCatalog {
     this.skipped = skipped;
   }
 
-  /** `system: false` builds a catalog from `extraFiles` only (tests, deterministic fixtures). */
-  static async scan(opts: { extraFiles?: string[]; system?: boolean } = {}): Promise<FontCatalog> {
+  /** Omit `system` for host discovery; false or explicit system files isolate a catalog. */
+  static async scan(opts: { extraFiles?: string[]; deckFaces?: readonly DeckFontFace[]; system?: boolean | readonly string[] } = {}): Promise<FontCatalog> {
     const [system, extra] = await Promise.all([
-      opts.system === false ? Promise.resolve({ faces: [], skipped: 0 }) : scanSystemFaces(),
-      scanExtraFiles(opts.extraFiles ?? []),
+      typeof opts.system === 'object' ? scanFiles(opts.system, 'system')
+        : opts.system === false ? { faces: [], skipped: 0 } : scanSystemFaces(),
+      scanExtraFiles([...(opts.extraFiles ?? []), ...(opts.deckFaces ?? []).map((face) => face.file)]),
     ]);
-    return new FontCatalog([...extra.faces, ...system.faces], extra.skipped + system.skipped);
+    const declared = (opts.deckFaces ?? []).flatMap((declaration, index) =>
+      extra.faces.filter((face) => face.asset.file === path.resolve(declaration.file)).map((face) => ({
+        ...face,
+        aliases: [...new Set([...face.aliases, normalizeName(declaration.family)])],
+        declaredFamily: normalizeName(declaration.family),
+        weight: declaration.weight ?? 400,
+        italic: declaration.italic ?? false,
+        order: -index,
+      })),
+    );
+    return new FontCatalog([...declared, ...extra.faces, ...system.faces], extra.skipped + system.skipped);
   }
 
   find(family: string, weight: number, italic: boolean): FontFace | undefined {
     const familyKey = normalizeName(family);
     if (!familyKey) return undefined;
 
-    const matches = this.faces.filter((face) => face.aliases.includes(familyKey));
+    const declared = this.faces.filter((face) => face.declaredFamily === familyKey);
+    const matches = declared.length > 0 ? declared : this.faces.filter((face) => face.declaredFamily === undefined && face.aliases.includes(familyKey));
     if (matches.length === 0) return undefined;
 
     const sorted = [...matches].sort((left, right) => compareFaces(left, right, weight, italic));
@@ -98,7 +112,7 @@ async function scanExtraFiles(files: string[]): Promise<ScanResult> {
   return scanFiles(files, 'deck');
 }
 
-function scanFiles(files: string[], source: FaceSource): ScanResult {
+function scanFiles(files: readonly string[], source: FaceSource): ScanResult {
   const faces: CatalogFace[] = [];
   let skipped = 0;
   let order = 0;
@@ -127,21 +141,23 @@ function scanFiles(files: string[], source: FaceSource): ScanResult {
 
 function scanFontFile(file: string, ext: FontExtension): { faces: BuiltFace[]; skipped: number } {
   try {
-    const opened = fontkit.openSync(file);
+    const bytes = readFileSync(file);
+    const sha256 = createHash('sha256').update(bytes).digest('hex');
+    const opened = fontkit.create(bytes);
     if (isCollection(opened)) {
       if (opened.type === 'DFont') {
         return { faces: [], skipped: 1 };
       }
 
       const faces: BuiltFace[] = [];
-      for (const font of opened.fonts) {
-        const built = buildFace(font, file, ext);
+      for (const [faceIndex, font] of opened.fonts.entries()) {
+        const built = buildFace(font, { file, sha256, faceIndex }, ext);
         if (built) faces.push(built);
       }
       return { faces, skipped: faces.length === 0 ? 1 : 0 };
     }
 
-    const built = buildFace(opened, file, ext);
+    const built = buildFace(opened, { file, sha256, faceIndex: 0 }, ext);
     return built ? { faces: [built], skipped: 0 } : { faces: [], skipped: 1 };
   } catch {
     return { faces: [], skipped: 1 };
@@ -152,7 +168,7 @@ function isCollection(value: FontKitFont | FontKitCollection): value is FontKitC
   return 'fonts' in value;
 }
 
-function buildFace(font: FontLike, file: string, ext: FontExtension): BuiltFace | undefined {
+function buildFace(font: FontLike, asset: Omit<FontAsset, 'postscriptName'>, ext: FontExtension): BuiltFace | undefined {
   const familyName = cleanName(font.familyName);
   const preferredFamily = cleanName(font.getName('preferredFamily', 'en')) ?? cleanName(font.getName('preferredFamily', 'und'));
   const family = preferredFamily ?? familyName;
@@ -172,8 +188,9 @@ function buildFace(font: FontLike, file: string, ext: FontExtension): BuiltFace 
 
   return {
     face: {
-      family,
-      file,
+      aliases: [...aliases],
+      asset: { ...asset, postscriptName: cleanName(font.postscriptName) ?? '' },
+      office: officeIdentity(font),
       weight,
       italic,
       fsType,
@@ -185,6 +202,36 @@ function buildFace(font: FontLike, file: string, ext: FontExtension): BuiltFace 
     },
     aliases: [...aliases],
   };
+}
+
+const OFFICE_STYLES: Readonly<Record<string, OfficeFontStyle>> = {
+  regular: 'regular', normal: 'regular', roman: 'regular', book: 'regular',
+  bold: 'bold', italic: 'italic', oblique: 'italic',
+  bolditalic: 'boldItalic', boldoblique: 'boldItalic',
+};
+
+function officeIdentity(font: FontLike): FontFace['office'] {
+  if (Object.keys(font.variationAxes).length > 0) {
+    return { error: 'Variable font instances do not have a supported Office style-linking identity; use a static face' };
+  }
+  const family = cleanName(font.familyName);
+  const subfamily = cleanName(font.subfamilyName);
+  if (!family || !subfamily || !cleanName(font.postscriptName)) {
+    return { error: 'Missing legacy family/subfamily (name IDs 1/2) or PostScript face name (name ID 6)' };
+  }
+  const key = subfamily.toLowerCase().replace(/[\s-]/g, '');
+  const style = Object.hasOwn(OFFICE_STYLES, key) ? OFFICE_STYLES[key] : undefined;
+  if (!style) return { error: `Legacy subfamily "${subfamily}" does not identify a supported Office RIBBI style` };
+  const selection = font['OS/2']?.fsSelection;
+  const macStyle = font.head?.macStyle;
+  const bold = style === 'bold' || style === 'boldItalic';
+  const italic = style === 'italic' || style === 'boldItalic';
+  if (!selection || !macStyle) return { error: 'Missing OS/2.fsSelection or head.macStyle style-linking metadata' };
+  if (selection.bold !== bold || selection.italic !== italic || macStyle.bold !== bold || macStyle.italic !== italic ||
+      (selection.regular && (bold || italic))) {
+    return { error: 'Legacy subfamily, OS/2.fsSelection and head.macStyle disagree about Office RIBBI style' };
+  }
+  return { family, style };
 }
 
 function normalizeWeight(weight: number | undefined, subfamily: string): number {
@@ -223,8 +270,9 @@ function normalizeFsType(fsType: Os2Table['fsType']): number {
 
 function cloneFace(face: CatalogFace): FontFace {
   return {
-    family: face.family,
-    file: face.file,
+    aliases: [...face.aliases],
+    asset: face.asset,
+    office: face.office,
     weight: face.weight,
     italic: face.italic,
     fsType: face.fsType,
@@ -248,7 +296,7 @@ function compareFaces(left: CatalogFace, right: CatalogFace, requestedWeight: nu
   if (leftWeight[1] !== rightWeight[1]) return leftWeight[1] - rightWeight[1];
 
   if (left.order !== right.order) return left.order - right.order;
-  return left.file.localeCompare(right.file);
+  return left.asset.file.localeCompare(right.asset.file);
 }
 
 function weightScore(candidate: number, requested: number): [number, number] {

@@ -98,6 +98,11 @@ export const CODES = {
     severity: 'error',
     hint: 'Put a concrete family before {generic}',
   },
+  FONT_IDENTITY_INVALID: {
+    kind: 'error',
+    severity: 'error',
+    hint: 'Choose a font face with consistent legacy family, subfamily and RIBBI metadata; do not rewrite font tables or remap CSS weights',
+  },
   FONT_NOT_SAFE: {
     kind: 'substituted',
     severity: 'warning',
@@ -312,11 +317,6 @@ export const CODES = {
     kind: 'substituted',
     severity: 'info',
     hint: 'Emitted as decimal numbering',
-  },
-  SUBSTITUTE_FONT_WEIGHT: {
-    kind: 'substituted',
-    severity: 'info',
-    hint: 'Nearest of regular/bold used',
   },
   PRESERVE_OPAQUE_CHART: {
     kind: 'preserved',
