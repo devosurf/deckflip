@@ -56,6 +56,50 @@ it('serializes unmodified faces by Office family and RIBBI, not CSS aliases or w
   }
 });
 
+it.each([
+  { label: 'normal/bold weight keywords', regularWeight: 'normal', boldWeight: 'bold', slantedStyle: 'italic' },
+  { label: 'oblique style', regularWeight: '400', boldWeight: '700', slantedStyle: 'oblique' },
+  { label: 'oblique style with an angle', regularWeight: '400', boldWeight: '700', slantedStyle: 'oblique 12deg' },
+])('matches @font-face $label without changing the selected Office style', async ({ regularWeight, boldWeight, slantedStyle }) => {
+  const dir = await mkdtemp(join(tmpdir(), 'deckflip-font-descriptors-'));
+  directories.push(dir);
+  const fontUrl = (file: string) => pathToFileURL(resolve('fixtures/corpus/fonts/_assets/source-sans-3', file)).href;
+  const input = join(dir, 'deck.html');
+  await writeFile(input, `<!doctype html><html><head><style>
+    @font-face { font-family: Descriptor; font-weight: ${regularWeight}; font-style: normal; src: url('${fontUrl('SourceSans3-Regular.ttf')}'); }
+    @font-face { font-family: Descriptor; font-weight: ${boldWeight}; font-style: normal; src: url('${fontUrl('SourceSans3-Bold.ttf')}'); }
+    @font-face { font-family: Descriptor; font-weight: ${regularWeight}; font-style: ${slantedStyle}; src: url('${fontUrl('SourceSans3-It.ttf')}'); }
+    @font-face { font-family: Descriptor; font-weight: ${boldWeight}; font-style: ${slantedStyle}; src: url('${fontUrl('SourceSans3-BoldIt.ttf')}'); }
+    p { font-family: Descriptor; font-size: 24px; line-height: 32px; }
+    </style></head><body><section>
+    <p style="font-weight: normal; font-style: normal">Regular</p>
+    <p style="font-weight: bold; font-style: normal">Bold</p>
+    <p style="font-weight: normal; font-style: ${slantedStyle}">Slanted</p>
+    <p style="font-weight: bold; font-style: ${slantedStyle}">Bold slanted</p>
+    </section></body></html>`);
+  const output = join(dir, 'fonts.pptx');
+  const result = spawnSync(process.execPath, ['--import', 'tsx', 'src/cli/main.ts', 'convert',
+    input, '-o', output, '--json', '--quiet', '--offline'],
+  { encoding: 'utf8', timeout: 60_000 });
+  expect(result.status, result.stderr || result.stdout).toBe(0);
+  const zip = await JSZip.loadAsync(await readFile(output));
+  const slide = parseXml(await zip.file('ppt/slides/slide1.xml')!.async('string'));
+  expect(descendants(slide, 'a:r').map((run) => {
+    const props = descendants(run, 'a:rPr')[0]!;
+    return {
+      text: descendants(run, 'a:t')[0]!.children.join(''),
+      families: ['a:latin', 'a:ea', 'a:cs'].map((name) => descendants(props, name)[0]?.attrs.typeface),
+      bold: props.attrs.b === '1',
+      italic: props.attrs.i === '1',
+    };
+  })).toEqual([
+    { text: 'Regular', families: ['Source Sans 3', 'Source Sans 3', 'Source Sans 3'], bold: false, italic: false },
+    { text: 'Bold', families: ['Source Sans 3', 'Source Sans 3', 'Source Sans 3'], bold: true, italic: false },
+    { text: 'Slanted', families: ['Source Sans 3', 'Source Sans 3', 'Source Sans 3'], bold: false, italic: true },
+    { text: 'Bold slanted', families: ['Source Sans 3', 'Source Sans 3', 'Source Sans 3'], bold: true, italic: true },
+  ]);
+});
+
 it('rejects inconsistent selected metadata without falling back or replacing the destination', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'deckflip-invalid-font-cli-'));
   directories.push(dir);

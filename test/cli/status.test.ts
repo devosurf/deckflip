@@ -7,6 +7,7 @@ import JSZip from 'jszip';
 import { chromium } from 'playwright-core';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { Report } from '../../src/report/types.js';
+import { parseXml } from '../../src/ooxml/xml.js';
 import { buildPptx } from '../render/pptx-fixture.js';
 
 const browserAvailable = await chromium.launch().then(async (browser) => {
@@ -47,6 +48,23 @@ async function missingFontPptx(dir: string): Promise<string> {
     </p:sp>` }] }));
   return input;
 }
+
+it.skipIf(!browserAvailable)('keeps optional application-version metadata conformant so PowerPoint can open the Deck', async () => {
+  const dir = await workspace();
+  const input = join(dir, 'metadata.html');
+  const output = join(dir, 'metadata.pptx');
+  await writeFile(input, '<!doctype html><html><head><title>Metadata</title></head><body><section></section></body></html>');
+  const result = cli('convert', input, '-o', output);
+  expect(result.status, result.stderr).toBe(0);
+  const zip = await JSZip.loadAsync(await readFile(output));
+  const properties = parseXml(await zip.file('docProps/app.xml')!.async('string'));
+  // ISO/IEC 29500-1 requires XX.YYYY when AppVersion is present; SemVer made PowerPoint reject the Deck.
+  for (const child of properties.children) {
+    if (typeof child !== 'string' && child.name === 'AppVersion') {
+      expect(child.children.join('')).toMatch(/^\d{2}\.\d{4}$/);
+    }
+  }
+});
 
 describe('CLI severity and strict-mode status', () => {
   it('rejects missing-font PPTX conversion before creating a Deck or Asset directory, even in strict mode', async () => {

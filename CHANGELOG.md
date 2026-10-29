@@ -6,14 +6,16 @@
 
 - Keep font portability reports truthful: `convert` and `validate` now reject explicit `--embed-fonts` requests with `FONT_EMBED_UNSUPPORTED` (exit 2), retaining the report without creating or replacing the converted Deck. Non-safe Resolved fonts keep `FONT_NOT_SAFE`, including when a request names only an unused CSS fallback. Help and font references now state that embedding is not implemented (#31).
 - Separate CSS font aliases, exact selected asset/collection face, and metadata-derived Office family/RIBBI identity. Unmodified Heebo 500/700/800 serializes as Heebo Medium regular / Heebo bold / Heebo ExtraBold regular without changing browser weights. Local `@font-face` aliases retain their asset bindings. Invalid or unsupported identity fails with `FONT_IDENTITY_INVALID`, rather than inventing a family/style (#32).
+- Normalize local `@font-face` weight keywords (`normal`/`bold`) and oblique styles, including angle-qualified descriptors, before matching faces. Regular/upright text no longer selects a later bold/slanted face because its descriptor was discarded. CLI/PPTX regressions cover all four Office styles; the accepted font fixture's Oracle package digest is unchanged (#32).
+- Keep fresh PPTX application metadata conformant: omit the optional `AppVersion`, whose `XX.YYYY` format cannot hold SemVer, and retain the full producer version in `Application`. PowerPoint for Mac 16.114.2 rejected packages containing `AppVersion=0.2.0`; the compiled CLI output now opens there. Preserved source metadata is unchanged.
 
 ### Changed
 
 - `inspect` font records now expose `cssFamily`, `aliases`, `asset` (file, SHA-256, face index, PostScript name), and `office` (legacy family and RIBBI style), replacing the ambiguous flat family/file fields. Collection members are no longer collapsed by filename.
 
-### Acceptance pending
+### Acceptance
 
-- #32 remains open pending exact-font PowerPoint edit/save/reopen and an accepted font-fixture Oracle record. The observed host limitations and saved-family changes are recorded in `fixtures/corpus/fonts/office-identity/expected/editability.json`; structural Verification and package checks are not font-fidelity proof.
+- #32 passed exact-font acceptance on an isolated QA Mac running PowerPoint 16.114.2: all seven native text objects edited/saved/reopened with unchanged Office families/RIBBI, and both PDF exports used the seven pinned faces without substitution or wrapping. The font-only Oracle and visual gate are enabled (0.56% difference, below the unchanged 1.25% limit). `fixtures/corpus/fonts/office-identity/expected/editability.json` retains the earlier blocked attempts and the accepted evidence. Developer fonts and existing corpus Oracle records are unchanged; #32 remains open for review.
 
 ## 0.2.0 - 2026-10-08
 
