@@ -38,7 +38,7 @@ A Slide may live in its own file: `<section data-src="slides/01-intro.html"></se
 
 ## Assets
 
-`img[src]`, `video[src|poster]`, `audio[src]`, `source[src]`, CSS `url()` (backgrounds, `@font-face`) and `link[href]` resolve relative to the file that references them (the Deck file, or the per-file Slide document). `data:` URIs are allowed. `http(s)` and any other scheme is `VALIDATE_REMOTE_ASSET` (error; hint: save the file into the Deck's asset directory). A missing local file is `VALIDATE_MISSING_ASSET` (error).
+`img[src]`, `video[src|poster]`, `audio[src]`, `source[src]`, CSS `url()` (backgrounds, `@font-face`) and `link[href]` resolve relative to the file that references them (the Deck file, or the per-file Slide document); a URL inside a stylesheet resolves relative to that stylesheet. `data:` URIs are allowed. Stylesheets (`link[href]`, `@import`) and `@font-face` sources may also be `http(s)`: they are downloaded once and pinned in the Asset directory's `fonts/` ([07](07-fonts.md#deck-font-assets)). Any other `http(s)` or other-scheme asset is `VALIDATE_REMOTE_ASSET` (error; hint: save the file into the Deck's asset directory). A missing local file is `VALIDATE_MISSING_ASSET` (error).
 
 For pictures and image fills, base64 and percent-encoded image data URIs use the same content-based format policy as local images: PNG/JPEG bytes are preserved, GIF/WebP are re-encoded to PNG, and SVG pictures retain their vector payload with a PNG fallback (SVG fills become PNG). Invalid embedded data or unsupported image formats produce `VALIDATE_IMAGE_ASSET` with an element locator. Conversion reports omit embedded payloads, including in CSS fallback Report entries. Remote image requests are blocked during conversion measurement.
 

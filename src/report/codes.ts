@@ -128,6 +128,21 @@ export const CODES = {
     severity: 'warning',
     hint: 'Install {family} before editing to keep layout faithful',
   },
+  FONT_ASSET_UNAVAILABLE: {
+    kind: 'error',
+    severity: 'error',
+    hint: 'Convert once with network access so deckflip pins it in the Asset directory, or save the file next to the Deck and reference it relatively',
+  },
+  FONT_ASSET_UNSUPPORTED: {
+    kind: 'error',
+    severity: 'error',
+    hint: 'Supply the face as a TTF, OTF, WOFF or WOFF2 file through url(); deckflip never measures local() faces',
+  },
+  FONT_GLYPH_FALLBACK: {
+    kind: 'substituted',
+    severity: 'warning',
+    hint: 'Use a face of {family} that covers every character, or remove the characters; a unicode-range subset covers only its range',
+  },
   RASTER_CSS_FILTER: {
     kind: 'rasterised',
     severity: 'warning',

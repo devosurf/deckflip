@@ -1,5 +1,7 @@
 // Conversion report schema (docs/spec/01-cli.md, 08-report-codes.md).
 
+import type { ResolvedFont } from '../model/index.js';
+
 export type EntryKind = 'error' | 'rasterised' | 'flattened' | 'substituted' | 'dropped' | 'preserved' | 'overridden' | 'flagged';
 export type Severity = 'error' | 'warning' | 'info';
 
@@ -24,6 +26,8 @@ export interface Report {
   input: { path: string; kind: 'html' | 'pptx' };
   output?: { path: string; kind: 'pptx' | 'html' | 'png' };
   canvas: { width: number; height: number; source: 'default' | 'deck-meta' | 'flag' };
+  /** `convert`/`validate`: each selected face once, with its asset identity and where its bytes came from */
+  fonts?: ResolvedFont[];
   summary: {
     slides: number;
     native: number;

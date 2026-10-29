@@ -6,6 +6,7 @@ import type { Browser } from 'playwright-core';
 import type { Canvas } from '../model/index.js';
 import { convertHtmlToPptx, convertPptxToHtml, inferKind, validateHtml, validatePptx, verifyConversion } from '../convert.js';
 import { FontCatalog, resolveDeckFonts } from '../fonts/index.js';
+import { DeckFontSession } from '../html/fonts.js';
 import { loadDeck } from '../html/load.js';
 import { measureDeck } from '../html/measure.js';
 import { inspectDeck } from '../inspect/index.js';
@@ -181,10 +182,12 @@ async function handleRender(input: string, options: RenderCliOptions): Promise<n
       ...(options.browser === undefined ? {} : { browserPath: options.browser }),
       offline: options.offline,
     });
+    const fonts = await DeckFontSession.open(loaded);
     try {
       const images = await renderHtml(loaded, {
         browser,
         dpi: options.dpi,
+        fonts,
         ...(slideFilter === undefined ? {} : { slides: slideFilter }),
       });
       for (const [index, png] of images) {
@@ -192,6 +195,7 @@ async function handleRender(input: string, options: RenderCliOptions): Promise<n
       }
       return 0;
     } finally {
+      await fonts.close();
       await browser.close();
     }
   }
@@ -215,7 +219,7 @@ async function handleRender(input: string, options: RenderCliOptions): Promise<n
 async function handleInspect(input: string): Promise<number> {
   if (inferKind(input) === 'pptx') {
     const deck = await parsePptx(new Uint8Array(await readFile(input)));
-    const catalog = await FontCatalog.scan({ extraFiles: [] });
+    const catalog = await FontCatalog.scan();
     resolveDeckFonts(deck, catalog, { embedFonts: false });
     process.stdout.write(`${JSON.stringify(inspectDeck(deck), null, 2)}\n`);
     return 0;
@@ -224,7 +228,7 @@ async function handleInspect(input: string): Promise<number> {
   const browser = await launchChromium({ offline: false });
   try {
     const measured = await measureDeck(loaded, { browser });
-    const catalog = await FontCatalog.scan({ deckFaces: measured.deck.fontFaces });
+    const catalog = await FontCatalog.scan({ declared: measured.fonts.declared });
     resolveDeckFonts(measured.deck, catalog, { embedFonts: false });
     process.stdout.write(`${JSON.stringify(inspectDeck(measured.deck), null, 2)}\n`);
     return 0;

@@ -9,8 +9,8 @@ Every entry carries `code`, `kind`, `severity`, `reason` and `hint`; element-lev
 | `VALIDATE_UNKNOWN_META` | `meta[name^="deckflip:"]` not in the dialect | Remove it; known names: `deckflip:canvas` |
 | `VALIDATE_STRAY_CONTENT` | element in `body` outside any `section` | Move it into a `<section>` |
 | `VALIDATE_SLIDE_SIZE` | a section's border box is not the Canvas | Set no width/height on sections |
-| `VALIDATE_REMOTE_ASSET` | `http(s):` or other non-local URL | Save the file next to the deck and reference it relatively |
-| `VALIDATE_MISSING_ASSET` | local asset not found | Check the path relative to the deck file |
+| `VALIDATE_REMOTE_ASSET` | `http(s):` or other non-local URL, except stylesheets and `@font-face` sources (pinned instead) | Save the file next to the deck and reference it relatively |
+| `VALIDATE_MISSING_ASSET` | local asset not found, including a stylesheet or a needed `@font-face` file | Check the path relative to the referencing file |
 | `VALIDATE_IMAGE_ASSET` | invalid embedded data, unsupported image format, or decoding failure | Use a valid PNG, JPEG, GIF, WebP or SVG image; check embedded data URI encoding |
 | `VALIDATE_ELEMENT` | `script`, `iframe`, `object`, `embed`, `canvas`, form controls, `details`, `dialog`, `marquee` | Replace with static HTML |
 | `VALIDATE_TEXT_CSS` | `hyphens: auto`, `text-wrap: balance\|pretty`, vertical `writing-mode`, `column-*`, `text-orientation`, `font-size-adjust`, `font-stretch` | Remove the declaration |
@@ -28,8 +28,11 @@ Every entry carries `code`, `kind`, `severity`, `reason` and `hint`; element-lev
 | `FONT_GENERIC_ONLY` | error | the first resolvable entry is a generic family | Put a concrete family before the generic |
 | `FONT_IDENTITY_INVALID` | error | insufficient/conflicting Office identity metadata, unsupported legacy subfamily or variable instance | Choose a supported static face with consistent legacy names/style bits; do not edit font tables or remap weights |
 | `FONT_EMBED_UNSUPPORTED` | error | explicit embedding request; embedding is not implemented | Remove `--embed-fonts`; use a safe font or install the Resolved font on every viewing machine |
+| `FONT_ASSET_UNAVAILABLE` | error | a needed hosted stylesheet or font could not be downloaded and is not pinned, or its pin was removed or changed | Convert once with network access so it is pinned in `<name>.assets/fonts/`, or save the file next to the deck |
+| `FONT_ASSET_UNSUPPORTED` | error | a needed `@font-face` has only `local()` sources, no loadable format, or bytes that are no TTF/OTF/WOFF/WOFF2 font | Supply the face as a TTF, OTF, WOFF or WOFF2 file through `url()` |
 | `FONT_NOT_SAFE` | warning | Resolved font outside the safe set and not embedded, regardless of an embedding request | Use a safe font or install the Resolved font on every viewing machine |
-| `FONT_EMBED_RESTRICTED` | warning | reserved for the embedding milestone: the font's licence bits forbid editable embedding | Choose another font |
+| `FONT_GLYPH_FALLBACK` | warning | the selected face lacks characters the text uses (outside its glyphs or `unicode-range`); Chromium drew them with another font | Use a face that covers every character, or remove the characters |
+| `FONT_EMBED_RESTRICTED` | warning | a Deck-provided face's licence bits (`fsType`) rule out editable embedding | Choose another font |
 | `FONT_EMBED_FORMAT` | warning | reserved for the embedding milestone: WOFF2 or TTC source cannot be embedded | Provide the family as TTF, OTF or WOFF |
 | `FONT_MISSING_FOR_LAYOUT` | warning | PPTX -> HTML: source font not installed, not embedded | Install it before editing to keep layout faithful |
 

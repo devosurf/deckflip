@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { chromium } from 'playwright-core';
-import type { Browser } from 'playwright-core';
+import type { Browser, Page } from 'playwright-core';
 import { DeckflipError } from '../report/types.js';
 
 interface SlideDocument {
@@ -72,7 +72,13 @@ async function writeTemporaryHtml(sourceFile: string, html: string): Promise<str
   return tempPath;
 }
 
-async function renderSlide(browser: Browser, loaded: LoadedDeck, slide: SlideDocument, dpi: number): Promise<Buffer> {
+/** The Deck font session (html/fonts.ts), so a render loads the same pinned faces measurement does. */
+export interface RenderFonts {
+  attach(page: Page, slide: number, documentFile: string): Promise<void>;
+  settle(page: Page, slide: number): Promise<void>;
+}
+
+async function renderSlide(browser: Browser, loaded: LoadedDeck, slide: SlideDocument, dpi: number, fonts?: RenderFonts): Promise<Buffer> {
   const htmlPath = await writeTemporaryHtml(slide.sourceFile, slide.html);
   const context = await browser.newContext({
     viewport: { width: loaded.canvas.width, height: loaded.canvas.height },
@@ -82,7 +88,9 @@ async function renderSlide(browser: Browser, loaded: LoadedDeck, slide: SlideDoc
   try {
     const page = await context.newPage();
     try {
+      await fonts?.attach(page, slide.index, slide.sourceFile);
       await page.goto(pathToFileURL(htmlPath).href, { waitUntil: 'load' });
+      await fonts?.settle(page, slide.index);
       await page.addStyleTag({
         content: '*,*::before,*::after{animation-play-state:paused!important;transition:none!important;}',
       });
@@ -105,13 +113,13 @@ async function renderSlide(browser: Browser, loaded: LoadedDeck, slide: SlideDoc
 
 export async function renderHtml(
   loaded: LoadedDeck,
-  opts: { browser: Browser; dpi: number; slides?: number[] },
+  opts: { browser: Browser; dpi: number; slides?: number[]; fonts?: RenderFonts },
 ): Promise<Map<number, Buffer>> {
   const selected = opts.slides ? new Set(opts.slides) : undefined;
   const out = new Map<number, Buffer>();
   for (const slide of loaded.documents) {
     if (selected && !selected.has(slide.index)) continue;
-    out.set(slide.index, await renderSlide(opts.browser, loaded, slide, opts.dpi));
+    out.set(slide.index, await renderSlide(opts.browser, loaded, slide, opts.dpi, opts.fonts));
   }
   return out;
 }

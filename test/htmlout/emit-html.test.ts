@@ -23,7 +23,6 @@ function deckWith(elements: Element[], slides: Partial<Deck['slides'][number]>[]
     title: 'Quarterly <review>',
     lang: 'sv-SE',
     canvas: { width: 960, height: 540, source: 'deck-meta' },
-    fontFaces: [],
     slides: slides.map((slide, index) => ({ index: index + 1, id: `slide-${index + 1}`, name: `Slide ${index + 1}`, layout: 'Blank', elements: index === 0 ? elements : [], ...slide })),
   };
 }

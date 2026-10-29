@@ -29,7 +29,7 @@ Replacing an animation, transition, or unsupported construct with a static equiv
 _Avoid_: Degrade, strip, simplify
 
 **Conversion report**:
-The record of everything a conversion flattened, rasterised, substituted or dropped, and why; also its Layout flags and Verification errors.
+The record of everything a conversion flattened, rasterised, substituted or dropped, and why; also its Layout flags, Verification errors and the Resolved fonts it selected.
 _Avoid_: Log, warnings, diagnostics
 
 **Report entry**:
@@ -73,8 +73,12 @@ A self-contained HTML document holding exactly one Slide, referenced from a Deck
 _Avoid_: Slide file, fragment, partial
 
 **Asset directory**:
-The `<name>.assets/` directory next to a Deck file holding its media, fonts, previews, Manifest and, after PPTX->HTML, the source package.
+The `<name>.assets/` directory next to a Deck file holding its media, fonts, Pinned font sources, previews, Manifest and, after PPTX->HTML, the source package.
 _Avoid_: Output folder, resources, attachments
+
+**Pinned font source**:
+A downloaded stylesheet or font file a Deck's CSS refers to, frozen in its Asset directory so every later conversion measures the same bytes without the network.
+_Avoid_: Cache, lock file, vendored font
 
 **Text block**:
 The lowest block-level element whose rendered content is inline, or a list or table cell; the unit that becomes one text body.
@@ -101,7 +105,7 @@ An element or Slide whose Fingerprint still matches the Manifest, so its origina
 _Avoid_: Unchanged, pristine, clean
 
 **Resolved font**:
-The selected font asset and face for a text run, together with its CSS match and Office font identity. A Resolved font identifies a face, not proof of embedding, glyph fallback or fidelity.
+The selected font asset and face for a text run, together with its CSS match, Office font identity and where the asset's bytes came from. A Resolved font identifies a face, not proof of embedding, glyph fallback or fidelity.
 _Avoid_: Effective font, fallback font, used font
 
 **CSS font alias**:

@@ -1,13 +1,6 @@
 import type { Align, AutonumScheme, Box, Bullet, Color, CornerRadius, Fill, GroupElement, ImageFill, ImagePlacement, Insets, Line, OpaqueClass, OpaqueElement, Paragraph, PictureElement, Run, RunStyle, ShapeElement, TableCell, TableElement, TableRow, TextBody } from '../model/index.js';
 import type { HtmlChild, HtmlNode } from '../roundtrip/fingerprint.js';
 
-export interface BrowserFontFace {
-  family: string;
-  file: string;
-  weight?: number;
-  italic?: boolean;
-}
-
 /** A report entry raised inside the page; measure.ts attaches slide, kind, severity and hint. */
 export interface BrowserEntry {
   code: string;
@@ -69,8 +62,19 @@ export interface BrowserMeasureResult {
   tree: HtmlNode;
   shapes: BrowserElement[];
   entries: BrowserEntry[];
-  fontFaces: BrowserFontFace[];
+  /** every text node of the Visible text, in document order, as the font audit reads it; the nodes stay on `window` for CDP */
+  renderedText: BrowserRenderedText[];
   census: BrowserCensus;
+}
+
+/** A laid-out text node: what it asks of fonts. Its index matches `window.__deckflipRenderedText`. */
+export interface BrowserRenderedText {
+  /** the text's owner, as the Census names it */
+  selector: string;
+  fontStack: string[];
+  weight: number;
+  italic: boolean;
+  text: string;
 }
 
 /** The element a piece of Visible text belongs to: the one carrying its `data-shape-id`, else its nearest block container. */
@@ -94,6 +98,9 @@ export interface BrowserCensus {
 
 /** Marks the stylesheet measure.ts injects to freeze animations; `validateDocument` lifts it while reading `transition`. */
 export const FREEZE_ATTR = 'data-deckflip-freeze';
+
+/** Where the page script leaves the text nodes of `renderedText`, for measure.ts to look up through CDP. */
+export const RENDERED_TEXT_GLOBAL = '__deckflipRenderedText';
 
 /** Natural sizes of every `background-image: url()` in the document, keyed by resolved URL; `null` when it did not load. */
 export type BackgroundImageSizes = Record<string, { width: number; height: number } | null>;
@@ -138,7 +145,7 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
       tree: { tag: 'section', attrs: {}, children: [] },
       shapes: [],
       entries: [],
-      fontFaces: collectFontFaces(document.baseURI),
+      renderedText: [],
       census: { text: [], notes: '', stacking: [] },
     };
   }
@@ -195,7 +202,7 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
     tree,
     shapes,
     entries,
-    fontFaces: collectFontFaces(document.baseURI),
+    renderedText: renderedText(),
     census: { text: visibleText(), notes: notesText(), stacking: stackingOrder() },
   };
 
@@ -439,6 +446,29 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
       }
       return out;
     });
+  }
+
+  /**
+   * The font audit's view (#34): each text node of the Visible text with the font request its element computes.
+   * The nodes stay on `window.__deckflipRenderedText` (`RENDERED_TEXT_GLOBAL`), in the same order, so measure.ts
+   * can ask Chromium which platform fonts drew each one.
+   */
+  function renderedText(): BrowserRenderedText[] {
+    const out: BrowserRenderedText[] = [];
+    const nodes: Text[] = [];
+    const walker = document.createTreeWalker(section!, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const parent = node.parentElement;
+      if (!parent || !showsText(parent) || !isLaidOut(node as Text)) continue;
+      const owner = textOwner(parent);
+      const text = applyTextTransform(parent, removeSoftHyphens(node.textContent ?? ''));
+      if (!owner || !hasVisibleText(text)) continue;
+      const cs = getComputedStyle(parent);
+      out.push({ selector: cssPath(owner), fontStack: fontStackOf(cs), weight: parseFontWeight(cs.fontWeight), italic: /italic|oblique/i.test(cs.fontStyle), text });
+      nodes.push(node as Text);
+    }
+    (window as unknown as Record<string, unknown>).__deckflipRenderedText = nodes;
+    return out;
   }
 
   /**
@@ -2654,7 +2684,7 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
 
   function styleFromElement(el: Element): RunStyle {
     const cs = getComputedStyle(el);
-    const fontStack = cs.fontFamily.split(',').map((entry) => entry.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean);
+    const fontStack = fontStackOf(cs);
     const weight = parseFontWeight(cs.fontWeight);
     const size = px(cs.fontSize);
     const italic = /italic|oblique/i.test(cs.fontStyle);
@@ -3142,43 +3172,9 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
     return blocks.length === 1 ? blocks[0] : undefined;
   }
 
-  function collectFontFaces(baseUrl: string): BrowserFontFace[] {
-    const faces: BrowserFontFace[] = [];
-    for (const sheet of Array.from(document.styleSheets)) {
-      let rules: CSSRuleList;
-      try {
-        rules = sheet.cssRules;
-      } catch {
-        continue;
-      }
-      for (const rule of Array.from(rules)) {
-        if (rule.type !== CSSRule.FONT_FACE_RULE) {
-          continue;
-        }
-        const fontFace = rule as CSSFontFaceRule;
-        const family = fontFace.style.getPropertyValue('font-family').trim().replace(/^['"]|['"]$/g, '');
-        const src = fontFace.style.getPropertyValue('src');
-        const urlMatch = src.match(/url\((['"]?)([^'")]+)\1\)/i);
-        if (!family || !urlMatch) {
-          continue;
-        }
-        const resolved = new URL(urlMatch[2]!, baseUrl);
-        if (resolved.protocol !== 'file:') {
-          continue;
-        }
-        const face: BrowserFontFace = { family, file: resolved.href };
-        const weightValue = fontFace.style.getPropertyValue('font-weight').trim();
-        const styleValue = fontFace.style.getPropertyValue('font-style').trim();
-        if (weightValue) {
-          face.weight = parseFontWeight(weightValue);
-        }
-        if (/italic|oblique/i.test(styleValue)) {
-          face.italic = true;
-        }
-        faces.push(face);
-      }
-    }
-    return faces;
+  /** Computed `font-family` as a stack, quotes stripped, in order. */
+  function fontStackOf(cs: CSSStyleDeclaration): string[] {
+    return cs.fontFamily.split(',').map((entry) => entry.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean);
   }
 
   /** Kills float noise from rect arithmetic while keeping Chromium's 1/64 px layout values (6 decimals) exact, so they survive the EMU round trip. */

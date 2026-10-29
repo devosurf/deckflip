@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Pin Deck font assets (#34): every stylesheet and `@font-face` source a Slide loads, local or `http(s)`, linked, `@import`ed or nested in `@media`/`@supports`/`@layer`, is resolved against its own stylesheet and answered by deckflip before Chromium measures. Downloads are frozen in `<name>.assets/fonts/` (`sources.json` maps each URL by hash) and reused, offline included; a pin is never refreshed. WOFF and WOFF2 are decoded to sfnt, which identifies the asset and is what Chromium measures.
+- `local()` sources are ignored, so installed fonts never replace supplied bytes; a declared family matches only its own `@font-face` rules, by CSS weight/style matching. `unicode-range` subsets are selected by the characters a run uses.
+- New report codes: `FONT_ASSET_UNAVAILABLE` and `FONT_ASSET_UNSUPPORTED` (errors) for faces a Slide needs that cannot be downloaded/pinned or decoded, and `FONT_GLYPH_FALLBACK` (warning), a font audit comparing each drawn text node's selected face and character coverage with the platform fonts Chromium actually used. Missing local stylesheets and font files are `VALIDATE_MISSING_ASSET`. `FONT_EMBED_RESTRICTED` now reports Deck-provided faces whose `fsType` rules out editable embedding.
+- The Conversion report lists each selected face as `fonts`, the same Resolved fonts `inspect` prints, with `asset.source` (`installed`, `file`, `remote` with its pinned copy, or `data`), acquired format and hashes. URLs never include credentials or query values.
+
+### Changed
+
+- `asset.file` in Resolved fonts moved to `asset.source`; `asset.sha256` is the decoded face's hash. Installed-face weight matching follows CSS Fonts 4 (a 400 request prefers 500 over 300).
+- `render` of an HTML Deck loads the same pinned faces as measurement.
+- The `text/emoji` corpus report now records the CJK and emoji glyphs Verdana lacks as `FONT_GLYPH_FALLBACK`; its package digest is unchanged.
+
+### Fixed
+
+- `@font-face` rules in linked local stylesheets were invisible to font resolution (Chromium blocks their CSSOM), so the selected face could differ from the measured one; remote and imported rules were ignored the same way.
+
 ## 0.3.0 - 2026-10-29
 
 ### Fixed

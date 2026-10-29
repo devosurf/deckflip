@@ -24,7 +24,7 @@ Run-scoped settings are flags; Deck-intrinsic settings live in deck metadata. No
 ## Exit codes
 `0` success (report entries allowed) · `1` no output produced (internal/renderer/Chromium failure, unreadable PPTX) · `2` validation failed, nothing converted · `3` bad invocation · `4` Strict mode: output and report written but the report is non-empty · `5` output and report written, but Verification found the output differs from the source.
 
-Precedence: `3` > `1` > `2` > `5` > `4` > `0`. Validation errors take precedence over Strict mode for both input kinds and both `convert` and `validate`: exit 2, with a diagnostic report available. Failed conversion does not create a converted Deck or Asset directory and leaves any existing destination Deck/assets unchanged. Verification errors exit 5 with or without Strict mode and keep the output. Otherwise, a nonempty report returns 4 under Strict mode and 0 without it; successful conversion output remains available. Clean operations return 0 in either mode. `verify` returns 0 or 5; 2 when its HTML source fails validation, while an HTML output that fails validation is a deckflip defect like any Verification error (5).
+Precedence: `3` > `1` > `2` > `5` > `4` > `0`. Validation errors take precedence over Strict mode for both input kinds and both `convert` and `validate`: exit 2, with a diagnostic report available. Failed conversion does not create a converted Deck or Asset directory and leaves any existing destination Deck/assets unchanged. Downloads an HTML source needs are pinned in that source's own Asset directory (`<name>.assets/fonts/`, [07](07-fonts.md#deck-font-assets)) whatever the outcome, so a repeat run measures the same bytes. Verification errors exit 5 with or without Strict mode and keep the output. Otherwise, a nonempty report returns 4 under Strict mode and 0 without it; successful conversion output remains available. Clean operations return 0 in either mode. `verify` returns 0 or 5; 2 when its HTML source fails validation, while an HTML output that fails validation is a deckflip defect like any Verification error (5).
 
 ## Conversion report
 Always written as a sidecar `<output>.report.json` unless `--report <path>` selects another destination. Both conversion directions honor the selected destination on success, Strict-mode failure, and validation failure, creating missing parent directories. An override does not also write the default sidecar or remove pre-existing unrelated files. `--json` puts the same document on stdout; human summary on stderr (one line per Slide with counts, then one line per entry). Schema:
@@ -37,6 +37,18 @@ Always written as a sidecar `<output>.report.json` unless `--report <path>` sele
   "input":  { "path": "deck.html", "kind": "html" },
   "output": { "path": "deck.pptx", "kind": "pptx" },
   "canvas": { "width": 1280, "height": 720, "source": "deck-meta" },
+  "fonts": [
+    {
+      "cssFamily": "Brand", "aliases": ["heebo", "heebo medium"], "class": "deck-provided",
+      "asset": {
+        "sha256": "<sha256 of the decoded sfnt>", "faceIndex": 0, "postscriptName": "Heebo-Medium",
+        "source": { "kind": "remote", "url": "https://fonts.example.com/s/heebo.woff2", "format": "woff2", "sha256": "<sha256 of the download>", "pinned": "/deck/deck.assets/fonts/<sha256>.woff2" }
+      },
+      "office": { "family": "Heebo Medium", "style": "regular" },
+      "metrics": { "ascender": 1.0478515625, "descender": 0.4208984375 },
+      "fsType": 0
+    }
+  ],
   "summary": { "slides": 12, "native": 140, "rasterised": 3, "flattened": 2, "substituted": 1, "dropped": 0, "preserved": 0, "overridden": 0, "flagged": 0, "errors": 0 },
   "entries": [
     {
@@ -53,6 +65,7 @@ Always written as a sidecar `<output>.report.json` unless `--report <path>` sele
 ```
 - `kind`: `rasterised | flattened | substituted | dropped | preserved | overridden | flagged | error`; `severity`: `error | warning | info`. `error` entries come from validation (exit 2) or from Verification (`VERIFY_*`, exit 5); `flagged` entries are Layout flags.
 - Locator: `{selector}` for HTML input, `{shapeId, name}` for PPTX input; `slide` is 1-based. Verification locates an output-only finding by its paired source element where it has one.
+- `fonts` (`convert` and `validate`): each selected face once, the Resolved font `inspect` also lists ([07](07-fonts.md#resolution-and-office-identity)). It is provenance, not a Report entry, so it never affects Strict mode.
 - Codes are an enumerated list, stable once published, grouped by family: `VALIDATE_*`, `RASTER_*`, `FLATTEN_*`, `SUBSTITUTE_*`, `FONT_*`, `PRESERVE_*`, `DROPPED_*`, `OVERRIDE_*`, `RENDER_*`, `LAYOUT_*`, `VERIFY_*`. The complete list with hint templates is [08-report-codes.md](08-report-codes.md).
 - `hint` is mandatory for every non-error entry: it is what makes the agent loop converge.
 
