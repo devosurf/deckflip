@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 - 2026-10-29
 
 ### Fixed
 
@@ -15,7 +15,7 @@
 
 ### Acceptance
 
-- #32 passed exact-font acceptance on an isolated QA Mac running PowerPoint 16.114.2: all seven native text objects edited/saved/reopened with unchanged Office families/RIBBI, and both PDF exports used the seven pinned faces without substitution or wrapping. The font-only Oracle and visual gate are enabled (0.56% difference, below the unchanged 1.25% limit). `fixtures/corpus/fonts/office-identity/expected/editability.json` retains the earlier blocked attempts and the accepted evidence. Developer fonts and existing corpus Oracle records are unchanged; #32 remains open for review.
+- #32 passed exact-font acceptance on an isolated QA Mac running PowerPoint 16.114.2: all seven native text objects edited/saved/reopened with unchanged Office families/RIBBI, and both PDF exports used the seven pinned faces without substitution or wrapping. The font-only Oracle and visual gate are enabled (0.56% difference, below the unchanged 1.25% limit). `fixtures/corpus/fonts/office-identity/expected/editability.json` retains the earlier blocked attempts and the accepted evidence. Developer fonts and existing corpus Oracle records are unchanged.
 
 ## 0.2.0 - 2026-10-08
 
