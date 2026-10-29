@@ -1,0 +1,53 @@
+{
+  "description": "Extra inputs for the #33 cases, beyond fixtures/corpus/fonts/_assets. All are OFL-1.1 fonts; none are committed. fetch-sources.mjs downloads and verifies them into sources/.",
+  "downloads": [
+    {
+      "file": "SourceSans3-Regular.otf",
+      "url": "https://raw.githubusercontent.com/adobe-fonts/source-sans/ed1808970eb3c7301c9a523bee26473ba0bb62fa/OTF/SourceSans3-Regular.otf",
+      "sha256": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6",
+      "note": "CFF OpenType from the same 3.052R commit as the pinned TTFs"
+    },
+    {
+      "file": "SourceSans3-Bold.otf",
+      "url": "https://raw.githubusercontent.com/adobe-fonts/source-sans/ed1808970eb3c7301c9a523bee26473ba0bb62fa/OTF/SourceSans3-Bold.otf",
+      "sha256": "7776ddb9f3eb58683e59f28d558d8896b768c2d0c80799fb3f1c56c54dfd98c9"
+    },
+    {
+      "file": "SourceSans3-It.otf",
+      "url": "https://raw.githubusercontent.com/adobe-fonts/source-sans/ed1808970eb3c7301c9a523bee26473ba0bb62fa/OTF/SourceSans3-It.otf",
+      "sha256": "430b9f0eb1170be0981706d14b6cf87122efba9d86c373bbdf69daf276421462"
+    },
+    {
+      "file": "SourceSans3-BoldIt.otf",
+      "url": "https://raw.githubusercontent.com/adobe-fonts/source-sans/ed1808970eb3c7301c9a523bee26473ba0bb62fa/OTF/SourceSans3-BoldIt.otf",
+      "sha256": "05e97d9adc01059607e97b167a68afb25680db904db7aba831dc2510f14b6515"
+    },
+    {
+      "file": "heebo-500-latin.woff2",
+      "url": "https://fonts.gstatic.com/s/heebo/v28/NGSpv5_NC0k9P_v6ZUCbLRAHxK1EuyysdUmm7UiCXB5W.woff2",
+      "sha256": "b6a547226e1beb2400d5f681865d2ceeae178e735396f624974aad9127b1beb8",
+      "note": "Google Fonts css2 ?family=Heebo:wght@500 with a Chrome User-Agent: 'latin' unicode-range subset (U+0000-00FF, U+0131, U+0152-0153, ...)"
+    },
+    {
+      "file": "heebo-500-hebrew.woff2",
+      "url": "https://fonts.gstatic.com/s/heebo/v28/NGSpv5_NC0k9P_v6ZUCbLRAHxK1Euyysd0mm7UiCXB5WkK8.woff2",
+      "sha256": "cd6b414196944824e7ab2fff0820f3bb307bb9e2c994cf37e1bec05f12287b66",
+      "note": "Same request, 'hebrew' unicode-range subset"
+    },
+    {
+      "file": "heebo-500-full.ttf",
+      "url": "https://fonts.gstatic.com/s/heebo/v28/NGSpv5_NC0k9P_v6ZUCbLRAHxK1Euyyccg.ttf",
+      "sha256": "be6f6f11ff9ec81515f08386c1ce0331f36b1a72fefed8530a7c35e27aebf491",
+      "note": "Same request without a browser User-Agent: one complete TTF, no unicode-range"
+    }
+  ],
+  "derived": [
+    {
+      "file": "Heebo-Variable-wght500.instance.ttf",
+      "from": "fixtures/corpus/fonts/_assets/heebo/Heebo-Variable.ttf",
+      "command": "fonttools varLib.instancer ../../fixtures/corpus/fonts/_assets/heebo/Heebo-Variable.ttf wght=500 --static --no-recalc-timestamp -q -o sources/Heebo-Variable-wght500.instance.ttf",
+      "tool": "fonttools 4.60.1",
+      "sha256": "44ebf59919c79227c55aa71e71fdf82782d60823fb1b7d080f61c07335dfbb90"
+    }
+  ]
+}

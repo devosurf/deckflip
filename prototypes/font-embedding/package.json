@@ -1,0 +1,20 @@
+{
+  "name": "font-embedding-prototype",
+  "private": true,
+  "type": "module",
+  "description": "Wayfinder #33: PowerPoint for Mac embedded-font compatibility experiment",
+  "scripts": {
+    "sources": "node fetch-sources.mjs",
+    "build": "node build-cases.mjs",
+    "inspect": "node inspect-pptx.mjs",
+    "pdf-fonts": "node pdf-fonts.mjs",
+    "measure": "node chromium-measure.mjs"
+  },
+  "dependencies": {
+    "fontkit": "2.0.4",
+    "jszip": "3.10.1",
+    "pdfjs-dist": "5.4.624",
+    "playwright-core": "1.62.1",
+    "wawoff2": "2.0.1"
+  }
+}

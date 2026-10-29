@@ -1,0 +1,4953 @@
+{
+  "issue": 33,
+  "date": "2026-10-29",
+  "host": {
+    "os": "macOS 26.7 (25G229), arm64",
+    "powerpoint": "Microsoft PowerPoint for Mac 16.114.2 (bundle 16.114.26102345), Microsoft 365",
+    "cuaDriver": "0.37.0",
+    "chromium": "151.0.7922.34 (playwright-core 1.62.1)",
+    "fontTools": "4.60.1",
+    "wawoff2": "2.0.1"
+  },
+  "fontsUnderTest": "fixtures/corpus/fonts/_assets/manifest.json (unmodified Heebo 3.100 and Source Sans 3 3.052R, OFL-1.1); extra sources pinned in sources.json",
+  "isolation": {
+    "fontsMovedOut": "The seven pinned faces (installed for #32 in the QA user's ~/Library/Fonts) were moved outside every font directory for the run and restored afterwards with verified SHA-256.",
+    "systemCheck": "NSFontManager availableFontFamilies/availableFonts contained no Heebo or Source Sans family/face during every run (183 families) and both again after restore (185).",
+    "officeCloudFonts": "Office's cloud-font catalog on this host lists Heebo (Thin..Black) but not Source Sans 3. With the fonts removed, PowerPoint downloaded cloud Heebo (4 faces) on first open even with OfficeExperiencesDownloadingContentPreference=FALSE, and still rendered cloud Heebo with a read-only CloudFonts cache. Isolation required BOTH com.microsoft.office ConnectedOfficeExperiencesPreference=FALSE and a read-only FontCache/4/CloudFonts directory; both were restored afterwards (originally TRUE / writable, cache holding only Segoe UI).",
+    "controls": {
+      "before": "control-no-embedding: every box rendered in Calibri (PDF fonts Calibri*), line breaks differ from the fonts-installed baseline",
+      "after": "control-after: identical Calibri fallback; no Heebo/Source Sans in the cloud cache or system — no embedded face leaked between cases"
+    },
+    "perCaseProcess": "PowerPoint was quit and relaunched between cases and between save and reopen.",
+    "developerMachine": "unchanged; all PowerPoint work ran on the separate QA Mac"
+  },
+  "powerpointNativeEmbedding": {
+    "how": "With the fonts installed, PowerPoint opened the deckflip #32 office-identity package with embedTrueTypeFonts=\"1\" (and saveSubsetFonts=\"1\" for the subset variant), and saved in place. Packages: ref/powerpoint-embed-all.pptx, ref/powerpoint-embed-subset.pptx.",
+    "embedAll": {
+      "sha256": "4805006408c226eb68fa5e22dbd3c3b1264aa53844c62a6ff209674ce814c269",
+      "presentationAttributes": "embedTrueTypeFonts=\"1\"",
+      "fontContentType": "application/x-fontdata",
+      "fontRelationshipType": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font",
+      "slots": [
+        {
+          "typeface": "Heebo",
+          "slot": "regular",
+          "eotVersion": "0x20002",
+          "flags": "0x4",
+          "eotFamily": "Heebo Medium",
+          "eotStyle": "Regular",
+          "weight": 500,
+          "fsType": "0x0",
+          "bytes": 40888
+        },
+        {
+          "typeface": "Heebo",
+          "slot": "bold",
+          "eotVersion": "0x20002",
+          "flags": "0x4",
+          "eotFamily": "Heebo",
+          "eotStyle": "Bold",
+          "weight": 700,
+          "fsType": "0x0",
+          "bytes": 40914
+        },
+        {
+          "typeface": "Heebo ExtraBold",
+          "slot": "bold",
+          "eotVersion": "0x20002",
+          "flags": "0x4",
+          "eotFamily": "Heebo ExtraBold",
+          "eotStyle": "Regular",
+          "weight": 800,
+          "fsType": "0x0",
+          "bytes": 41174
+        },
+        {
+          "typeface": "Heebo Medium",
+          "slot": "regular",
+          "eotVersion": "0x20002",
+          "flags": "0x4",
+          "eotFamily": "Heebo Medium",
+          "eotStyle": "Regular",
+          "weight": 500,
+          "fsType": "0x0",
+          "bytes": 40888
+        },
+        {
+          "typeface": "Source Sans 3",
+          "slot": "regular",
+          "eotVersion": "0x20002",
+          "flags": "0x4",
+          "eotFamily": "Source Sans 3",
+          "eotStyle": "Regular",
+          "weight": 400,
+          "fsType": "0x0",
+          "bytes": 178404
+        },
+        {
+          "typeface": "Source Sans 3",
+          "slot": "bold",
+          "eotVersion": "0x20002",
+          "flags": "0x4",
+          "eotFamily": "Source Sans 3",
+          "eotStyle": "Bold",
+          "weight": 700,
+          "fsType": "0x0",
+          "bytes": 178875
+        },
+        {
+          "typeface": "Source Sans 3",
+          "slot": "italic",
+          "eotVersion": "0x20002",
+          "flags": "0x4",
+          "eotFamily": "Source Sans 3",
+          "eotStyle": "Italic",
+          "weight": 400,
+          "fsType": "0x0",
+          "bytes": 139101
+        },
+        {
+          "typeface": "Source Sans 3",
+          "slot": "boldItalic",
+          "eotVersion": "0x20002",
+          "flags": "0x4",
+          "eotFamily": "Source Sans 3",
+          "eotStyle": "Bold Italic",
+          "weight": 700,
+          "fsType": "0x0",
+          "bytes": 140006
+        }
+      ]
+    },
+    "embedSubset": {
+      "sha256": "8e394bb2bce88b43b0939464baf4518ad5c1d79f5637d484022a1d26a421c49c",
+      "presentationAttributes": "embedTrueTypeFonts=\"1\" saveSubsetFonts=\"1\"",
+      "fontContentType": "application/x-fontdata",
+      "fontRelationshipType": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/font",
+      "slots": [
+        {
+          "typeface": "Heebo",
+          "slot": "regular",
+          "eotVersion": "0x20002",
+          "flags": "0x5",
+          "eotFamily": "Heebo Medium",
+          "eotStyle": "Regular",
+          "weight": 500,
+          "fsType": "0x0",
+          "bytes": 23384
+        },
+        {
+          "typeface": "Heebo",
+          "slot": "bold",
+          "eotVersion": "0x20002",
+          "flags": "0x5",
+          "eotFamily": "Heebo",
+          "eotStyle": "Bold",
+          "weight": 700,
+          "fsType": "0x0",
+          "bytes": 23211
+        },
+        {
+          "typeface": "Heebo ExtraBold",
+          "slot": "bold",
+          "eotVersion": "0x20002",
+          "flags": "0x5",
+          "eotFamily": "Heebo ExtraBold",
+          "eotStyle": "Regular",
+          "weight": 800,
+          "fsType": "0x0",
+          "bytes": 23299
+        },
+        {
+          "typeface": "Heebo Medium",
+          "slot": "regular",
+          "eotVersion": "0x20002",
+          "flags": "0x5",
+          "eotFamily": "Heebo Medium",
+          "eotStyle": "Regular",
+          "weight": 500,
+          "fsType": "0x0",
+          "bytes": 23384
+        },
+        {
+          "typeface": "Source Sans 3",
+          "slot": "regular",
+          "eotVersion": "0x20002",
+          "flags": "0x5",
+          "eotFamily": "Source Sans 3",
+          "eotStyle": "Regular",
+          "weight": 400,
+          "fsType": "0x0",
+          "bytes": 85688
+        },
+        {
+          "typeface": "Source Sans 3",
+          "slot": "bold",
+          "eotVersion": "0x20002",
+          "flags": "0x5",
+          "eotFamily": "Source Sans 3",
+          "eotStyle": "Bold",
+          "weight": 700,
+          "fsType": "0x0",
+          "bytes": 86584
+        },
+        {
+          "typeface": "Source Sans 3",
+          "slot": "italic",
+          "eotVersion": "0x20002",
+          "flags": "0x5",
+          "eotFamily": "Source Sans 3",
+          "eotStyle": "Italic",
+          "weight": 400,
+          "fsType": "0x0",
+          "bytes": 57611
+        },
+        {
+          "typeface": "Source Sans 3",
+          "slot": "boldItalic",
+          "eotVersion": "0x20002",
+          "flags": "0x5",
+          "eotFamily": "Source Sans 3",
+          "eotStyle": "Bold Italic",
+          "weight": 700,
+          "fsType": "0x0",
+          "bytes": 57544
+        }
+      ]
+    },
+    "notes": [
+      "PowerPoint writes EOT 2.2 with MicroType Express compression (flags 0x4; 0x5 when subsetting).",
+      "Its own slot choices are not RIBBI-correct: 'Heebo' regular holds Heebo Medium bytes and 'Heebo ExtraBold' uses the bold slot for a Regular-style face.",
+      "AppleScript `save p in <path> as save as Open XML presentation` wrote a copy with no embedded fonts and no embedTrueTypeFonts; only an in-place save embedded."
+    ]
+  },
+  "cases": [
+    {
+      "id": "baseline-fonts-installed",
+      "description": "control-no-embedding opened with the seven pinned faces installed (before isolation)",
+      "open": {
+        "screenshot": "baseline-control-fonts-installed.png",
+        "pdf": "control-fonts-installed.pdf",
+        "pdfFonts": [
+          "Heebo-Bold",
+          "Heebo-ExtraBold",
+          "Heebo-Medium",
+          "SourceSans3-Bold",
+          "SourceSans3-BoldIt",
+          "SourceSans3-It",
+          "SourceSans3-Regular"
+        ],
+        "lines": [
+          "Heebo Medium: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs",
+          "Heebo Bold: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor",
+          "jugs",
+          "Heebo ExtraBold: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs",
+          "Source Sans Regular: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs",
+          "Source Sans Bold: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs",
+          "Source Sans Italic: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "Source Sans Bold Italic: the quick brown fox jumps over the",
+          "lazy dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs"
+        ]
+      },
+      "verdict": "Reference faces and line breaks for the core Slide."
+    },
+    {
+      "id": "control-no-embedding",
+      "description": "Same Slide and Office identities with no embedded fonts; shows host fallback when the fonts are unavailable.",
+      "package": {
+        "generatedSha256": "15671cf00054261c5b8dfd9ea87fc740ecd2e36039c926b99861cad9765e0473",
+        "testedCopySha256": "8b13b9104189711b959b05ab5d685924ec08c30266d33bf774d5e7e659900a5b",
+        "partsDigest": "ab961926c7f187e48c089202a4277b01b8619e001a68879ad170998f27bd69c1",
+        "partsDigestMatchesTestedCopy": true
+      },
+      "procedure": "opened + PDF (isolated)",
+      "verdict": "Fallback is visible and detectable: every box renders in Calibri and line breaks differ from the baseline.",
+      "embedFontsFlagAtOpen": null,
+      "dialogsAtOpen": null,
+      "open": {
+        "screenshot": "control-before-open.png",
+        "pdf": "control-before-open.pdf",
+        "pdfFonts": [
+          "Calibri",
+          "Calibri-Bold",
+          "Calibri-BoldItalic",
+          "Calibri-Italic"
+        ],
+        "lines": [
+          "Heebo Medium: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "Heebo Bold: the quick brown fox jumps over the lazy dog while",
+          "vexed nymphs pack my box with five dozen liquor jugs",
+          "Heebo ExtraBold: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "Source Sans Regular: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "Source Sans Bold: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "Source Sans Italic: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "Source Sans Bold Italic: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor jugs"
+        ],
+        "lineTextMatchesFontsInstalledBaseline": false
+      }
+    },
+    {
+      "id": "a-eot-uncompressed-ttf",
+      "description": "Seven unmodified pinned static TTF faces, each wrapped in an uncompressed full-font EOT 2.2 container, in Office legacy family/RIBBI slots.",
+      "package": {
+        "generatedSha256": "ef7663ed728a9ae414ededb30178561eb066642b574b29cc6962320fd6b1a943",
+        "testedCopySha256": "b32dd6dda4da6d8d1e84d011856a94e9b2b910a14ba61eef84f51740039894be",
+        "partsDigest": "59ce35c56c5a617a6155cbdc14e842a97661a8231f90554f13b145441c56eec5",
+        "partsDigestMatchesTestedCopy": true
+      },
+      "procedure": "open stage and edited-before-save PDF come from the first A run (fresh process); the save/reopen cycle is the A3 run on a fresh copy without any AppleScript PDF export before saving: work copy: GUI-typed the added characters at the end of every box (CuaDriver keystrokes), saved in place, closed; PowerPoint quit and relaunched; work copy reopened + PDF exported",
+      "verdict": "PASS. All seven unmodified faces render from the embedded payloads (glyph outlines match the pinned files 100%, next best ≤18%), line breaks equal the fonts-installed baseline, typed digits/Latin-1/€/Hebrew/Greek/Cyrillic render in the same embedded faces, and PowerPoint preserved the seven payloads byte-for-byte on save; reopen in a new process renders identically.",
+      "embedFontsFlagAtOpen": null,
+      "dialogsAtOpen": null,
+      "reopened": {
+        "screenshot": "a3-reopened.png",
+        "pdf": "a3-reopened.pdf",
+        "pdfFonts": [
+          "1",
+          "2",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8"
+        ],
+        "faces": [
+          {
+            "pdfFont": "4",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.1724
+          },
+          {
+            "pdfFont": "4",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.5
+          },
+          {
+            "pdfFont": "1",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Bold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "2",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font3.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-ExtraBold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "5",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font4.fntdata",
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-Regular.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "6",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font5.fntdata",
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-Bold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "7",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font6.fntdata",
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-It.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "8",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font7.fntdata",
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-BoldIt.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          }
+        ],
+        "lines": [
+          "Heebo Medium: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש",
+          "Heebo Bold: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש",
+          "Heebo ExtraBold: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש",
+          "Source Sans Regular: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß Ωλ Жя ő",
+          "Source Sans Bold: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß Ωλ Жя ő",
+          "Source Sans Italic: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "0123456789 QWZ ÅÄÖ éñ € ß Ωλ Жя ő",
+          "Source Sans Bold Italic: the quick brown fox jumps over the",
+          "lazy dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs 0123456789 QWZ ÅÄÖ éñ € ß Ωλ Жя ő"
+        ]
+      },
+      "saved": {
+        "bytes": 1797218,
+        "sha256": "95ca563865fef3685282d8444ae166e62b7ff9d4c9e96e3dd20734f231dad4f5",
+        "fontParts": 8,
+        "embeddedFontLst": "<p:embeddedFontLst><p:embeddedFont><p:font typeface=\"Heebo\" pitchFamily=\"2\" charset=\"-79\"/><p:bold r:id=\"rId3\"/></p:embeddedFont><p:embeddedFont><p:font typeface=\"Heebo ExtraBold\" pitchFamily=\"2\" charset=\"-79\"/><p:regular r:id=\"rId4\"/><p:bold r:id=\"rId5\"/></p:embeddedFont><p:embeddedFont><p:font typeface=\"Heebo Medium\" pitchFamily=\"2\" charset=\"-79\"/><p:regular r:id=\"rId6\"/></p:embeddedFont><p:embeddedFont><p:font typeface=\"Source Sans 3\" panose=\"020B0503030403020204\" pitchFamily=\"34\" charset=\"0\"/><p:regular r:id=\"rId7\"/><p:bold r:id=\"rId8\"/><p:italic r:id=\"rId9\"/><p:boldItalic r:id=\"rId10\"/></p:embeddedFont></p:embeddedFontLst>",
+        "runsWithAddedText": [
+          {
+            "typeface": "Heebo Medium",
+            "b": "0",
+            "i": "0",
+            "text": "Heebo Medium: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Heebo Medium",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Heebo Medium",
+            "b": "0",
+            "i": "0",
+            "text": "שלום"
+          },
+          {
+            "typeface": "Heebo",
+            "b": "1",
+            "i": "0",
+            "text": "Heebo Bold: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Heebo",
+            "b": "1",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Heebo",
+            "b": "1",
+            "i": "0",
+            "text": "שלום"
+          },
+          {
+            "typeface": "Heebo ExtraBold",
+            "b": "0",
+            "i": "0",
+            "text": "Heebo ExtraBold: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Heebo ExtraBold",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Heebo ExtraBold",
+            "b": "0",
+            "i": "0",
+            "text": "שלום"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "0",
+            "text": "Source Sans Regular: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "0",
+            "text": "Ωλ"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "0",
+            "text": "Жя"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "0",
+            "text": "Source Sans Bold: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "0",
+            "text": "Ωλ"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "0",
+            "text": "Жя"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "1",
+            "text": "Source Sans Italic: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "1",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "1",
+            "text": "Ωλ"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "1",
+            "text": "Жя"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "1",
+            "text": "Source Sans Bold Italic: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "1",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "1",
+            "text": "Ωλ"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "1",
+            "text": "Жя"
+          }
+        ]
+      },
+      "open": {
+        "screenshot": "a-open.png",
+        "pdf": "a-open.pdf",
+        "pdfFonts": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7"
+        ],
+        "faces": [
+          {
+            "pdfFont": "1",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.1818
+          },
+          {
+            "pdfFont": "2",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Bold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "3",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font3.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-ExtraBold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "4",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font4.fntdata",
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-Regular.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "5",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font5.fntdata",
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-Bold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "6",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font6.fntdata",
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-It.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "7",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font7.fntdata",
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-BoldIt.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          }
+        ],
+        "lines": [
+          "Heebo Medium: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs",
+          "Heebo Bold: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor",
+          "jugs",
+          "Heebo ExtraBold: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs",
+          "Source Sans Regular: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs",
+          "Source Sans Bold: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs",
+          "Source Sans Italic: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "Source Sans Bold Italic: the quick brown fox jumps over the",
+          "lazy dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs"
+        ],
+        "lineTextMatchesFontsInstalledBaseline": true
+      },
+      "editedBeforeSave": {
+        "screenshot": "a-edited.png",
+        "pdf": "a-edited.pdf",
+        "pdfFonts": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7"
+        ],
+        "faces": [
+          {
+            "pdfFont": "1",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.1724
+          },
+          {
+            "pdfFont": "1",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.5
+          },
+          {
+            "pdfFont": "2",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Bold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "3",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font3.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-ExtraBold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "4",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font4.fntdata",
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-Regular.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "5",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font5.fntdata",
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-Bold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "6",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font6.fntdata",
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-It.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "7",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font7.fntdata",
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-BoldIt.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          }
+        ],
+        "lines": [
+          "Heebo Medium: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש",
+          "Heebo Bold: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש",
+          "Heebo ExtraBold: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש",
+          "Source Sans Regular: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß Ωλ Жя ő",
+          "Source Sans Bold: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß Ωλ Жя ő",
+          "Source Sans Italic: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "0123456789 QWZ ÅÄÖ éñ € ß Ωλ Жя ő",
+          "Source Sans Bold Italic: the quick brown fox jumps over the",
+          "lazy dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs 0123456789 QWZ ÅÄÖ éñ € ß Ωλ Жя ő"
+        ]
+      }
+    },
+    {
+      "id": "a-eot-uncompressed-ttf@applescript-pdf-first",
+      "description": "Seven unmodified pinned static TTF faces, each wrapped in an uncompressed full-font EOT 2.2 container, in Office legacy family/RIBBI slots.",
+      "package": {
+        "generatedSha256": "ef7663ed728a9ae414ededb30178561eb066642b574b29cc6962320fd6b1a943",
+        "testedCopySha256": "b32dd6dda4da6d8d1e84d011856a94e9b2b910a14ba61eef84f51740039894be",
+        "partsDigest": "59ce35c56c5a617a6155cbdc14e842a97661a8231f90554f13b145441c56eec5",
+        "partsDigestMatchesTestedCopy": true
+      },
+      "procedure": "opened; AppleScript `save … as save as PDF`; GUI edit; AppleScript PDF; `save` in place; close; reopen",
+      "verdict": "Opens and edits correctly, but the AppleScript PDF export cleared the document's 'Embed fonts in the file' flag; the later save silently dropped embeddedFontLst, all font parts and embedTrueTypeFonts, so the reopened Deck fell back to Calibri. Office identities (family, b/i) of every run, including typed text, were kept.",
+      "embedFontsFlagAtOpen": null,
+      "dialogsAtOpen": null,
+      "open": {
+        "screenshot": "a-open.png",
+        "pdf": "a-open.pdf",
+        "pdfFonts": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7"
+        ],
+        "faces": [
+          {
+            "pdfFont": "1",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.1818
+          },
+          {
+            "pdfFont": "2",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Bold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "3",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font3.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-ExtraBold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "4",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font4.fntdata",
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-Regular.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "5",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font5.fntdata",
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-Bold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "6",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font6.fntdata",
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-It.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "7",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font7.fntdata",
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-BoldIt.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          }
+        ],
+        "lines": [
+          "Heebo Medium: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs",
+          "Heebo Bold: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor",
+          "jugs",
+          "Heebo ExtraBold: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs",
+          "Source Sans Regular: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs",
+          "Source Sans Bold: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs",
+          "Source Sans Italic: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "Source Sans Bold Italic: the quick brown fox jumps over the",
+          "lazy dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs"
+        ],
+        "lineTextMatchesFontsInstalledBaseline": true
+      },
+      "edited": {
+        "screenshot": "a-edited.png",
+        "pdf": "a-edited.pdf",
+        "pdfFonts": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7"
+        ],
+        "faces": [
+          {
+            "pdfFont": "1",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.1724
+          },
+          {
+            "pdfFont": "1",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.5
+          },
+          {
+            "pdfFont": "2",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Bold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "3",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font3.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-ExtraBold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "4",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font4.fntdata",
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-Regular.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "5",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font5.fntdata",
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-Bold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "6",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font6.fntdata",
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-It.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "7",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font7.fntdata",
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-BoldIt.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          }
+        ],
+        "lines": [
+          "Heebo Medium: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש",
+          "Heebo Bold: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש",
+          "Heebo ExtraBold: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש",
+          "Source Sans Regular: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß Ωλ Жя ő",
+          "Source Sans Bold: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß Ωλ Жя ő",
+          "Source Sans Italic: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "0123456789 QWZ ÅÄÖ éñ € ß Ωλ Жя ő",
+          "Source Sans Bold Italic: the quick brown fox jumps over the",
+          "lazy dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs 0123456789 QWZ ÅÄÖ éñ € ß Ωλ Жя ő"
+        ]
+      },
+      "reopened": {
+        "screenshot": "a-reopened.png",
+        "pdf": "a-reopened.pdf",
+        "pdfFonts": [
+          "Calibri",
+          "Calibri-Bold",
+          "Calibri-BoldItalic",
+          "Calibri-Italic"
+        ],
+        "faces": [
+          {
+            "pdfFont": "Calibri",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          },
+          {
+            "pdfFont": "Calibri-Bold",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          },
+          {
+            "pdfFont": "Calibri-Italic",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          },
+          {
+            "pdfFont": "Calibri-BoldItalic",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          }
+        ],
+        "lines": [
+          "Heebo Medium: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "0123456789 QWZ ÅÄÖ éñ€ß ם ו ל ש",
+          "Heebo Bold: the quick brown fox jumps over the lazy dog while",
+          "vexed nymphs pack my box with five dozen liquor jugs",
+          "0123456789 QWZ ÅÄÖ éñ€ß ם ו ל ש",
+          "Heebo ExtraBold: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "0123456789 QWZ ÅÄÖ éñ€ß ם ו ל ש",
+          "Source Sans Regular: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "0123456789 QWZ ÅÄÖ éñ€ß Ωλ Жя ő",
+          "Source Sans Bold: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "0123456789 QWZ ÅÄÖ éñ€ß Ωλ Жя ő",
+          "Source Sans Italic: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "0123456789 QWZ ÅÄÖ éñ€ß Ωλ Жя ő",
+          "Source Sans Bold Italic: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor jugs",
+          "0123456789 QWZ ÅÄÖ éñ€ß Ωλ Жя ő"
+        ]
+      },
+      "saved": {
+        "bytes": 10160,
+        "sha256": "5d19f887544f52a1aeb32f6d1ddc7b0eb193a1d084e7308f098719292197c7a5",
+        "fontParts": 0,
+        "embeddedFontLst": null,
+        "runsWithAddedText": [
+          {
+            "typeface": "Heebo Medium",
+            "b": "0",
+            "i": "0",
+            "text": "Heebo Medium: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Heebo Medium",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Heebo Medium",
+            "b": "0",
+            "i": "0",
+            "text": "שלום"
+          },
+          {
+            "typeface": "Heebo",
+            "b": "1",
+            "i": "0",
+            "text": "Heebo Bold: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Heebo",
+            "b": "1",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Heebo",
+            "b": "1",
+            "i": "0",
+            "text": "שלום"
+          },
+          {
+            "typeface": "Heebo ExtraBold",
+            "b": "0",
+            "i": "0",
+            "text": "Heebo ExtraBold: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Heebo ExtraBold",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Heebo ExtraBold",
+            "b": "0",
+            "i": "0",
+            "text": "שלום"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "0",
+            "text": "Source Sans Regular: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "0",
+            "text": "Ωλ"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "0",
+            "text": "Жя"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "0",
+            "text": "Source Sans Bold: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "0",
+            "text": "Ωλ"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "0",
+            "text": "Жя"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "1",
+            "text": "Source Sans Italic: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "1",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "1",
+            "text": "Ωλ"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "1",
+            "text": "Жя"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "1",
+            "text": "Source Sans Bold Italic: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "1",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "1",
+            "text": "Ωλ"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "1",
+            "text": "Жя"
+          }
+        ]
+      }
+    },
+    {
+      "id": "b-raw-ttf",
+      "description": "Same faces and slots as A, but the font parts contain the raw TTF bytes without an EOT header.",
+      "package": {
+        "generatedSha256": "07f1adbb2dd6e2e6ca6e8fe26009e229843ceb2f68386951260982c05e0dd579",
+        "testedCopySha256": "b2fdfba8dec2eaa27c4d05cd484bd5b478109315d09f843315267c6b2d70b0cc",
+        "partsDigest": "05013f0dfecd2fa87efaa7a8248830aa0ccd499ca8a9aa0a6acb9a13aa2d063a",
+        "partsDigestMatchesTestedCopy": true
+      },
+      "procedure": "probe copy opened + PDF exported; separate work copy: GUI-typed the added characters at the end of every box (CuaDriver keystrokes), saved in place, closed; PowerPoint quit and relaunched; work copy reopened + PDF exported",
+      "verdict": "UNSUPPORTED. Raw sfnt bytes in .fntdata are silently ignored (Calibri fallback); PowerPoint keeps the parts verbatim on save.",
+      "embedFontsFlagAtOpen": "1",
+      "dialogsAtOpen": null,
+      "open": {
+        "screenshot": "b-raw-ttf-open.png",
+        "pdf": "b-raw-ttf-open.pdf",
+        "pdfFonts": [
+          "Calibri",
+          "Calibri-Bold",
+          "Calibri-BoldItalic",
+          "Calibri-Italic"
+        ],
+        "faces": [
+          {
+            "pdfFont": "Calibri",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          },
+          {
+            "pdfFont": "Calibri-Bold",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          },
+          {
+            "pdfFont": "Calibri-Italic",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          },
+          {
+            "pdfFont": "Calibri-BoldItalic",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          }
+        ],
+        "lines": [
+          "Heebo Medium: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "Heebo Bold: the quick brown fox jumps over the lazy dog while",
+          "vexed nymphs pack my box with five dozen liquor jugs",
+          "Heebo ExtraBold: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "Source Sans Regular: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "Source Sans Bold: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "Source Sans Italic: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "Source Sans Bold Italic: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor jugs"
+        ],
+        "lineTextMatchesFontsInstalledBaseline": false
+      },
+      "reopened": {
+        "screenshot": "b-raw-ttf-reopened.png",
+        "pdf": "b-raw-ttf-reopened.pdf",
+        "pdfFonts": [
+          "Calibri",
+          "Calibri-Bold",
+          "Calibri-BoldItalic",
+          "Calibri-Italic"
+        ],
+        "faces": [
+          {
+            "pdfFont": "Calibri",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          },
+          {
+            "pdfFont": "Calibri-Bold",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          },
+          {
+            "pdfFont": "Calibri-Italic",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          },
+          {
+            "pdfFont": "Calibri-BoldItalic",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          }
+        ],
+        "lines": [
+          "Heebo Medium: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "0123456789 QWZ ÅÄÖ éñ€ß ם ו ל ש",
+          "Heebo Bold: the quick brown fox jumps over the lazy dog while",
+          "vexed nymphs pack my box with five dozen liquor jugs",
+          "0123456789 QWZ ÅÄÖ éñ€ß ם ו ל ש",
+          "Heebo ExtraBold: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "0123456789 QWZ ÅÄÖ éñ€ß ם ו ל ש",
+          "Source Sans Regular: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "0123456789 QWZ ÅÄÖ éñ€ß Ωλ Жя ő",
+          "Source Sans Bold: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "0123456789 QWZ ÅÄÖ éñ€ß Ωλ Жя ő",
+          "Source Sans Italic: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "0123456789 QWZ ÅÄÖ éñ€ß Ωλ Жя ő",
+          "Source Sans Bold Italic: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor jugs",
+          "0123456789 QWZ ÅÄÖ éñ€ß Ωλ Жя ő"
+        ]
+      },
+      "saved": {
+        "bytes": 1754017,
+        "sha256": "95e636210ee8107615a655b2fb0644b5f8d5ff623dc68b4ce474486b6e570999",
+        "fontParts": 7,
+        "embeddedFontLst": "<p:embeddedFontLst><p:embeddedFont><p:font typeface=\"Heebo\"/><p:bold r:id=\"rId3\"/></p:embeddedFont><p:embeddedFont><p:font typeface=\"Heebo ExtraBold\"/><p:regular r:id=\"rId4\"/></p:embeddedFont><p:embeddedFont><p:font typeface=\"Heebo Medium\"/><p:regular r:id=\"rId5\"/></p:embeddedFont><p:embeddedFont><p:font typeface=\"Source Sans 3\"/><p:regular r:id=\"rId6\"/><p:bold r:id=\"rId7\"/><p:italic r:id=\"rId8\"/><p:boldItalic r:id=\"rId9\"/></p:embeddedFont></p:embeddedFontLst>",
+        "embeddedSlots": [
+          {
+            "typeface": "Heebo",
+            "slot": "bold",
+            "part": "font1.fntdata",
+            "payload": "raw sfnt",
+            "sha256": "54d93bf35b8272df73180f687879bda00284a3343d85c3f46ec04d39c89ed5a7"
+          },
+          {
+            "typeface": "Heebo ExtraBold",
+            "slot": "regular",
+            "part": "font2.fntdata",
+            "payload": "raw sfnt",
+            "sha256": "c5b7419952eafb6f130e7878ceefb8864c4b5f5d12f9ed45b66d70dd1a46631b"
+          },
+          {
+            "typeface": "Heebo Medium",
+            "slot": "regular",
+            "part": "font3.fntdata",
+            "payload": "raw sfnt",
+            "sha256": "cba4ce1a4c8ebaf36d0ac34d1941bc4d8a0117e343fac28c46a01635a08a92f1"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "slot": "regular",
+            "part": "font4.fntdata",
+            "payload": "raw sfnt",
+            "sha256": "4644c81b86ec9caaa76b634889968ed3c4f4f52f054855933acc7c2b21e53b0f"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "slot": "bold",
+            "part": "font5.fntdata",
+            "payload": "raw sfnt",
+            "sha256": "9214b9d95e4231c609802815c2646c98174e2102d0d37f88978a7f8e71006e6a"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "slot": "italic",
+            "part": "font6.fntdata",
+            "payload": "raw sfnt",
+            "sha256": "192afd78f0f54a3c69eaf02d43f4d9a821e9d6110e41d3d25d61a7385cd580e4"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "slot": "boldItalic",
+            "part": "font7.fntdata",
+            "payload": "raw sfnt",
+            "sha256": "7978291fc1bf314db887e0366853b33c5cf2e964c7b95cfb9ce403a6ec46a842"
+          }
+        ],
+        "runsWithAddedText": [
+          {
+            "typeface": "Heebo Medium",
+            "b": "0",
+            "i": "0",
+            "text": "Heebo Medium: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Heebo Medium",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Heebo Medium",
+            "b": "0",
+            "i": "0",
+            "text": "שלום"
+          },
+          {
+            "typeface": "Heebo",
+            "b": "1",
+            "i": "0",
+            "text": "Heebo Bold: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Heebo",
+            "b": "1",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Heebo",
+            "b": "1",
+            "i": "0",
+            "text": "שלום"
+          },
+          {
+            "typeface": "Heebo ExtraBold",
+            "b": "0",
+            "i": "0",
+            "text": "Heebo ExtraBold: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Heebo ExtraBold",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Heebo ExtraBold",
+            "b": "0",
+            "i": "0",
+            "text": "שלום"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "0",
+            "text": "Source Sans Regular: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "0",
+            "text": "Ωλ"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "0",
+            "text": "Жя"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "0",
+            "text": "Source Sans Bold: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "0",
+            "text": "Ωλ"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "0",
+            "text": "Жя"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "1",
+            "text": "Source Sans Italic: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "1",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "1",
+            "text": "Ωλ"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "1",
+            "text": "Жя"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "1",
+            "text": "Source Sans Bold Italic: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "1",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "1",
+            "text": "Ωλ"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "1",
+            "text": "Жя"
+          }
+        ]
+      }
+    },
+    {
+      "id": "c-powerpoint-mtx-preserved",
+      "description": "PowerPoint-written MTX-compressed EOT parts (\"Embed all characters\") and its embeddedFontLst, including its slot choices, copied byte-for-byte into the same Slide.",
+      "package": {
+        "generatedSha256": "a17534dd590dcf87bf0b500c2224400bb0e9d2bd57a795cc028b38c5c2994588",
+        "testedCopySha256": "507d62d87a039bf25d1a6363550471eb68df68f4c430252b29f6ba81ec53127b",
+        "partsDigest": "71f00ac8f2d14a1de877b2f1e0715d395b0b4902aa752f7fa212665ff234e9c2",
+        "partsDigestMatchesTestedCopy": true
+      },
+      "procedure": "opened + PDF; GUI edit; AppleScript PDF; Cmd+S; reopen (this run also shows the PDF-export flag reset: save dropped the fonts)",
+      "verdict": "PowerPoint's own MTX payloads copied verbatim render the exact pinned faces, including its non-RIBBI slot choices. The drop on save is the AppleScript-PDF flag reset seen in A, not a payload problem (A3 shows the clean path).",
+      "embedFontsFlagAtOpen": null,
+      "dialogsAtOpen": null,
+      "open": {
+        "screenshot": "c-open.png",
+        "pdf": "c-open.pdf",
+        "pdfFonts": [
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8"
+        ],
+        "faces": [
+          {
+            "pdfFont": "4",
+            "identifiedAs": [
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.1818
+          },
+          {
+            "pdfFont": "2",
+            "identifiedAs": [
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Bold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "3",
+            "identifiedAs": [
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-ExtraBold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "5",
+            "identifiedAs": [
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-Regular.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "6",
+            "identifiedAs": [
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-Bold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "7",
+            "identifiedAs": [
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-It.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "8",
+            "identifiedAs": [
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-BoldIt.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          }
+        ],
+        "lines": [
+          "Heebo Medium: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs",
+          "Heebo Bold: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor",
+          "jugs",
+          "Heebo ExtraBold: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs",
+          "Source Sans Regular: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs",
+          "Source Sans Bold: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs",
+          "Source Sans Italic: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "Source Sans Bold Italic: the quick brown fox jumps over the",
+          "lazy dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs"
+        ],
+        "lineTextMatchesFontsInstalledBaseline": true
+      },
+      "edited": {
+        "screenshot": "c-edited.png",
+        "pdf": "c-edited.pdf",
+        "pdfFonts": [
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8"
+        ],
+        "faces": [
+          {
+            "pdfFont": "4",
+            "identifiedAs": [
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.1724
+          },
+          {
+            "pdfFont": "4",
+            "identifiedAs": [
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.5
+          },
+          {
+            "pdfFont": "2",
+            "identifiedAs": [
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Bold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "3",
+            "identifiedAs": [
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-ExtraBold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "5",
+            "identifiedAs": [
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-Regular.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "6",
+            "identifiedAs": [
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-Bold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "7",
+            "identifiedAs": [
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-It.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "8",
+            "identifiedAs": [
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-BoldIt.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          }
+        ],
+        "lines": [
+          "Heebo Medium: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש",
+          "Heebo Bold: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש",
+          "Heebo ExtraBold: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש",
+          "Source Sans Regular: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß Ωλ Жя ő",
+          "Source Sans Bold: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß Ωλ Жя ő",
+          "Source Sans Italic: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "0123456789 QWZ ÅÄÖ éñ € ß Ωλ Жя ő",
+          "Source Sans Bold Italic: the quick brown fox jumps over the",
+          "lazy dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs 0123456789 QWZ ÅÄÖ éñ € ß Ωλ Жя ő"
+        ]
+      },
+      "reopened": {
+        "screenshot": "c-reopened.png",
+        "pdf": "c-reopened.pdf",
+        "pdfFonts": [
+          "Calibri",
+          "Calibri-Bold",
+          "Calibri-BoldItalic",
+          "Calibri-Italic"
+        ],
+        "lines": [
+          "Heebo Medium: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "0123456789 QWZ ÅÄÖ éñ€ß ם ו ל ש",
+          "Heebo Bold: the quick brown fox jumps over the lazy dog while",
+          "vexed nymphs pack my box with five dozen liquor jugs",
+          "0123456789 QWZ ÅÄÖ éñ€ß ם ו ל ש",
+          "Heebo ExtraBold: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "0123456789 QWZ ÅÄÖ éñ€ß ם ו ל ש",
+          "Source Sans Regular: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "0123456789 QWZ ÅÄÖ éñ€ß Ωλ Жя ő",
+          "Source Sans Bold: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "0123456789 QWZ ÅÄÖ éñ€ß Ωλ Жя ő",
+          "Source Sans Italic: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "0123456789 QWZ ÅÄÖ éñ€ß Ωλ Жя ő",
+          "Source Sans Bold Italic: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor jugs",
+          "0123456789 QWZ ÅÄÖ éñ€ß Ωλ Жя ő"
+        ]
+      },
+      "saved": {
+        "bytes": 10162,
+        "sha256": "19517bb2b54d4a5d2684073da08703d0596ba554f98d6bf71c60c6c25169309e",
+        "fontParts": 0,
+        "embeddedFontLst": null,
+        "runsWithAddedText": [
+          {
+            "typeface": "Heebo Medium",
+            "b": "0",
+            "i": "0",
+            "text": "Heebo Medium: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Heebo Medium",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Heebo Medium",
+            "b": "0",
+            "i": "0",
+            "text": "שלום"
+          },
+          {
+            "typeface": "Heebo",
+            "b": "1",
+            "i": "0",
+            "text": "Heebo Bold: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Heebo",
+            "b": "1",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Heebo",
+            "b": "1",
+            "i": "0",
+            "text": "שלום"
+          },
+          {
+            "typeface": "Heebo ExtraBold",
+            "b": "0",
+            "i": "0",
+            "text": "Heebo ExtraBold: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Heebo ExtraBold",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Heebo ExtraBold",
+            "b": "0",
+            "i": "0",
+            "text": "שלום"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "0",
+            "text": "Source Sans Regular: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "0",
+            "text": "Ωλ"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "0",
+            "text": "Жя"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "0",
+            "text": "Source Sans Bold: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "0",
+            "text": "Ωλ"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "0",
+            "text": "Жя"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "1",
+            "text": "Source Sans Italic: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "1",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "1",
+            "text": "Ωλ"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "1",
+            "text": "Жя"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "1",
+            "text": "Source Sans Bold Italic: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "1",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "1",
+            "text": "Ωλ"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "1",
+            "text": "Жя"
+          }
+        ]
+      }
+    },
+    {
+      "id": "c2-powerpoint-subset-preserved",
+      "description": "PowerPoint-written subset MTX EOT parts (\"Embed only the characters used\", flags 0x5) from a Deck with different text, copied byte-for-byte into the same Slide.",
+      "package": {
+        "generatedSha256": "677d818fa67daf316e220693610446c9d4a098f93940d4240fac09d49e016322",
+        "testedCopySha256": "677d818fa67daf316e220693610446c9d4a098f93940d4240fac09d49e016322",
+        "partsDigest": "7d4e5df6892c79476c1ef8371b8fab0e5934de357a052dc1053fbcfa714f6b74",
+        "partsDigestMatchesTestedCopy": true
+      },
+      "procedure": "probe copy opened + PDF exported; separate work copy: GUI-typed the added characters at the end of every box (CuaDriver keystrokes), saved in place, closed; PowerPoint quit and relaunched; work copy reopened + PDF exported",
+      "verdict": "LIMITED. Preserved PowerPoint subset payloads render the characters they contain; typed characters outside the subset (ÅÄÖ, é, ñ, ß, €, Hebrew, Greek, Cyrillic) silently fall back to Cambria/Times New Roman/Arial.",
+      "embedFontsFlagAtOpen": "1",
+      "dialogsAtOpen": null,
+      "open": {
+        "screenshot": "c2-powerpoint-subset-preserved-open.png",
+        "pdf": "c2-powerpoint-subset-preserved-open.pdf",
+        "pdfFonts": [
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8"
+        ],
+        "faces": [
+          {
+            "pdfFont": "4",
+            "identifiedAs": [
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.1818
+          },
+          {
+            "pdfFont": "2",
+            "identifiedAs": [
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Bold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "3",
+            "identifiedAs": [
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-ExtraBold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "5",
+            "identifiedAs": [
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-Regular.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "6",
+            "identifiedAs": [
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-Bold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "7",
+            "identifiedAs": [
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-It.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "8",
+            "identifiedAs": [
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-BoldIt.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          }
+        ],
+        "lines": [
+          "Heebo Medium: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs",
+          "Heebo Bold: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor",
+          "jugs",
+          "Heebo ExtraBold: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs",
+          "Source Sans Regular: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs",
+          "Source Sans Bold: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs",
+          "Source Sans Italic: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "Source Sans Bold Italic: the quick brown fox jumps over the",
+          "lazy dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs"
+        ],
+        "lineTextMatchesFontsInstalledBaseline": true
+      },
+      "reopened": {
+        "screenshot": "c2-powerpoint-subset-preserved-reopened.png",
+        "pdf": "c2-powerpoint-subset-preserved-reopened.pdf",
+        "pdfFonts": [
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "Arial-BoldItalicMT",
+          "Arial-BoldMT",
+          "Arial-ItalicMT",
+          "ArialMT",
+          "Calibri",
+          "Calibri-Bold",
+          "Calibri-BoldItalic",
+          "Calibri-Italic",
+          "Cambria",
+          "Cambria-Bold",
+          "TimesNewRomanPS-BoldMT",
+          "TimesNewRomanPSMT"
+        ],
+        "faces": [
+          {
+            "pdfFont": "4",
+            "identifiedAs": [
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.1739
+          },
+          {
+            "pdfFont": "Cambria",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          },
+          {
+            "pdfFont": "TimesNewRomanPSMT",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          },
+          {
+            "pdfFont": "2",
+            "identifiedAs": [
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Bold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "Cambria-Bold",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          },
+          {
+            "pdfFont": "TimesNewRomanPS-BoldMT",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          },
+          {
+            "pdfFont": "3",
+            "identifiedAs": [
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-ExtraBold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "5",
+            "identifiedAs": [
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-Regular.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "Calibri",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          },
+          {
+            "pdfFont": "ArialMT",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          },
+          {
+            "pdfFont": "6",
+            "identifiedAs": [
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-Bold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "Calibri-Bold",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          },
+          {
+            "pdfFont": "Arial-BoldMT",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          },
+          {
+            "pdfFont": "7",
+            "identifiedAs": [
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-It.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "Calibri-Italic",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          },
+          {
+            "pdfFont": "Arial-ItalicMT",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          },
+          {
+            "pdfFont": "8",
+            "identifiedAs": [
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-BoldIt.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "Calibri-BoldItalic",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          },
+          {
+            "pdfFont": "Arial-BoldItalicMT",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          }
+        ],
+        "lines": [
+          "Heebo Medium: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש",
+          "Heebo Bold: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש",
+          "Heebo ExtraBold: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש",
+          "Source Sans Regular: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß Ωλ Жя ő",
+          "Source Sans Bold: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß Ωλ Жя ő",
+          "Source Sans Italic: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "0123456789 QWZ ÅÄÖ éñ € ß Ωλ Жя ő",
+          "Source Sans Bold Italic: the quick brown fox jumps over the",
+          "lazy dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs 0123456789 QWZ ÅÄÖ éñ € ß Ωλ Жя ő"
+        ]
+      },
+      "saved": {
+        "bytes": 392080,
+        "sha256": "c6ac20ba77fc8204d5c372b2b7ff3890ae7e2b1924974a06e6f6a772fadf44ba",
+        "fontParts": 8,
+        "embeddedFontLst": "<p:embeddedFontLst><p:embeddedFont><p:font typeface=\"Heebo\"/><p:regular r:id=\"rId3\"/><p:bold r:id=\"rId4\"/></p:embeddedFont><p:embeddedFont><p:font typeface=\"Heebo ExtraBold\"/><p:bold r:id=\"rId5\"/></p:embeddedFont><p:embeddedFont><p:font typeface=\"Heebo Medium\"/><p:regular r:id=\"rId6\"/></p:embeddedFont><p:embeddedFont><p:font typeface=\"Source Sans 3\" panose=\"020B0503030403020204\"/><p:regular r:id=\"rId7\"/><p:bold r:id=\"rId8\"/><p:italic r:id=\"rId9\"/><p:boldItalic r:id=\"rId10\"/></p:embeddedFont></p:embeddedFontLst>",
+        "embeddedSlots": [
+          {
+            "typeface": "Heebo",
+            "slot": "regular",
+            "part": "font1.fntdata",
+            "payload": "EOT",
+            "sha256": "9c1e23c94bfd76991cc890670576f28074d1e341fd3826fec1f83b92157ec9a3",
+            "flags": "0x5",
+            "fsType": "0x0",
+            "eotFamily": "Heebo Medium",
+            "eotStyle": "Regular"
+          },
+          {
+            "typeface": "Heebo",
+            "slot": "bold",
+            "part": "font2.fntdata",
+            "payload": "EOT",
+            "sha256": "42da3811d01fb4ee8ab7efdb8441708bf8cbb9fd3930eefd7bf33862a0fd0e34",
+            "flags": "0x5",
+            "fsType": "0x0",
+            "eotFamily": "Heebo",
+            "eotStyle": "Bold"
+          },
+          {
+            "typeface": "Heebo ExtraBold",
+            "slot": "bold",
+            "part": "font3.fntdata",
+            "payload": "EOT",
+            "sha256": "2177b25870044b356d5a97ab922c24d7af5b40d3e7f66f4f8082ecea3624cec2",
+            "flags": "0x5",
+            "fsType": "0x0",
+            "eotFamily": "Heebo ExtraBold",
+            "eotStyle": "Regular"
+          },
+          {
+            "typeface": "Heebo Medium",
+            "slot": "regular",
+            "part": "font4.fntdata",
+            "payload": "EOT",
+            "sha256": "9c1e23c94bfd76991cc890670576f28074d1e341fd3826fec1f83b92157ec9a3",
+            "flags": "0x5",
+            "fsType": "0x0",
+            "eotFamily": "Heebo Medium",
+            "eotStyle": "Regular"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "slot": "regular",
+            "part": "font5.fntdata",
+            "payload": "EOT",
+            "sha256": "df8fcd27ca3a83a7017543c6885d15b5658ed9610ba608e03246768998d985ed",
+            "flags": "0x5",
+            "fsType": "0x0",
+            "eotFamily": "Source Sans 3",
+            "eotStyle": "Regular"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "slot": "bold",
+            "part": "font6.fntdata",
+            "payload": "EOT",
+            "sha256": "2cf90d71e27309e6ad902bbe528a3e1d123532a3bdafb9b5dca75a65eccaf5e8",
+            "flags": "0x5",
+            "fsType": "0x0",
+            "eotFamily": "Source Sans 3",
+            "eotStyle": "Bold"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "slot": "italic",
+            "part": "font7.fntdata",
+            "payload": "EOT",
+            "sha256": "a6031b76468f5d4ce23d9cfb4b13d3e21b8af60be429d59bc2c8bf18284e8392",
+            "flags": "0x5",
+            "fsType": "0x0",
+            "eotFamily": "Source Sans 3",
+            "eotStyle": "Italic"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "slot": "boldItalic",
+            "part": "font8.fntdata",
+            "payload": "EOT",
+            "sha256": "4788b73025673a273d847ab958392230dee07c7da581b47309eb06ad8bcad32d",
+            "flags": "0x5",
+            "fsType": "0x0",
+            "eotFamily": "Source Sans 3",
+            "eotStyle": "Bold Italic"
+          }
+        ],
+        "runsWithAddedText": [
+          {
+            "typeface": "Heebo Medium",
+            "b": "0",
+            "i": "0",
+            "text": "Heebo Medium: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Heebo Medium",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Heebo Medium",
+            "b": "0",
+            "i": "0",
+            "text": "שלום"
+          },
+          {
+            "typeface": "Heebo",
+            "b": "1",
+            "i": "0",
+            "text": "Heebo Bold: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Heebo",
+            "b": "1",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Heebo",
+            "b": "1",
+            "i": "0",
+            "text": "שלום"
+          },
+          {
+            "typeface": "Heebo ExtraBold",
+            "b": "0",
+            "i": "0",
+            "text": "Heebo ExtraBold: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Heebo ExtraBold",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Heebo ExtraBold",
+            "b": "0",
+            "i": "0",
+            "text": "שלום"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "0",
+            "text": "Source Sans Regular: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "0",
+            "text": "Ωλ"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "0",
+            "text": "Жя"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "0",
+            "text": "Source Sans Bold: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "0",
+            "text": "Ωλ"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "0",
+            "text": "Жя"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "1",
+            "text": "Source Sans Italic: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "1",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "1",
+            "text": "Ωλ"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "1",
+            "text": "Жя"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "1",
+            "text": "Source Sans Bold Italic: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "1",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "1",
+            "text": "Ωλ"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "1",
+            "text": "Жя"
+          }
+        ]
+      }
+    },
+    {
+      "id": "d-eot-otf-cff",
+      "description": "Heebo TTF as in A; Source Sans 3 from the unmodified 3.052R CFF OTF files in uncompressed EOT.",
+      "package": {
+        "generatedSha256": "3666edc8ca3dd564d7c67bf5931989bbb365ea6cb79c9751a3c89d2ccfac0eb5",
+        "testedCopySha256": "14ef42096b7403ab17893bf41717d7474282c06de6370c59f041eb188b9f7741",
+        "partsDigest": "2e799677f31db75ca397d3066675b900397f5e4cbe098051d9352212c61fa2e1",
+        "partsDigestMatchesTestedCopy": true
+      },
+      "procedure": "probe copy opened + PDF exported; separate work copy: GUI-typed the added characters at the end of every box (CuaDriver keystrokes), saved in place, closed; PowerPoint quit and relaunched; work copy reopened + PDF exported",
+      "verdict": "PASS. CFF-flavoured OTF (Source Sans 3 3.052R OTF) in uncompressed EOT renders from the exact OTF outlines with the same advances/line breaks as the TTF; edit/save/reopen preserved.",
+      "embedFontsFlagAtOpen": "1",
+      "dialogsAtOpen": null,
+      "open": {
+        "screenshot": "d-eot-otf-cff-open.png",
+        "pdf": "d-eot-otf-cff-open.pdf",
+        "pdfFonts": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7"
+        ],
+        "faces": [
+          {
+            "pdfFont": "1",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.1818
+          },
+          {
+            "pdfFont": "2",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Bold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "3",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font3.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-ExtraBold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "4",
+            "identifiedAs": [
+              "prototypes/font-embedding/sources/SourceSans3-Regular.otf",
+              "deck payload ppt/fonts/font4.fntdata"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "5",
+            "identifiedAs": [
+              "prototypes/font-embedding/sources/SourceSans3-Bold.otf",
+              "deck payload ppt/fonts/font5.fntdata"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "6",
+            "identifiedAs": [
+              "prototypes/font-embedding/sources/SourceSans3-It.otf",
+              "deck payload ppt/fonts/font6.fntdata"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "7",
+            "identifiedAs": [
+              "prototypes/font-embedding/sources/SourceSans3-BoldIt.otf",
+              "deck payload ppt/fonts/font7.fntdata"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          }
+        ],
+        "lines": [
+          "Heebo Medium: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs",
+          "Heebo Bold: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor",
+          "jugs",
+          "Heebo ExtraBold: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs",
+          "Source Sans Regular: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs",
+          "Source Sans Bold: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs",
+          "Source Sans Italic: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "Source Sans Bold Italic: the quick brown fox jumps over the",
+          "lazy dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs"
+        ],
+        "lineTextMatchesFontsInstalledBaseline": true
+      },
+      "reopened": {
+        "screenshot": "d-eot-otf-cff-reopened.png",
+        "pdf": "d-eot-otf-cff-reopened.pdf",
+        "pdfFonts": [
+          "1",
+          "2",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8"
+        ],
+        "faces": [
+          {
+            "pdfFont": "4",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.1724
+          },
+          {
+            "pdfFont": "4",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.5
+          },
+          {
+            "pdfFont": "1",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Bold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "2",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font3.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-ExtraBold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "5",
+            "identifiedAs": [
+              "prototypes/font-embedding/sources/SourceSans3-Regular.otf",
+              "deck payload ppt/fonts/font4.fntdata"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "6",
+            "identifiedAs": [
+              "prototypes/font-embedding/sources/SourceSans3-Bold.otf",
+              "deck payload ppt/fonts/font5.fntdata"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "7",
+            "identifiedAs": [
+              "prototypes/font-embedding/sources/SourceSans3-It.otf",
+              "deck payload ppt/fonts/font6.fntdata"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "8",
+            "identifiedAs": [
+              "prototypes/font-embedding/sources/SourceSans3-BoldIt.otf",
+              "deck payload ppt/fonts/font7.fntdata"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          }
+        ],
+        "lines": [
+          "Heebo Medium: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש",
+          "Heebo Bold: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש",
+          "Heebo ExtraBold: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש",
+          "Source Sans Regular: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß Ωλ Жя ő",
+          "Source Sans Bold: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß Ωλ Жя ő",
+          "Source Sans Italic: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "0123456789 QWZ ÅÄÖ éñ € ß Ωλ Жя ő",
+          "Source Sans Bold Italic: the quick brown fox jumps over the",
+          "lazy dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs 0123456789 QWZ ÅÄÖ éñ € ß Ωλ Жя ő"
+        ]
+      },
+      "saved": {
+        "bytes": 1464534,
+        "sha256": "9f3fabafb7b2a136473f09f5f774fcafefd98437c5a41df5c807f15d19970de5",
+        "fontParts": 8,
+        "embeddedFontLst": "<p:embeddedFontLst><p:embeddedFont><p:font typeface=\"Heebo\"/><p:bold r:id=\"rId3\"/></p:embeddedFont><p:embeddedFont><p:font typeface=\"Heebo ExtraBold\"/><p:regular r:id=\"rId4\"/><p:bold r:id=\"rId5\"/></p:embeddedFont><p:embeddedFont><p:font typeface=\"Heebo Medium\"/><p:regular r:id=\"rId6\"/></p:embeddedFont><p:embeddedFont><p:font typeface=\"Source Sans 3\" panose=\"020B0503030403020204\"/><p:regular r:id=\"rId7\"/><p:bold r:id=\"rId8\"/><p:italic r:id=\"rId9\"/><p:boldItalic r:id=\"rId10\"/></p:embeddedFont></p:embeddedFontLst>",
+        "embeddedSlots": [
+          {
+            "typeface": "Heebo",
+            "slot": "bold",
+            "part": "font1.fntdata",
+            "flags": "0x0",
+            "fsType": "0x0",
+            "eotFamily": "Heebo",
+            "eotStyle": "Bold",
+            "sha256": "70dd6eaa829802189d5b839b38871f4c50635c4fbcd3a9ccc53a93e4e096024b"
+          },
+          {
+            "typeface": "Heebo ExtraBold",
+            "slot": "regular",
+            "part": "font2.fntdata",
+            "flags": "0x0",
+            "fsType": "0x0",
+            "eotFamily": "Heebo ExtraBold",
+            "eotStyle": "Regular",
+            "sha256": "5e38e810e401b8f8003f585467e3d1b42a08d2df9f2c927b81440701a5f0714d"
+          },
+          {
+            "typeface": "Heebo ExtraBold",
+            "slot": "bold",
+            "part": "font3.fntdata",
+            "flags": "0x4",
+            "fsType": "0x0",
+            "eotFamily": "10",
+            "eotStyle": "Regular",
+            "sha256": "6963398dc70169d1c406b8d2cfdd28e0db9c0e238d45652d7bc6bac17527f6e1"
+          },
+          {
+            "typeface": "Heebo Medium",
+            "slot": "regular",
+            "part": "font4.fntdata",
+            "flags": "0x0",
+            "fsType": "0x0",
+            "eotFamily": "Heebo Medium",
+            "eotStyle": "Regular",
+            "sha256": "c41c6be5fd4d3c2de8897db39c1714f6ec41261ef6869b9747c83fff4e35fa17"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "slot": "regular",
+            "part": "font5.fntdata",
+            "flags": "0x0",
+            "fsType": "0x0",
+            "eotFamily": "Source Sans 3",
+            "eotStyle": "Regular",
+            "sha256": "1c307d08eab3e54ad13429a80f26e90ec46ad7a2bee4232b73bd9a89332f6fca"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "slot": "bold",
+            "part": "font6.fntdata",
+            "flags": "0x0",
+            "fsType": "0x0",
+            "eotFamily": "Source Sans 3",
+            "eotStyle": "Bold",
+            "sha256": "79d5087a4095aa127caee6b8dba571a8da78e772b66cfdffed7d96c2e64fb4cc"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "slot": "italic",
+            "part": "font7.fntdata",
+            "flags": "0x0",
+            "fsType": "0x0",
+            "eotFamily": "Source Sans 3",
+            "eotStyle": "Italic",
+            "sha256": "f5cc707191dbc544dd2ea00483172c991127a388ca39bdd8bbeffb1df0cda3a9"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "slot": "boldItalic",
+            "part": "font8.fntdata",
+            "flags": "0x0",
+            "fsType": "0x0",
+            "eotFamily": "Source Sans 3",
+            "eotStyle": "Bold Italic",
+            "sha256": "2cb63dd327eee37478cba0840c356a1dd049aca9350b587b08ed1c3dc8262567"
+          }
+        ],
+        "runsWithAddedText": [
+          {
+            "typeface": "Heebo Medium",
+            "b": "0",
+            "i": "0",
+            "text": "Heebo Medium: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Heebo Medium",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Heebo Medium",
+            "b": "0",
+            "i": "0",
+            "text": "שלום"
+          },
+          {
+            "typeface": "Heebo",
+            "b": "1",
+            "i": "0",
+            "text": "Heebo Bold: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Heebo",
+            "b": "1",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Heebo",
+            "b": "1",
+            "i": "0",
+            "text": "שלום"
+          },
+          {
+            "typeface": "Heebo ExtraBold",
+            "b": "0",
+            "i": "0",
+            "text": "Heebo ExtraBold: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Heebo ExtraBold",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Heebo ExtraBold",
+            "b": "0",
+            "i": "0",
+            "text": "שלום"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "0",
+            "text": "Source Sans Regular: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "0",
+            "text": "Ωλ"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "0",
+            "text": "Жя"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "0",
+            "text": "Source Sans Bold: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "0",
+            "text": "Ωλ"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "0",
+            "text": "Жя"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "1",
+            "text": "Source Sans Italic: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "1",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "1",
+            "text": "Ωλ"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "1",
+            "text": "Жя"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "1",
+            "text": "Source Sans Bold Italic: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "1",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "1",
+            "text": "Ωλ"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "1",
+            "text": "Жя"
+          }
+        ]
+      }
+    },
+    {
+      "id": "e-eot-decoded-woff-woff2",
+      "description": "Heebo faces decoded from WOFF2 and Source Sans 3 faces decoded from WOFF 1.0, then wrapped as in A.",
+      "package": {
+        "generatedSha256": "68313095b702ff6cc3b2fae56de09d4ead218cbc3afefe47268a4a5083b054eb",
+        "testedCopySha256": "f12c85ec1ee5381bd9f32b52c2cb13913fd0f918236120a088769f7a7f9edb74",
+        "partsDigest": "9e899115d6a2c80603a903404fe5d54214d17e0a05c2196357ed993f015c028a",
+        "partsDigestMatchesTestedCopy": true
+      },
+      "procedure": "probe copy opened + PDF exported; separate work copy: GUI-typed the added characters at the end of every box (CuaDriver keystrokes), saved in place, closed; PowerPoint quit and relaunched; work copy reopened + PDF exported",
+      "verdict": "PASS. Faces decoded from WOFF2 (google/woff2 via wawoff2) and WOFF 1.0 (zlib) render with outlines identical to the pinned TTFs; edit/save/reopen preserved.",
+      "embedFontsFlagAtOpen": "1",
+      "dialogsAtOpen": null,
+      "open": {
+        "screenshot": "e-eot-decoded-woff-woff2-open.png",
+        "pdf": "e-eot-decoded-woff-woff2-open.pdf",
+        "pdfFonts": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7"
+        ],
+        "faces": [
+          {
+            "pdfFont": "1",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.1818
+          },
+          {
+            "pdfFont": "2",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Bold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "3",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font3.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-ExtraBold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "4",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font4.fntdata",
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-Regular.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "5",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font5.fntdata",
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-Bold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "6",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font6.fntdata",
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-It.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "7",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font7.fntdata",
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-BoldIt.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          }
+        ],
+        "lines": [
+          "Heebo Medium: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs",
+          "Heebo Bold: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor",
+          "jugs",
+          "Heebo ExtraBold: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs",
+          "Source Sans Regular: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs",
+          "Source Sans Bold: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs",
+          "Source Sans Italic: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "Source Sans Bold Italic: the quick brown fox jumps over the",
+          "lazy dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs"
+        ],
+        "lineTextMatchesFontsInstalledBaseline": true
+      },
+      "reopened": {
+        "screenshot": "e-eot-decoded-woff-woff2-reopened.png",
+        "pdf": "e-eot-decoded-woff-woff2-reopened.pdf",
+        "pdfFonts": [
+          "1",
+          "2",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8"
+        ],
+        "faces": [
+          {
+            "pdfFont": "4",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.1724
+          },
+          {
+            "pdfFont": "4",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.5
+          },
+          {
+            "pdfFont": "1",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Bold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "2",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font3.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-ExtraBold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "5",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font4.fntdata",
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-Regular.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "6",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font5.fntdata",
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-Bold.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "7",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font6.fntdata",
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-It.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          },
+          {
+            "pdfFont": "8",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font7.fntdata",
+              "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-BoldIt.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "office-cloud-font: Heebo ExtraBold",
+            "nextBestFraction": 0.0
+          }
+        ],
+        "lines": [
+          "Heebo Medium: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש",
+          "Heebo Bold: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש",
+          "Heebo ExtraBold: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש",
+          "Source Sans Regular: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß Ωλ Жя ő",
+          "Source Sans Bold: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß Ωλ Жя ő",
+          "Source Sans Italic: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "0123456789 QWZ ÅÄÖ éñ € ß Ωλ Жя ő",
+          "Source Sans Bold Italic: the quick brown fox jumps over the",
+          "lazy dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs 0123456789 QWZ ÅÄÖ éñ € ß Ωλ Жя ő"
+        ]
+      },
+      "saved": {
+        "bytes": 1797194,
+        "sha256": "e3a0b50e3fe621d55ddd62dbf32be22bbc088b725436fb86d659c12cf89dc614",
+        "fontParts": 8,
+        "embeddedFontLst": "<p:embeddedFontLst><p:embeddedFont><p:font typeface=\"Heebo\"/><p:bold r:id=\"rId3\"/></p:embeddedFont><p:embeddedFont><p:font typeface=\"Heebo ExtraBold\"/><p:regular r:id=\"rId4\"/><p:bold r:id=\"rId5\"/></p:embeddedFont><p:embeddedFont><p:font typeface=\"Heebo Medium\"/><p:regular r:id=\"rId6\"/></p:embeddedFont><p:embeddedFont><p:font typeface=\"Source Sans 3\" panose=\"020B0503030403020204\"/><p:regular r:id=\"rId7\"/><p:bold r:id=\"rId8\"/><p:italic r:id=\"rId9\"/><p:boldItalic r:id=\"rId10\"/></p:embeddedFont></p:embeddedFontLst>",
+        "embeddedSlots": [
+          {
+            "typeface": "Heebo",
+            "slot": "bold",
+            "part": "font1.fntdata",
+            "payload": "EOT",
+            "sha256": "2c2b73f07eb9a6572254bfee38ca20e8857b8961582892116d5e7e7a63e41e53",
+            "flags": "0x0",
+            "fsType": "0x0",
+            "eotFamily": "Heebo",
+            "eotStyle": "Bold"
+          },
+          {
+            "typeface": "Heebo ExtraBold",
+            "slot": "regular",
+            "part": "font2.fntdata",
+            "payload": "EOT",
+            "sha256": "fbdcd0bcb26496aab553b1d3bc22405d08a341e5ea99f2ca238fdded2801836a",
+            "flags": "0x0",
+            "fsType": "0x0",
+            "eotFamily": "Heebo ExtraBold",
+            "eotStyle": "Regular"
+          },
+          {
+            "typeface": "Heebo ExtraBold",
+            "slot": "bold",
+            "part": "font3.fntdata",
+            "payload": "EOT",
+            "sha256": "b16b41e55e1136354e55855c2cc03735ac841413e463f057ccad8cae159d5c5c",
+            "flags": "0x4",
+            "fsType": "0x0",
+            "eotFamily": "10",
+            "eotStyle": "Regular"
+          },
+          {
+            "typeface": "Heebo Medium",
+            "slot": "regular",
+            "part": "font4.fntdata",
+            "payload": "EOT",
+            "sha256": "e8af784e5153ccd8f07bc7839f54ed79ddadc912146421ab803481062bcc8b85",
+            "flags": "0x0",
+            "fsType": "0x0",
+            "eotFamily": "Heebo Medium",
+            "eotStyle": "Regular"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "slot": "regular",
+            "part": "font5.fntdata",
+            "payload": "EOT",
+            "sha256": "e8409d39b31cb59d655dbe2f84eeae5f02a6dccd883e7ba83f7edae8b15b6400",
+            "flags": "0x0",
+            "fsType": "0x0",
+            "eotFamily": "Source Sans 3",
+            "eotStyle": "Regular"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "slot": "bold",
+            "part": "font6.fntdata",
+            "payload": "EOT",
+            "sha256": "1cf3dbbbb011414404a9b3cee1e9840c5db41be8035ecf16ad1c564b644fd120",
+            "flags": "0x0",
+            "fsType": "0x0",
+            "eotFamily": "Source Sans 3",
+            "eotStyle": "Bold"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "slot": "italic",
+            "part": "font7.fntdata",
+            "payload": "EOT",
+            "sha256": "aa7ab1e6925c6430333cd5644d5084d01ecb6656a5c6ebd5296c027a153bbca5",
+            "flags": "0x0",
+            "fsType": "0x0",
+            "eotFamily": "Source Sans 3",
+            "eotStyle": "Italic"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "slot": "boldItalic",
+            "part": "font8.fntdata",
+            "payload": "EOT",
+            "sha256": "0cb3572ad1d25e8d30b38def1a7d4848015a39d9a3a27026aefabaea694d6f8a",
+            "flags": "0x0",
+            "fsType": "0x0",
+            "eotFamily": "Source Sans 3",
+            "eotStyle": "Bold Italic"
+          }
+        ],
+        "runsWithAddedText": [
+          {
+            "typeface": "Heebo Medium",
+            "b": "0",
+            "i": "0",
+            "text": "Heebo Medium: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Heebo Medium",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Heebo Medium",
+            "b": "0",
+            "i": "0",
+            "text": "שלום"
+          },
+          {
+            "typeface": "Heebo",
+            "b": "1",
+            "i": "0",
+            "text": "Heebo Bold: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Heebo",
+            "b": "1",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Heebo",
+            "b": "1",
+            "i": "0",
+            "text": "שלום"
+          },
+          {
+            "typeface": "Heebo ExtraBold",
+            "b": "0",
+            "i": "0",
+            "text": "Heebo ExtraBold: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Heebo ExtraBold",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Heebo ExtraBold",
+            "b": "0",
+            "i": "0",
+            "text": "שלום"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "0",
+            "text": "Source Sans Regular: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "0",
+            "text": "Ωλ"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "0",
+            "text": "Жя"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "0",
+            "text": "Source Sans Bold: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "0",
+            "text": "Ωλ"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "0",
+            "text": "Жя"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "1",
+            "text": "Source Sans Italic: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "1",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "1",
+            "text": "Ωλ"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "0",
+            "i": "1",
+            "text": "Жя"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "1",
+            "text": "Source Sans Bold Italic: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "1",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "1",
+            "text": "Ωλ"
+          },
+          {
+            "typeface": "Source Sans 3",
+            "b": "1",
+            "i": "1",
+            "text": "Жя"
+          }
+        ]
+      }
+    },
+    {
+      "id": "f-fstype-restricted",
+      "description": "Installable control face plus a Heebo Medium derivative with OS/2.fsType 0x0002 (Restricted).",
+      "package": {
+        "generatedSha256": "3ae917435870fb5032008da1bf44d813d77ba775c821504b7560d0afda1800d4",
+        "testedCopySha256": "9a025985757880aa2506bcd18b1244ec3f8a3d644758da5739b8ff36da4c87ef",
+        "partsDigest": "4b06d6a2cdccf16f41c3ca627bca064d9b88eae57fd43b8b6eaafad670dc4d9e",
+        "partsDigestMatchesTestedCopy": true
+      },
+      "procedure": "probe copy opened + PDF exported; separate work copy: GUI-typed the added characters at the end of every box (CuaDriver keystrokes), saved in place, closed; PowerPoint quit and relaunched; work copy reopened + PDF exported",
+      "verdict": "NOT USED. fsType 0x0002 face silently falls back to Calibri while the installable control in the same Deck renders; part kept on save.",
+      "embedFontsFlagAtOpen": "1",
+      "dialogsAtOpen": null,
+      "open": {
+        "screenshot": "f-fstype-restricted-open.png",
+        "pdf": "f-fstype-restricted-open.pdf",
+        "pdfFonts": [
+          "1",
+          "Calibri"
+        ],
+        "faces": [
+          {
+            "pdfFont": "1",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.2
+          },
+          {
+            "pdfFont": "Calibri",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          }
+        ],
+        "lines": [
+          "DF Perm Installable: the quick brown fox jumps over the",
+          "lazy dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs",
+          "DF Perm Restricted: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs"
+        ]
+      },
+      "reopened": {
+        "screenshot": "f-fstype-restricted-reopened.png",
+        "pdf": "f-fstype-restricted-reopened.pdf",
+        "pdfFonts": [
+          "1",
+          "Calibri"
+        ],
+        "faces": [
+          {
+            "pdfFont": "1",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.1833
+          },
+          {
+            "pdfFont": "1",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.5
+          },
+          {
+            "pdfFont": "Calibri",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          }
+        ],
+        "lines": [
+          "DF Perm Installable: the quick brown fox jumps over the",
+          "lazy dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש",
+          "DF Perm Restricted: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "0123456789 QWZ ÅÄÖ éñ€ß ם ו ל ש"
+        ]
+      },
+      "saved": {
+        "bytes": 176119,
+        "sha256": "73323053b7cc3cfc06852ea80992c586f8c5b4e38d638d2a0f2392ef514782fd",
+        "fontParts": 2,
+        "embeddedFontLst": "<p:embeddedFontLst><p:embeddedFont><p:font typeface=\"DF Perm Installable\"/><p:regular r:id=\"rId3\"/></p:embeddedFont><p:embeddedFont><p:font typeface=\"DF Perm Restricted\"/><p:regular r:id=\"rId4\"/></p:embeddedFont></p:embeddedFontLst>",
+        "embeddedSlots": [
+          {
+            "typeface": "DF Perm Installable",
+            "slot": "regular",
+            "part": "font1.fntdata",
+            "payload": "EOT",
+            "sha256": "7cfbdadc0a0a854d56655970deeed50063394c0b2926353775e8be3644c777c9",
+            "flags": "0x0",
+            "fsType": "0x0",
+            "eotFamily": "DF Perm Installable",
+            "eotStyle": "Regular"
+          },
+          {
+            "typeface": "DF Perm Restricted",
+            "slot": "regular",
+            "part": "font2.fntdata",
+            "payload": "EOT",
+            "sha256": "6f46453d9860e5aae5dee9ebdcbf8abaefaeff1d641daa1797e712b8049097ca",
+            "flags": "0x0",
+            "fsType": "0x2",
+            "eotFamily": "DF Perm Restricted",
+            "eotStyle": "Regular"
+          }
+        ],
+        "runsWithAddedText": [
+          {
+            "typeface": "DF Perm Installable",
+            "b": "0",
+            "i": "0",
+            "text": "DF Perm Installable: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "DF Perm Installable",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "DF Perm Installable",
+            "b": "0",
+            "i": "0",
+            "text": "שלום"
+          },
+          {
+            "typeface": "DF Perm Restricted",
+            "b": "0",
+            "i": "0",
+            "text": "DF Perm Restricted: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "DF Perm Restricted",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "DF Perm Restricted",
+            "b": "0",
+            "i": "0",
+            "text": "שלום"
+          }
+        ]
+      }
+    },
+    {
+      "id": "f-fstype-preview",
+      "description": "Installable control face plus a Heebo Medium derivative with OS/2.fsType 0x0004 (Preview).",
+      "package": {
+        "generatedSha256": "b1b9517bfc560212435ab08c4150534302dd870ae8ca29c5a64f8b3b14dd4e54",
+        "testedCopySha256": "cfd9a3a29e0aaf58b71088feb32738a928c00a3d3e578aa28364cc17327b2406",
+        "partsDigest": "879076a6589bf7e174e7ac9b6c91f2ff2fe97a7551cd50347e027b1c3ff50a48",
+        "partsDigestMatchesTestedCopy": true
+      },
+      "procedure": "opened (blocking dialog) → Open Read-only → screenshot",
+      "verdict": "NOT EDITABLE. fsType 0x0004 makes PowerPoint refuse editing: 'This presentation cannot be edited because it contains one or more read-only embedded (restricted) fonts…' with Open Read-only / Remove Restricted Fonts. Read-only view renders the face; AppleScript PDF export produced no file.",
+      "embedFontsFlagAtOpen": null,
+      "dialogsAtOpen": "This presentation cannot be edited because it contains one or more read-only embedded (restricted) fonts. To edit the presentation you must remove the restricted fonts, or you can open the presentation as read-only. Read-only embedded fonts included in this presentation: DF Perm Preview. [Open Read-only] [Remove Restricted Fonts]",
+      "open-readonly": {
+        "screenshot": "f-fstype-preview-open-readonly.png",
+        "pdf": null,
+        "pdfFonts": null,
+        "pdfExport": "AppleScript save-as-PDF produced no file in read-only mode",
+        "ribbonDisabled": true
+      }
+    },
+    {
+      "id": "f-fstype-editable",
+      "description": "Installable control face plus a Heebo Medium derivative with OS/2.fsType 0x0008 (Editable).",
+      "package": {
+        "generatedSha256": "dea9368567b68807c5da064d18bcf5c267615b3413e3c615fafc8c0e0e334ba2",
+        "testedCopySha256": "09efe08833fb01f83017363c50e7827e9f245c30d461db927c3d89083a3ebffa",
+        "partsDigest": "72cd2375667547075310980bf76a45ad458d6ee2beb82807c3568493dc9fb38f",
+        "partsDigestMatchesTestedCopy": true
+      },
+      "procedure": "probe copy opened + PDF exported; separate work copy: GUI-typed the added characters at the end of every box (CuaDriver keystrokes), saved in place, closed; PowerPoint quit and relaunched; work copy reopened + PDF exported",
+      "verdict": "PASS. fsType 0x0008 face renders, edits, saves and reopens.",
+      "embedFontsFlagAtOpen": "1",
+      "dialogsAtOpen": null,
+      "open": {
+        "screenshot": "f-fstype-editable-open.png",
+        "pdf": "f-fstype-editable-open.pdf",
+        "pdfFonts": [
+          "1",
+          "2"
+        ],
+        "faces": [
+          {
+            "pdfFont": "1",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.2
+          },
+          {
+            "pdfFont": "2",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.1714
+          }
+        ],
+        "lines": [
+          "DF Perm Installable: the quick brown fox jumps over the",
+          "lazy dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs",
+          "DF Perm Editable: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs"
+        ]
+      },
+      "reopened": {
+        "screenshot": "f-fstype-editable-reopened.png",
+        "pdf": "f-fstype-editable-reopened.pdf",
+        "pdfFonts": [
+          "1",
+          "2"
+        ],
+        "faces": [
+          {
+            "pdfFont": "2",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.1833
+          },
+          {
+            "pdfFont": "2",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.5
+          },
+          {
+            "pdfFont": "1",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.1667
+          },
+          {
+            "pdfFont": "1",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.5
+          }
+        ],
+        "lines": [
+          "DF Perm Installable: the quick brown fox jumps over the",
+          "lazy dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש",
+          "DF Perm Editable: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש"
+        ]
+      },
+      "saved": {
+        "bytes": 176084,
+        "sha256": "824a5ae5a81f36c239dcfb7847a0ce2428d3f09fc71edd94d6652217315271bb",
+        "fontParts": 2,
+        "embeddedFontLst": "<p:embeddedFontLst><p:embeddedFont><p:font typeface=\"DF Perm Editable\"/><p:regular r:id=\"rId3\"/></p:embeddedFont><p:embeddedFont><p:font typeface=\"DF Perm Installable\"/><p:regular r:id=\"rId4\"/></p:embeddedFont></p:embeddedFontLst>",
+        "embeddedSlots": [
+          {
+            "typeface": "DF Perm Editable",
+            "slot": "regular",
+            "part": "font1.fntdata",
+            "payload": "EOT",
+            "sha256": "d4c87add93680caae757f28ba59793a460dff41d6d9fe545a01973a888f3619c",
+            "flags": "0x0",
+            "fsType": "0x8",
+            "eotFamily": "DF Perm Editable",
+            "eotStyle": "Regular"
+          },
+          {
+            "typeface": "DF Perm Installable",
+            "slot": "regular",
+            "part": "font2.fntdata",
+            "payload": "EOT",
+            "sha256": "7cfbdadc0a0a854d56655970deeed50063394c0b2926353775e8be3644c777c9",
+            "flags": "0x0",
+            "fsType": "0x0",
+            "eotFamily": "DF Perm Installable",
+            "eotStyle": "Regular"
+          }
+        ],
+        "runsWithAddedText": [
+          {
+            "typeface": "DF Perm Installable",
+            "b": "0",
+            "i": "0",
+            "text": "DF Perm Installable: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "DF Perm Installable",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "DF Perm Installable",
+            "b": "0",
+            "i": "0",
+            "text": "שלום"
+          },
+          {
+            "typeface": "DF Perm Editable",
+            "b": "0",
+            "i": "0",
+            "text": "DF Perm Editable: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "DF Perm Editable",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "DF Perm Editable",
+            "b": "0",
+            "i": "0",
+            "text": "שלום"
+          }
+        ]
+      }
+    },
+    {
+      "id": "f-fstype-nosubset",
+      "description": "Installable control face plus a Heebo Medium derivative with OS/2.fsType 0x0100 (NoSubset).",
+      "package": {
+        "generatedSha256": "839762647f9277e87263cf4f49e2bc26f72b4cee6ad4bd75749b359addfaf3ab",
+        "testedCopySha256": "1ba62bafd8e6bbd5af1fee50bbeb4b3c8d13bc533043bf8c8afa9d30a58ac371",
+        "partsDigest": "bd45e2c2881e623dc5da774f5e79d92329f54eb5262344ce3ba22a2ecc487b43",
+        "partsDigestMatchesTestedCopy": true
+      },
+      "procedure": "probe copy opened + PDF exported; separate work copy: GUI-typed the added characters at the end of every box (CuaDriver keystrokes), saved in place, closed; PowerPoint quit and relaunched; work copy reopened + PDF exported",
+      "verdict": "PASS. fsType 0x0100 (installable + no-subsetting) renders, edits, saves and reopens; full-font embedding satisfies it.",
+      "embedFontsFlagAtOpen": "1",
+      "dialogsAtOpen": null,
+      "open": {
+        "screenshot": "f-fstype-nosubset-open.png",
+        "pdf": "f-fstype-nosubset-open.pdf",
+        "pdfFonts": [
+          "1",
+          "2"
+        ],
+        "faces": [
+          {
+            "pdfFont": "1",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.2
+          },
+          {
+            "pdfFont": "2",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.1944
+          }
+        ],
+        "lines": [
+          "DF Perm Installable: the quick brown fox jumps over the",
+          "lazy dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs",
+          "DF Perm NoSubset: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs"
+        ]
+      },
+      "reopened": {
+        "screenshot": "f-fstype-nosubset-reopened.png",
+        "pdf": "f-fstype-nosubset-reopened.pdf",
+        "pdfFonts": [
+          "1",
+          "2"
+        ],
+        "faces": [
+          {
+            "pdfFont": "1",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.1833
+          },
+          {
+            "pdfFont": "1",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.5
+          },
+          {
+            "pdfFont": "2",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.1803
+          },
+          {
+            "pdfFont": "2",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.5
+          }
+        ],
+        "lines": [
+          "DF Perm Installable: the quick brown fox jumps over the",
+          "lazy dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש",
+          "DF Perm NoSubset: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש"
+        ]
+      },
+      "saved": {
+        "bytes": 176091,
+        "sha256": "71a4a8db76425922c431f7ff8195841b39eb78b714986b0dad2be8fff0444a70",
+        "fontParts": 2,
+        "embeddedFontLst": "<p:embeddedFontLst><p:embeddedFont><p:font typeface=\"DF Perm Installable\"/><p:regular r:id=\"rId3\"/></p:embeddedFont><p:embeddedFont><p:font typeface=\"DF Perm NoSubset\"/><p:regular r:id=\"rId4\"/></p:embeddedFont></p:embeddedFontLst>",
+        "embeddedSlots": [
+          {
+            "typeface": "DF Perm Installable",
+            "slot": "regular",
+            "part": "font1.fntdata",
+            "payload": "EOT",
+            "sha256": "7cfbdadc0a0a854d56655970deeed50063394c0b2926353775e8be3644c777c9",
+            "flags": "0x0",
+            "fsType": "0x0",
+            "eotFamily": "DF Perm Installable",
+            "eotStyle": "Regular"
+          },
+          {
+            "typeface": "DF Perm NoSubset",
+            "slot": "regular",
+            "part": "font2.fntdata",
+            "payload": "EOT",
+            "sha256": "d1701638c40792cdcb42d905ccfcb01fd53485ad1f782935bfb2a47677ec30c3",
+            "flags": "0x0",
+            "fsType": "0x100",
+            "eotFamily": "DF Perm NoSubset",
+            "eotStyle": "Regular"
+          }
+        ],
+        "runsWithAddedText": [
+          {
+            "typeface": "DF Perm Installable",
+            "b": "0",
+            "i": "0",
+            "text": "DF Perm Installable: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "DF Perm Installable",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "DF Perm Installable",
+            "b": "0",
+            "i": "0",
+            "text": "שלום"
+          },
+          {
+            "typeface": "DF Perm NoSubset",
+            "b": "0",
+            "i": "0",
+            "text": "DF Perm NoSubset: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "DF Perm NoSubset",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "DF Perm NoSubset",
+            "b": "0",
+            "i": "0",
+            "text": "שלום"
+          }
+        ]
+      }
+    },
+    {
+      "id": "f-fstype-bitmaponly",
+      "description": "Installable control face plus a Heebo Medium derivative with OS/2.fsType 0x0200 (BitmapOnly).",
+      "package": {
+        "generatedSha256": "ac08e200000df97b98caeac400c68cb4656ca0f2297c87aa2f2dc5f19c13790f",
+        "testedCopySha256": "1d902dcb86468e172d11cc06ded513d150cfbcabcc9dfec9c0b0da00350465e9",
+        "partsDigest": "b81aa0b8aff855121b521db286a179f90b0bbac41f63c6a8a8661853c4bd755d",
+        "partsDigestMatchesTestedCopy": true
+      },
+      "procedure": "probe copy opened + PDF exported; separate work copy: GUI-typed the added characters at the end of every box (CuaDriver keystrokes), saved in place, closed; PowerPoint quit and relaunched; work copy reopened + PDF exported",
+      "verdict": "RENDERED BUT DISALLOWED. PowerPoint for Mac ignores 0x0200 and renders the outlines; the licence bit still forbids outline embedding, so deckflip must reject it.",
+      "embedFontsFlagAtOpen": "1",
+      "dialogsAtOpen": null,
+      "open": {
+        "screenshot": "f-fstype-bitmaponly-open.png",
+        "pdf": "f-fstype-bitmaponly-open.pdf",
+        "pdfFonts": [
+          "1",
+          "2"
+        ],
+        "faces": [
+          {
+            "pdfFont": "1",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.2
+          },
+          {
+            "pdfFont": "2",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.1667
+          }
+        ],
+        "lines": [
+          "DF Perm Installable: the quick brown fox jumps over the",
+          "lazy dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs",
+          "DF Perm BitmapOnly: the quick brown fox jumps over the",
+          "lazy dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs"
+        ]
+      },
+      "reopened": {
+        "screenshot": "f-fstype-bitmaponly-reopened.png",
+        "pdf": "f-fstype-bitmaponly-reopened.pdf",
+        "pdfFonts": [
+          "1",
+          "2"
+        ],
+        "faces": [
+          {
+            "pdfFont": "2",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.1833
+          },
+          {
+            "pdfFont": "2",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.5
+          },
+          {
+            "pdfFont": "1",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.1667
+          },
+          {
+            "pdfFont": "1",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font2.fntdata",
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.5
+          }
+        ],
+        "lines": [
+          "DF Perm Installable: the quick brown fox jumps over the",
+          "lazy dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש",
+          "DF Perm BitmapOnly: the quick brown fox jumps over the",
+          "lazy dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש"
+        ]
+      },
+      "saved": {
+        "bytes": 176121,
+        "sha256": "b7e2fa7ce2f8ed0d91bb1aad6e80a5b33fa850fff3eae4b5744dda18673b84d0",
+        "fontParts": 2,
+        "embeddedFontLst": "<p:embeddedFontLst><p:embeddedFont><p:font typeface=\"DF Perm BitmapOnly\"/><p:regular r:id=\"rId3\"/></p:embeddedFont><p:embeddedFont><p:font typeface=\"DF Perm Installable\"/><p:regular r:id=\"rId4\"/></p:embeddedFont></p:embeddedFontLst>",
+        "embeddedSlots": [
+          {
+            "typeface": "DF Perm BitmapOnly",
+            "slot": "regular",
+            "part": "font1.fntdata",
+            "payload": "EOT",
+            "sha256": "e0a923d3b5b3fbdbf2c6bd2f5409552846f70acdcdaa0e5e11dd77b868bbffa8",
+            "flags": "0x0",
+            "fsType": "0x200",
+            "eotFamily": "DF Perm BitmapOnly",
+            "eotStyle": "Regular"
+          },
+          {
+            "typeface": "DF Perm Installable",
+            "slot": "regular",
+            "part": "font2.fntdata",
+            "payload": "EOT",
+            "sha256": "7cfbdadc0a0a854d56655970deeed50063394c0b2926353775e8be3644c777c9",
+            "flags": "0x0",
+            "fsType": "0x0",
+            "eotFamily": "DF Perm Installable",
+            "eotStyle": "Regular"
+          }
+        ],
+        "runsWithAddedText": [
+          {
+            "typeface": "DF Perm Installable",
+            "b": "0",
+            "i": "0",
+            "text": "DF Perm Installable: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "DF Perm Installable",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "DF Perm Installable",
+            "b": "0",
+            "i": "0",
+            "text": "שלום"
+          },
+          {
+            "typeface": "DF Perm BitmapOnly",
+            "b": "0",
+            "i": "0",
+            "text": "DF Perm BitmapOnly: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "DF Perm BitmapOnly",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "DF Perm BitmapOnly",
+            "b": "0",
+            "i": "0",
+            "text": "שלום"
+          }
+        ]
+      }
+    },
+    {
+      "id": "g-variable",
+      "description": "Heebo[wght] embedded unmodified under its default-instance name, and a fontTools static wght=500 instance renamed \"Heebo VF500\".",
+      "package": {
+        "generatedSha256": "e15be2e1f00605ff02ef02e8c5f5cbc58d3b2affeca51499359fa62186344450",
+        "testedCopySha256": "e38dec8e1fc29d60b63bdd08481cbbf5dec23777523bf00c8ab0665db03aa7f9",
+        "partsDigest": "fdbb2544073fd269edd606b2de7d09a55091a4d4128446829954f62a9dfb7b3b",
+        "partsDigestMatchesTestedCopy": true
+      },
+      "procedure": "probe copy opened + PDF exported; separate work copy: GUI-typed the added characters at the end of every box (CuaDriver keystrokes), saved in place, closed; PowerPoint quit and relaunched; work copy reopened + PDF exported",
+      "verdict": "Variable font as-is: PowerPoint renders the wght=100 (Thin) instance (outlines match a fontTools wght=100 instance 100%), not the default 400 nor the CSS 500. Static instance: renders exactly (matches fontTools/Google static wght=500 outlines).",
+      "embedFontsFlagAtOpen": "1",
+      "dialogsAtOpen": null,
+      "open": {
+        "screenshot": "g-variable-open.png",
+        "pdf": "g-variable-open.pdf",
+        "pdfFonts": [
+          "1_Thin",
+          "2"
+        ],
+        "faces": [
+          {
+            "pdfFont": "1_Thin",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          },
+          {
+            "pdfFont": "2",
+            "identifiedAs": [
+              "prototypes/font-embedding/sources/heebo-500-full.ttf",
+              "prototypes/font-embedding/sources/Heebo-Variable-wght500.instance.ttf",
+              "deck payload ppt/fonts/font2.fntdata"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf",
+            "nextBestFraction": 0.1765
+          }
+        ],
+        "lines": [
+          "Heebo variable default: the quick brown fox jumps over the",
+          "lazy dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs",
+          "Heebo VF static instance: the quick brown fox jumps over",
+          "the lazy dog while vexed nymphs pack my box with five",
+          "dozen liquor jugs"
+        ]
+      },
+      "reopened": {
+        "screenshot": "g-variable-reopened.png",
+        "pdf": "g-variable-reopened.pdf",
+        "pdfFonts": [
+          "1_Thin",
+          "3"
+        ],
+        "faces": [
+          {
+            "pdfFont": "1_Thin",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          },
+          {
+            "pdfFont": "3",
+            "identifiedAs": [
+              "prototypes/font-embedding/sources/heebo-500-full.ttf",
+              "prototypes/font-embedding/sources/Heebo-Variable-wght500.instance.ttf",
+              "deck payload ppt/fonts/font2.fntdata"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf",
+            "nextBestFraction": 0.1695
+          },
+          {
+            "pdfFont": "3",
+            "identifiedAs": [
+              "prototypes/font-embedding/sources/heebo-500-full.ttf",
+              "prototypes/font-embedding/sources/Heebo-Variable-wght500.instance.ttf",
+              "deck payload ppt/fonts/font2.fntdata"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf",
+            "nextBestFraction": 0.5
+          }
+        ],
+        "lines": [
+          "Heebo variable default: the quick brown fox jumps over the",
+          "lazy dog while vexed nymphs pack my box with five dozen",
+          "liquor jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש",
+          "Heebo VF static instance: the quick brown fox jumps over",
+          "the lazy dog while vexed nymphs pack my box with five",
+          "dozen liquor jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש"
+        ]
+      },
+      "saved": {
+        "bytes": 263675,
+        "sha256": "cfaacd111b5a0286fe0972b84560a76535b1711dbbec6c57efc2a3350382a371",
+        "fontParts": 3,
+        "embeddedFontLst": "<p:embeddedFontLst><p:embeddedFont><p:font typeface=\"Heebo\"/><p:regular r:id=\"rId3\"/><p:bold r:id=\"rId4\"/></p:embeddedFont><p:embeddedFont><p:font typeface=\"Heebo VF500\"/><p:regular r:id=\"rId5\"/></p:embeddedFont></p:embeddedFontLst>",
+        "embeddedSlots": [
+          {
+            "typeface": "Heebo",
+            "slot": "regular",
+            "part": "font1.fntdata",
+            "payload": "EOT",
+            "sha256": "684370b61e5a6d2a09b097ae8a8f94d35ea1d4793d8b88ca6539f7662afc5438",
+            "flags": "0x0",
+            "fsType": "0x0",
+            "eotFamily": "Heebo",
+            "eotStyle": "Regular"
+          },
+          {
+            "typeface": "Heebo",
+            "slot": "bold",
+            "part": "font2.fntdata",
+            "payload": "EOT",
+            "sha256": "9cee753e002f415356e8fdbacacbe313c1c054676d06b7a9921329b9293e922c",
+            "flags": "0x4",
+            "fsType": "0x0",
+            "eotFamily": "3",
+            "eotStyle": "Regular"
+          },
+          {
+            "typeface": "Heebo VF500",
+            "slot": "regular",
+            "part": "font3.fntdata",
+            "payload": "EOT",
+            "sha256": "d467ace3ceb6ae15247d0dc398f9ef9db532fd96ca34a4fd63c1d2f42849dd97",
+            "flags": "0x0",
+            "fsType": "0x0",
+            "eotFamily": "Heebo VF500",
+            "eotStyle": "Regular"
+          }
+        ],
+        "runsWithAddedText": [
+          {
+            "typeface": "Heebo",
+            "b": "0",
+            "i": "0",
+            "text": "Heebo variable default: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Heebo",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Heebo",
+            "b": "0",
+            "i": "0",
+            "text": "שלום"
+          },
+          {
+            "typeface": "Heebo VF500",
+            "b": "0",
+            "i": "0",
+            "text": "Heebo VF static instance: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Heebo VF500",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Heebo VF500",
+            "b": "0",
+            "i": "0",
+            "text": "שלום"
+          }
+        ]
+      }
+    },
+    {
+      "id": "h-unicode-range-subset",
+      "description": "Google Fonts Heebo 500 \"latin\" unicode-range WOFF2 subset, decoded and embedded as the complete Heebo Medium regular face.",
+      "package": {
+        "generatedSha256": "717a6f52359d2f6d1e7a540b53d29c83fa4e2dc10a2f1aeb668a27a0c21d9060",
+        "testedCopySha256": "1deee6f7e5247889bd744707e080b5ebc900c0b02f21ced57f12744009988224",
+        "partsDigest": "262e25a78b764fd10350a82c79f145999ff82278894d5fa2cc5a5f69ca2307fa",
+        "partsDigestMatchesTestedCopy": true
+      },
+      "procedure": "probe copy opened + PDF exported; separate work copy: GUI-typed the added characters at the end of every box (CuaDriver keystrokes), saved in place, closed; PowerPoint quit and relaunched; work copy reopened + PDF exported",
+      "verdict": "LIMITED. The latin unicode-range subset renders the Slide's Latin text; typed Hebrew (outside the subset cmap) silently falls back to Times New Roman.",
+      "embedFontsFlagAtOpen": "1",
+      "dialogsAtOpen": null,
+      "open": {
+        "screenshot": "h-unicode-range-subset-open.png",
+        "pdf": "h-unicode-range-subset-open.pdf",
+        "pdfFonts": [
+          "1"
+        ],
+        "faces": [
+          {
+            "pdfFont": "1",
+            "identifiedAs": [
+              "prototypes/font-embedding/sources/heebo-500-full.ttf",
+              "prototypes/font-embedding/sources/Heebo-Variable-wght500.instance.ttf",
+              "deck payload ppt/fonts/font1.fntdata"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf",
+            "nextBestFraction": 0.1818
+          }
+        ],
+        "lines": [
+          "Heebo Medium latin subset: the quick brown fox jumps over",
+          "the lazy dog while vexed nymphs pack my box with five",
+          "dozen liquor jugs"
+        ]
+      },
+      "reopened": {
+        "screenshot": "h-unicode-range-subset-reopened.png",
+        "pdf": "h-unicode-range-subset-reopened.pdf",
+        "pdfFonts": [
+          "1",
+          "TimesNewRomanPSMT"
+        ],
+        "faces": [
+          {
+            "pdfFont": "1",
+            "identifiedAs": [
+              "prototypes/font-embedding/sources/heebo-500-full.ttf",
+              "prototypes/font-embedding/sources/Heebo-Variable-wght500.instance.ttf",
+              "deck payload ppt/fonts/font1.fntdata"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf",
+            "nextBestFraction": 0.1724
+          },
+          {
+            "pdfFont": "1",
+            "identifiedAs": [
+              "prototypes/font-embedding/sources/heebo-500-full.ttf",
+              "prototypes/font-embedding/sources/Heebo-Variable-wght500.instance.ttf",
+              "deck payload ppt/fonts/font1.fntdata"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf",
+            "nextBestFraction": 0.5
+          },
+          {
+            "pdfFont": "TimesNewRomanPSMT",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          }
+        ],
+        "lines": [
+          "Heebo Medium latin subset: the quick brown fox jumps over",
+          "the lazy dog while vexed nymphs pack my box with five",
+          "dozen liquor jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש"
+        ]
+      },
+      "saved": {
+        "bytes": 33070,
+        "sha256": "54620df2994c63a354b831c9a9d4e8c679b7a16e7a96fdca153c093218eeaebd",
+        "fontParts": 1,
+        "embeddedFontLst": "<p:embeddedFontLst><p:embeddedFont><p:font typeface=\"Heebo Medium\"/><p:regular r:id=\"rId3\"/></p:embeddedFont></p:embeddedFontLst>",
+        "embeddedSlots": [
+          {
+            "typeface": "Heebo Medium",
+            "slot": "regular",
+            "part": "font1.fntdata",
+            "payload": "EOT",
+            "sha256": "5b258dc6998bd382730930b7f7757e350b7cf5e954a97ef7715ea53cefa59d7a",
+            "flags": "0x0",
+            "fsType": "0x0",
+            "eotFamily": "Heebo Medium",
+            "eotStyle": "Regular"
+          }
+        ],
+        "runsWithAddedText": [
+          {
+            "typeface": "Heebo Medium",
+            "b": "0",
+            "i": "0",
+            "text": "Heebo Medium latin subset: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Heebo Medium",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Heebo Medium",
+            "b": "0",
+            "i": "0",
+            "text": "שלום"
+          }
+        ]
+      }
+    },
+    {
+      "id": "minimal-heebo-medium",
+      "description": "Smallest reproduction: unmodified Heebo Medium in uncompressed EOT, one text box, p:font typeface only.",
+      "package": {
+        "generatedSha256": "b5b4b2e6d2605b1e3b85df96e3afafbf545c4da8a81cbf6b231daf3339fd45c1",
+        "testedCopySha256": "b5b4b2e6d2605b1e3b85df96e3afafbf545c4da8a81cbf6b231daf3339fd45c1",
+        "partsDigest": "3311b75dfbc17bd353779ecdf97162a1fb06b8f180e7c012889743e60ed0a069",
+        "partsDigestMatchesTestedCopy": true
+      },
+      "procedure": "probe copy opened + PDF exported; separate work copy: GUI-typed the added characters at the end of every box (CuaDriver keystrokes), saved in place, closed; PowerPoint quit and relaunched; work copy reopened + PDF exported",
+      "verdict": "PASS. Smallest reproduction (51 471-byte package, one face, p:font with typeface only) opens, edits with absent characters, saves and reopens with the exact embedded face.",
+      "embedFontsFlagAtOpen": "1",
+      "dialogsAtOpen": null,
+      "open": {
+        "screenshot": "minimal-heebo-medium-open.png",
+        "pdf": "minimal-heebo-medium-open.pdf",
+        "pdfFonts": [
+          "1"
+        ],
+        "faces": [
+          {
+            "pdfFont": "1",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.1818
+          }
+        ],
+        "lines": [
+          "Heebo Medium: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs"
+        ]
+      },
+      "reopened": {
+        "screenshot": "minimal-heebo-medium-reopened.png",
+        "pdf": "minimal-heebo-medium-reopened.pdf",
+        "pdfFonts": [
+          "1"
+        ],
+        "faces": [
+          {
+            "pdfFont": "1",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.1724
+          },
+          {
+            "pdfFont": "1",
+            "identifiedAs": [
+              "deck payload ppt/fonts/font1.fntdata",
+              "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+            ],
+            "matchedFraction": 1.0,
+            "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+            "nextBestFraction": 0.5
+          }
+        ],
+        "lines": [
+          "Heebo Medium: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor",
+          "jugs 0123456789 QWZ ÅÄÖ éñ € ß ם ו ל ש"
+        ]
+      },
+      "saved": {
+        "bytes": 92908,
+        "sha256": "e73882aa36c5bfcc740dd099400197959cdfe390fd0c6b4dfd341e550e6cccb3",
+        "fontParts": 1,
+        "embeddedFontLst": "<p:embeddedFontLst><p:embeddedFont><p:font typeface=\"Heebo Medium\"/><p:regular r:id=\"rId3\"/></p:embeddedFont></p:embeddedFontLst>",
+        "embeddedSlots": [
+          {
+            "typeface": "Heebo Medium",
+            "slot": "regular",
+            "part": "font1.fntdata",
+            "payload": "EOT",
+            "sha256": "c41c6be5fd4d3c2de8897db39c1714f6ec41261ef6869b9747c83fff4e35fa17",
+            "flags": "0x0",
+            "fsType": "0x0",
+            "eotFamily": "Heebo Medium",
+            "eotStyle": "Regular"
+          }
+        ],
+        "runsWithAddedText": [
+          {
+            "typeface": "Heebo Medium",
+            "b": "0",
+            "i": "0",
+            "text": "Heebo Medium: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ "
+          },
+          {
+            "typeface": "Heebo Medium",
+            "b": "0",
+            "i": "0",
+            "text": "éñ€ß"
+          },
+          {
+            "typeface": "Heebo Medium",
+            "b": "0",
+            "i": "0",
+            "text": "שלום"
+          }
+        ]
+      }
+    },
+    {
+      "id": "control-after",
+      "description": null,
+      "package": {
+        "generatedSha256": "15671cf00054261c5b8dfd9ea87fc740ecd2e36039c926b99861cad9765e0473",
+        "testedCopySha256": "8b13b9104189711b959b05ab5d685924ec08c30266d33bf774d5e7e659900a5b",
+        "partsDigest": "ab961926c7f187e48c089202a4277b01b8619e001a68879ad170998f27bd69c1",
+        "partsDigestMatchesTestedCopy": true
+      },
+      "procedure": "opened + PDF (isolated, after all cases)",
+      "verdict": "Same Calibri fallback as the first control: isolation held for the whole run.",
+      "embedFontsFlagAtOpen": "0",
+      "dialogsAtOpen": null,
+      "open": {
+        "screenshot": "control-after-open.png",
+        "pdf": "control-after-open.pdf",
+        "pdfFonts": [
+          "Calibri",
+          "Calibri-Bold",
+          "Calibri-BoldItalic",
+          "Calibri-Italic"
+        ],
+        "faces": [
+          {
+            "pdfFont": "Calibri",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          },
+          {
+            "pdfFont": "Calibri-Bold",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          },
+          {
+            "pdfFont": "Calibri-Italic",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          },
+          {
+            "pdfFont": "Calibri-BoldItalic",
+            "identifiedAs": null,
+            "matchedFraction": 0.0
+          }
+        ],
+        "lines": [
+          "Heebo Medium: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "Heebo Bold: the quick brown fox jumps over the lazy dog while",
+          "vexed nymphs pack my box with five dozen liquor jugs",
+          "Heebo ExtraBold: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "Source Sans Regular: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "Source Sans Bold: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "Source Sans Italic: the quick brown fox jumps over the lazy dog",
+          "while vexed nymphs pack my box with five dozen liquor jugs",
+          "Source Sans Bold Italic: the quick brown fox jumps over the lazy",
+          "dog while vexed nymphs pack my box with five dozen liquor jugs"
+        ],
+        "lineTextMatchesFontsInstalledBaseline": false
+      }
+    }
+  ],
+  "savePathChecks": {
+    "embedFlagAfterAppleScriptPdfExport": "0",
+    "embedFlagAfterGuiFileExportPdf": "1",
+    "embedFlagAfterInPlaceSave": "1",
+    "noEditSaveAlsoPreserves": {
+      "case": "a2 (add/delete slide via AppleScript, save in place)",
+      "fontParts": 8
+    },
+    "note": "PowerPoint reads embedTrueTypeFonts=\"1\" into Preferences > Save > 'Embed fonts in the file' / 'Embed all characters' for the document. AppleScript save-as (PDF or PPTX) clears it; GUI File > Export > PDF does not."
+  },
+  "officeCloudFonts": {
+    "cloudCachedBeforeOpen": {
+      "case": "cloud-vs-embedded (case A package, cloud enabled, cloud Heebo already cached)",
+      "heeboRenderedFrom": "office cloud font (outlines match cloud Heebo 100%; cloud Heebo Medium has 459 glyphs/339 cmap entries vs pinned 591/464; first line 401.6 pt vs 400.0 pt)",
+      "sourceSans3RenderedFrom": "embedded payloads",
+      "faces": [
+        {
+          "pdfFont": "Heebo-Medium",
+          "identifiedAs": [
+            "office-cloud-font: Heebo Medium"
+          ],
+          "matchedFraction": 1.0,
+          "nextBest": "office-cloud-font: Heebo ExtraBold",
+          "nextBestFraction": 0.0323
+        },
+        {
+          "pdfFont": "Heebo-Bold",
+          "identifiedAs": [
+            "office-cloud-font: Heebo Bold"
+          ],
+          "matchedFraction": 1.0,
+          "nextBest": "office-cloud-font: Heebo ExtraBold",
+          "nextBestFraction": 0.0323
+        },
+        {
+          "pdfFont": "Heebo-ExtraBold",
+          "identifiedAs": [
+            "office-cloud-font: Heebo ExtraBold"
+          ],
+          "matchedFraction": 1.0,
+          "nextBest": "office-cloud-font: Heebo Bold",
+          "nextBestFraction": 0.0312
+        },
+        {
+          "pdfFont": "1",
+          "identifiedAs": [
+            "deck payload ppt/fonts/font4.fntdata",
+            "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-Regular.ttf"
+          ],
+          "matchedFraction": 1.0,
+          "nextBest": "office-cloud-font: Heebo ExtraBold",
+          "nextBestFraction": 0.0
+        },
+        {
+          "pdfFont": "2",
+          "identifiedAs": [
+            "deck payload ppt/fonts/font5.fntdata",
+            "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-Bold.ttf"
+          ],
+          "matchedFraction": 1.0,
+          "nextBest": "office-cloud-font: Heebo ExtraBold",
+          "nextBestFraction": 0.0
+        },
+        {
+          "pdfFont": "3",
+          "identifiedAs": [
+            "deck payload ppt/fonts/font6.fntdata",
+            "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-It.ttf"
+          ],
+          "matchedFraction": 1.0,
+          "nextBest": "office-cloud-font: Heebo ExtraBold",
+          "nextBestFraction": 0.0
+        },
+        {
+          "pdfFont": "4",
+          "identifiedAs": [
+            "deck payload ppt/fonts/font7.fntdata",
+            "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-BoldIt.ttf"
+          ],
+          "matchedFraction": 1.0,
+          "nextBest": "office-cloud-font: Heebo ExtraBold",
+          "nextBestFraction": 0.0
+        }
+      ]
+    },
+    "cloudEmptyCache": {
+      "case": "cloud-first-open-embedded (case A package, cloud enabled, empty cache)",
+      "heeboRenderedFrom": "embedded payloads; no cloud download during that open",
+      "faces": [
+        {
+          "pdfFont": "1",
+          "identifiedAs": [
+            "deck payload ppt/fonts/font1.fntdata",
+            "fixtures/corpus/fonts/_assets/heebo/Heebo-Medium.ttf"
+          ],
+          "matchedFraction": 1.0,
+          "nextBest": "prototypes/font-embedding/sources/heebo-500-full.ttf",
+          "nextBestFraction": 0.1818
+        },
+        {
+          "pdfFont": "2",
+          "identifiedAs": [
+            "deck payload ppt/fonts/font2.fntdata",
+            "fixtures/corpus/fonts/_assets/heebo/Heebo-Bold.ttf"
+          ],
+          "matchedFraction": 1.0,
+          "nextBest": "office-cloud-font: Heebo ExtraBold",
+          "nextBestFraction": 0.0
+        },
+        {
+          "pdfFont": "3",
+          "identifiedAs": [
+            "deck payload ppt/fonts/font3.fntdata",
+            "fixtures/corpus/fonts/_assets/heebo/Heebo-ExtraBold.ttf"
+          ],
+          "matchedFraction": 1.0,
+          "nextBest": "office-cloud-font: Heebo ExtraBold",
+          "nextBestFraction": 0.0
+        },
+        {
+          "pdfFont": "4",
+          "identifiedAs": [
+            "deck payload ppt/fonts/font4.fntdata",
+            "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-Regular.ttf"
+          ],
+          "matchedFraction": 1.0,
+          "nextBest": "office-cloud-font: Heebo ExtraBold",
+          "nextBestFraction": 0.0
+        },
+        {
+          "pdfFont": "5",
+          "identifiedAs": [
+            "deck payload ppt/fonts/font5.fntdata",
+            "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-Bold.ttf"
+          ],
+          "matchedFraction": 1.0,
+          "nextBest": "office-cloud-font: Heebo ExtraBold",
+          "nextBestFraction": 0.0
+        },
+        {
+          "pdfFont": "6",
+          "identifiedAs": [
+            "deck payload ppt/fonts/font6.fntdata",
+            "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-It.ttf"
+          ],
+          "matchedFraction": 1.0,
+          "nextBest": "office-cloud-font: Heebo ExtraBold",
+          "nextBestFraction": 0.0
+        },
+        {
+          "pdfFont": "7",
+          "identifiedAs": [
+            "deck payload ppt/fonts/font7.fntdata",
+            "fixtures/corpus/fonts/_assets/source-sans-3/SourceSans3-BoldIt.ttf"
+          ],
+          "matchedFraction": 1.0,
+          "nextBest": "office-cloud-font: Heebo ExtraBold",
+          "nextBestFraction": 0.0
+        }
+      ]
+    },
+    "uncontrolledDownload": "With ConnectedOfficeExperiencesPreference=FALSE but a writable cache, a minimal-case run downloaded cloud Heebo Medium between save and reopen, and the reopened Deck used the cloud copy instead of the embedded face. Those two runs were discarded and repeated with the read-only cache; the trigger for the download is not established."
+  },
+  "chromium": {
+    "chromium": "151.0.7922.34",
+    "fontSizePx": 200,
+    "text": "Heebo Medium: the quick brown fox jumps over the lazy dog while vexed nymphs pack my box with five dozen liquor jugs 0123456789 QWZ ÅÄÖ éñ€ß",
+    "results": {
+      "heebo-medium-ttf": {
+        "widthPx": 13391.796875,
+        "fontStatus": [
+          "loaded"
+        ]
+      },
+      "heebo-medium-woff2": {
+        "widthPx": 13391.796875,
+        "fontStatus": [
+          "loaded"
+        ]
+      },
+      "heebo-medium-woff2-decoded-ttf": {
+        "widthPx": 13391.796875,
+        "fontStatus": [
+          "loaded"
+        ]
+      },
+      "ss3-regular-ttf": {
+        "widthPx": 12366.8125,
+        "fontStatus": [
+          "loaded"
+        ]
+      },
+      "ss3-regular-woff": {
+        "widthPx": 12366.8125,
+        "fontStatus": [
+          "loaded"
+        ]
+      },
+      "ss3-regular-woff-decoded-ttf": {
+        "widthPx": 12366.8125,
+        "fontStatus": [
+          "loaded"
+        ]
+      },
+      "ss3-regular-otf": {
+        "widthPx": 12366.8125,
+        "fontStatus": [
+          "loaded"
+        ]
+      },
+      "heebo-variable-wght500": {
+        "widthPx": 13392,
+        "fontStatus": [
+          "loaded"
+        ]
+      },
+      "heebo-variable-instance-wght500": {
+        "widthPx": 13391.796875,
+        "fontStatus": [
+          "loaded"
+        ]
+      },
+      "heebo-variable-wght100": {
+        "widthPx": 12905.578125,
+        "fontStatus": [
+          "loaded"
+        ]
+      }
+    }
+  },
+  "packageIdentityNote": "partsDigest = SHA-256 over sorted part names and part SHA-256s. Packages tested before build-cases.mjs stopped emitting ZIP folder entries differ from today's generated bytes only by those timestamped folder entries; every tested copy's partsDigest equals the generated one."
+}
