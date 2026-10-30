@@ -10,7 +10,7 @@ Binary and npm package: **`deckflip`** (`npx deckflip <command>`). Checked: free
 - `deckflip validate <input>` — HTML: checks the Deck against the authoring subset (#10/#11) and reports what would be flattened/rasterised, plus its Layout flags. PPTX: checks the package parses and reports what round-trip will preserve opaquely. Same report format as `convert`.
 - `deckflip verify <source> <output>` — Verification of a conversion done earlier: one HTML Deck and one PPTX, the source's kind deciding the direction. The HTML side is measured afresh. The report holds `VERIFY_*` entries only and is printed (`--json`) or written where `--report` says; no default sidecar, so the conversion's own survives. `--browser`, `--offline`, `--quiet`, `--no-color` as for `convert`.
 - `deckflip render <input> -o <dir>` — one PNG per Slide (`slide-001.png`). HTML input renders in Chromium; PPTX input renders with LibreOffice by default, `--renderer powerpoint` uses real PowerPoint where installed (macOS save-as-PDF path from the spike). `--dpi`, `--slides 1,3-5`. Missing renderer exits 1. A diagnostic, not a step of the agent loop.
-- `deckflip inspect <input>` — JSON dump of Deck structure: Canvas size, per-Slide elements (kind, bounds in CSS px, text preview, native/rasterised), fonts used, preserved opaque parts. Lets an agent check a PPTX without rendering it.
+- `deckflip inspect <input> [--browser <path>] [--offline]` — JSON dump of Deck structure: Canvas size, per-Slide elements (kind, bounds in CSS px, text preview, native/rasterised), fonts used, preserved opaque parts. HTML input needs Chromium; PPTX input never launches or requires it, regardless of browser options or environment variables.
 - `--help` per command and `--version`. Help text is the canonical CLI doc the skill (#16) quotes.
 
 ## Flags
@@ -19,7 +19,16 @@ Run-scoped settings are flags; Deck-intrinsic settings live in deck metadata. No
 - `--embed-fonts` and `--embed-fonts=<name,...>` request embedding, which is not implemented. Both `convert` and `validate` reject explicit requests with `FONT_EMBED_UNSUPPORTED` (error, exit 2), keeping the report and leaving any destination unchanged. Default off. The request never suppresses `FONT_NOT_SAFE`, including when a named family is only an unused fallback.
 - `--raster-dpi <n>` default `192` (2x Canvas).
 - `--report <path>` overrides the sidecar location; `--strict` (Strict mode); `--json`; `--quiet`; `--no-color`.
-- Chromium: `--browser <path>` uses an existing Chromium/Chrome binary; otherwise the Playwright-managed build is used (download policy in [10-rendering-and-verification.md](10-rendering-and-verification.md)).
+- Chromium (`convert`, HTML `validate`/`render`/`inspect`, and `verify`): `--browser <path>` uses an existing Chromium/Chrome binary, overriding `DECKFLIP_BROWSER`; otherwise the Playwright-managed build is used. `--offline` prevents automatic downloads, not use of an existing browser.
+
+## Browser environment
+
+- Browser precedence: `--browser <path>` > `DECKFLIP_BROWSER` > Playwright-managed build. An invalid explicit or environment path fails rather than falling back.
+- `DECKFLIP_OFFLINE=1` or `CI=true` disables automatic Chromium downloads, as does `--offline`. With no selected/managed browser available, exit 1 prints `Chromium is not installed. Run <install command>.`; no download is attempted.
+- `PLAYWRIGHT_BROWSERS_PATH` selects Playwright's managed browser cache for both installation and launch.
+- Otherwise, a missing managed browser is installed on first use with a stderr notice. Installation resolves the Playwright CLI from the installed dependency, independently of the current directory. The printed install/recovery command uses absolute, shell-quoted Node and installer paths, including for global installations under paths containing spaces. Run it with the same `PLAYWRIGHT_BROWSERS_PATH` if one was set.
+
+The complete Chromium policy is in [10-rendering-and-verification.md](10-rendering-and-verification.md#chromium-policy).
 
 ## Exit codes
 `0` success (report entries allowed) · `1` no output produced (internal/renderer/Chromium failure, unreadable PPTX) · `2` validation failed, nothing converted · `3` bad invocation · `4` Strict mode: output and report written but the report is non-empty · `5` output and report written, but Verification found the output differs from the source.

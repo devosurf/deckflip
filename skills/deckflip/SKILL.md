@@ -23,6 +23,12 @@ Stop when `convert --strict` exits 0, or exits 4 with only entries you deliberat
 
 Exit codes: `0` ok · `1` no output (Chromium or renderer failure) · `2` validation failed · `3` bad invocation · `4` strict mode with a non-empty report · `5` output written but Verification failed.
 
+## Browser setup
+
+HTML measurement (including `inspect`) and conversion Verification use Chromium. Choose an existing binary with `--browser <path>` or `DECKFLIP_BROWSER`; the flag wins, then the environment variable, then the Playwright-managed build. Invalid overrides fail rather than falling back.
+
+On first use, a missing managed browser is installed automatically. `--offline`, `DECKFLIP_OFFLINE=1`, or `CI=true` prevents that download; a missing browser exits 1 with a copyable install command. `PLAYWRIGHT_BROWSERS_PATH` selects the managed cache: keep the same value when running that command. PPTX `inspect` parses directly and needs no browser, even offline.
+
 ## Canvas rules
 
 - The Canvas is `1280x720` CSS px (16:9). `<meta name="deckflip:canvas" content="4:3">` or `content="<w>x<h>"` changes it for the whole Deck. Sections are sized to the Canvas by the tool; set no width/height on them.

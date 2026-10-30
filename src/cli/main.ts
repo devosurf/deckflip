@@ -216,7 +216,7 @@ async function handleRender(input: string, options: RenderCliOptions): Promise<n
   return 0;
 }
 
-async function handleInspect(input: string): Promise<number> {
+async function handleInspect(input: string, options: InspectCliOptions): Promise<number> {
   if (inferKind(input) === 'pptx') {
     const deck = await parsePptx(new Uint8Array(await readFile(input)));
     const catalog = await FontCatalog.scan();
@@ -225,7 +225,10 @@ async function handleInspect(input: string): Promise<number> {
     return 0;
   }
   const loaded = await loadDeck(input, {});
-  const browser = await launchChromium({ offline: false });
+  const browser = await launchChromium({
+    ...(options.browser === undefined ? {} : { browserPath: options.browser }),
+    offline: options.offline,
+  });
   try {
     const measured = await measureDeck(loaded, { browser });
     const catalog = await FontCatalog.scan({ declared: measured.fonts.declared });
@@ -285,6 +288,11 @@ type RenderCliOptions = {
   offline: boolean;
 };
 
+type InspectCliOptions = {
+  browser?: string;
+  offline: boolean;
+};
+
 type VerifyCliOptions = {
   report?: string;
   json: boolean;
@@ -300,6 +308,7 @@ function buildProgram(): Command {
   program.exitOverride();
   program.showHelpAfterError();
   program.addHelpText('after', '\nAgent skill (authoring rules, the validate -> convert --strict -> inspect loop, templates):\n  npx skills add devosurf/deckflip\n\nExit codes: 0 ok · 1 no output produced · 2 validation failed · 3 bad invocation · 4 --strict with a non-empty report · 5 output written but Verification failed\n');
+  program.addHelpText('after', '\nChromium (convert, HTML validate/render/inspect, verify):\n  --browser <path> > DECKFLIP_BROWSER > Playwright-managed browser.\n  --offline, DECKFLIP_OFFLINE=1 or CI=true prevent automatic downloads.\n  PLAYWRIGHT_BROWSERS_PATH selects the managed browser cache.\n');
 
   program
     .command('convert <input>')
@@ -316,8 +325,8 @@ function buildProgram(): Command {
     .option('--json', 'print the report JSON to stdout')
     .option('--quiet', 'suppress the human summary on stderr')
     .option('--no-color', 'disable ANSI colors')
-    .option('--browser <path>', 'use an existing Chromium or Chrome binary')
-    .option('--offline', 'do not download Chromium')
+    .option('--browser <path>', 'existing Chromium/Chrome binary (overrides DECKFLIP_BROWSER)')
+    .option('--offline', 'do not download Chromium (also DECKFLIP_OFFLINE=1 or CI=true)')
     .action(async (input: string, options: ConvertCliOptions) => {
       process.exitCode = await handleConvert(input, options);
     });
@@ -335,8 +344,8 @@ function buildProgram(): Command {
     .option('--json', 'print the report JSON to stdout')
     .option('--quiet', 'suppress the human summary on stderr')
     .option('--no-color', 'disable ANSI colors')
-    .option('--browser <path>', 'use an existing Chromium or Chrome binary')
-    .option('--offline', 'do not download Chromium')
+    .option('--browser <path>', 'existing Chromium/Chrome binary (overrides DECKFLIP_BROWSER)')
+    .option('--offline', 'do not download Chromium (also DECKFLIP_OFFLINE=1 or CI=true)')
     .action(async (input: string, options: ValidateCliOptions) => {
       process.exitCode = await handleValidate(input, options);
     });
@@ -351,8 +360,8 @@ function buildProgram(): Command {
     .option('--slides <list>', 'render only the selected slides', parseSlidesList)
     .addOption(new Option('--renderer <kind>').choices(['libreoffice', 'powerpoint']).default('libreoffice'))
     .option('--soffice <path>', 'explicit LibreOffice executable')
-    .option('--browser <path>', 'use an existing Chromium or Chrome binary')
-    .option('--offline', 'do not download Chromium')
+    .option('--browser <path>', 'existing Chromium/Chrome binary (overrides DECKFLIP_BROWSER)')
+    .option('--offline', 'do not download Chromium (also DECKFLIP_OFFLINE=1 or CI=true)')
     .action(async (input: string, options: RenderCliOptions) => {
       process.exitCode = await handleRender(input, options);
     });
@@ -366,8 +375,8 @@ function buildProgram(): Command {
     .option('--json', 'print the report JSON to stdout')
     .option('--quiet', 'suppress the human summary on stderr')
     .option('--no-color', 'disable ANSI colors')
-    .option('--browser <path>', 'use an existing Chromium or Chrome binary')
-    .option('--offline', 'do not download Chromium')
+    .option('--browser <path>', 'existing Chromium/Chrome binary (overrides DECKFLIP_BROWSER)')
+    .option('--offline', 'do not download Chromium (also DECKFLIP_OFFLINE=1 or CI=true)')
     .action(async (source: string, output: string, options: VerifyCliOptions) => {
       process.exitCode = await handleVerify(source, output, options);
     });
@@ -377,8 +386,10 @@ function buildProgram(): Command {
     .description(
       'Print a JSON snapshot of the Deck: measured from HTML, or parsed from PPTX.',
     )
-    .action(async (input: string) => {
-      process.exitCode = await handleInspect(input);
+    .option('--browser <path>', 'existing Chromium/Chrome binary for HTML (overrides DECKFLIP_BROWSER)')
+    .option('--offline', 'do not download Chromium (also DECKFLIP_OFFLINE=1 or CI=true)')
+    .action(async (input: string, options: InspectCliOptions) => {
+      process.exitCode = await handleInspect(input, options);
     });
 
   return program;
