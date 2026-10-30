@@ -57,7 +57,7 @@ aside.notes { display: none !important; }
 
 Authors need no boilerplate; they may override. After layout, every Slide's border box must equal the Canvas (`VALIDATE_SLIDE_SIZE`, error) and its offset is irrelevant (the tool measures relative to the section). This is a deliberate trade: a Deck opened directly in a browser shows the Slides stacked vertically at Canvas size, which is good enough for a glance; `deckflip render` is the real preview.
 
-The first anonymous cascade layer supplies bundled Liberation Sans 2.1.5 (static Regular, Bold, Italic and BoldItalic) only as an inherited root default. The bundled `@font-face` declarations are served through the font-source session ([07](07-fonts.md#bundled-default)). Authored root, body, Slide and text families, including declarations in author layers, take precedence. There is no body default and no family appended to explicit stacks: unresolved families and generics still fail validation. The default makes authoring reproducible without installed fonts, but remains `FONT_NOT_SAFE` until embedding is implemented.
+The first anonymous cascade layer supplies bundled Liberation Sans 2.1.5 (static Regular, Bold, Italic and BoldItalic) only as an inherited root default. The bundled `@font-face` declarations are served through the font-source session ([07](07-fonts.md#bundled-default)). Authored root, body, Slide and text families, including declarations in author layers, take precedence. There is no body default and no family appended to explicit stacks: unresolved families and generics still fail validation. The default makes authoring reproducible without installed fonts, and its exact measured faces are embedded by default for portable editable output.
 
 ## Absolute-positioned form (PPTX -> HTML)
 

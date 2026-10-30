@@ -1,29 +1,7 @@
-import { textBodiesOf, type Deck, type FontClass, type ResolvedFont } from '../model/index.js';
-import { CODES, entry } from '../report/codes.js';
+import { textBodiesOf, type Deck, type ResolvedFont } from '../model/index.js';
+import { CODES } from '../report/codes.js';
 import type { Entry, EntryKind, Severity } from '../report/types.js';
 import { FontCatalog, compareScores, fontAssetKey, matchScore, type DeclaredFontFace, type FontFace } from './scan.js';
-
-export const SAFE_FAMILIES: ReadonlySet<string> = new Set([
-  'arial',
-  'courier new',
-  'georgia',
-  'times new roman',
-  'trebuchet ms',
-  'verdana',
-  'aptos',
-  'aptos display',
-  'aptos narrow',
-  'aptos mono',
-  'aptos serif',
-  'calibri',
-  'cambria',
-  'candara',
-  'consolas',
-  'constantia',
-  'corbel',
-  'franklin gothic',
-  'century gothic',
-]);
 
 export const GENERIC_FAMILIES: ReadonlySet<string> = new Set([
   'sans-serif',
@@ -42,7 +20,7 @@ export const GENERIC_FAMILIES: ReadonlySet<string> = new Set([
 ]);
 
 const FONT_ENTRY_SPECS: Record<
-  'FONT_GENERIC_ONLY' | 'FONT_UNRESOLVED' | 'FONT_NOT_SAFE' | 'FONT_IDENTITY_INVALID',
+  'FONT_GENERIC_ONLY' | 'FONT_UNRESOLVED' | 'FONT_IDENTITY_INVALID',
   { kind: EntryKind; severity: Severity; hint: string }
 > = {
   FONT_IDENTITY_INVALID: CODES.FONT_IDENTITY_INVALID,
@@ -54,12 +32,7 @@ const FONT_ENTRY_SPECS: Record<
   FONT_UNRESOLVED: {
     kind: 'error',
     severity: 'error',
-    hint: 'Install {family} or add a safe family such as Arial to the stack',
-  },
-  FONT_NOT_SAFE: {
-    kind: 'substituted',
-    severity: 'warning',
-    hint: 'Use a safe font, or install the Resolved font on every viewing machine; font embedding is not supported',
+    hint: CODES.FONT_UNRESOLVED.hint,
   },
 };
 
@@ -103,26 +76,22 @@ export function resolveFont(request: FontRequest, catalog: FontCatalog, installe
       const pick = selectDeclared(declared, request.weight, request.italic, codePoints, request.stretch ?? 100);
       if (pick === 'unavailable') return { kind: 'unavailable' };
       if (pick === undefined) continue;
-      return resolved(pick.loaded!.face, family, 'deck-provided', stackKey, request, pick.unicodeRange);
+      return resolved(pick.loaded!.face, family, stackKey, request, pick.unicodeRange);
     }
 
     const key = `${normalizeName(family)}|${request.stretch ?? 100}|${request.weight}|${request.italic}`;
     if (!installedCache.has(key)) installedCache.set(key, catalog.find(family, request.weight, request.italic, request.stretch));
     const face = installedCache.get(key);
-    if (face) return resolved(face, family, face.aliases.some((alias) => SAFE_FAMILIES.has(alias)) ? 'safe' : 'installed', stackKey, request);
+    if (face) return resolved(face, family, stackKey, request);
   }
   return { kind: 'error', code: 'FONT_UNRESOLVED', stackKey, family: firstConcreteFamily(stack) ?? stack[0] ?? '' };
 }
 
-export function resolveDeckFonts(deck: Deck, catalog: FontCatalog, opts: { embedFonts: false | true | string[] }): Entry[] {
-  const warnings = new Set<string>();
-  const restricted = new Set<string>();
+/** Resolve measured face identity only; portability is assessed by prepareFontEmbedding. */
+export function resolveDeckFonts(deck: Deck, catalog: FontCatalog): Entry[] {
   const emittedStacks = new Set<string>();
   const installedCache = new Map<string, FontFace | undefined>();
   const entries: Entry[] = [];
-  if (opts.embedFonts !== false) {
-    entries.push(entry('FONT_EMBED_UNSUPPORTED', { reason: 'Font embedding is not supported; no font faces were embedded' }));
-  }
 
   for (const slide of deck.slides) {
     for (const element of slide.elements) {
@@ -130,6 +99,12 @@ export function resolveDeckFonts(deck: Deck, catalog: FontCatalog, opts: { embed
         for (const paragraph of body.paragraphs) {
           for (const run of paragraph.runs) {
             if (run.kind !== 'text') continue;
+            if (run.style.embeddedFont !== undefined) {
+              // Authored declarations override source-package font reuse: Chromium measured their bytes.
+              const primary = normalizeStack(run.style.fontStack)[0];
+              if (primary === undefined || catalog.declared(slide.index, primary).length === 0) continue;
+              delete run.style.embeddedFont;
+            }
             delete run.style.font;
             const outcome = resolveFont({ slide: slide.index, stack: run.style.fontStack, weight: run.style.weight, stretch: run.style.stretch ?? 100, italic: run.style.italic, text: run.text }, catalog, installedCache);
             if (outcome.kind === 'unavailable') continue;
@@ -142,23 +117,6 @@ export function resolveDeckFonts(deck: Deck, catalog: FontCatalog, opts: { embed
 
             const resolvedFont = outcome.font;
             run.style.font = resolvedFont;
-            const assetKey = fontAssetKey(resolvedFont.asset);
-            const permission = resolvedFont.class === 'deck-provided' ? embeddingRestriction(resolvedFont.fsType) : undefined;
-            if (permission !== undefined && !restricted.has(assetKey)) {
-              restricted.add(assetKey);
-              entries.push(entry('FONT_EMBED_RESTRICTED', {
-                slide: slide.index,
-                locator: { selector },
-                reason: `${resolvedFont.office.family} (${resolvedFont.asset.postscriptName}) has OS/2 fsType 0x${resolvedFont.fsType.toString(16).padStart(4, '0')}: ${permission}`,
-                params: { family: resolvedFont.office.family },
-              }));
-            }
-
-            if (resolvedFont.class === 'safe') continue;
-            const resolvedFamilyKey = normalizeName(resolvedFont.office.family);
-            if (warnings.has(resolvedFamilyKey)) continue;
-            warnings.add(resolvedFamilyKey);
-            entries.push(buildEntryForSafeWarning(slide.index, selector, resolvedFont.office.family));
           }
         }
       }
@@ -166,6 +124,11 @@ export function resolveDeckFonts(deck: Deck, catalog: FontCatalog, opts: { embed
   }
 
   return entries;
+}
+
+/** Complete, actionable character list; never hide missing characters behind a truncation count. */
+export function listCodePoints(points: readonly number[]): string {
+  return points.map((point) => `U+${point.toString(16).toUpperCase().padStart(4, '0')} ${String.fromCodePoint(point)}`).join(', ');
 }
 
 /** Each selected face once, with the last run's CSS match: the provenance inspect and the Conversion report list. */
@@ -176,9 +139,10 @@ export function resolvedFontsOf(deck: Deck): ResolvedFont[] {
       for (const { body } of textBodiesOf(element)) {
         for (const paragraph of body.paragraphs) {
           for (const run of paragraph.runs) {
-            if (run.kind !== 'text' || run.style.font === undefined) continue;
-            const { asset } = run.style.font;
-            fonts.set(fontAssetKey(asset), run.style.font);
+            if (run.kind !== 'text') continue;
+            const font = run.style.embeddedFont?.resolved ?? run.style.font;
+            if (font === undefined) continue;
+            fonts.set(fontAssetKey(font.asset), font);
           }
         }
       }
@@ -238,7 +202,7 @@ function selectDeclared(faces: readonly DeclaredFontFace[], weight: number, ital
   return group.some((face) => face.state === 'failed' && codePoints.some((codePoint) => inUnicodeRange(face, codePoint))) ? 'unavailable' : undefined;
 }
 
-function resolved(face: FontFace, cssFamily: string, fontClass: FontClass, stackKey: string, request: FontRequest, unicodeRange?: DeclaredFontFace['unicodeRange']): Resolution {
+function resolved(face: FontFace, cssFamily: string, stackKey: string, request: FontRequest, unicodeRange?: DeclaredFontFace['unicodeRange']): Resolution {
   if ('error' in face.office) {
     return {
       kind: 'error', code: 'FONT_IDENTITY_INVALID', stackKey: `${stackKey}|${request.stretch ?? 100}|${request.weight}|${request.italic}`, family: cssFamily,
@@ -253,25 +217,11 @@ function resolved(face: FontFace, cssFamily: string, fontClass: FontClass, stack
       aliases: face.aliases,
       asset: face.asset,
       office: face.office,
-      class: fontClass,
       metrics: { ...face.metrics },
       fsType: face.fsType,
       ...(unicodeRange === undefined ? {} : { unicodeRange: formatUnicodeRange(unicodeRange) }),
     },
   };
-}
-
-/**
- * Why `fsType` rules out editable embedding (#33), or undefined when it allows it: installable (0) and editable
- * (0x0008) usage, with or without no-subsetting (0x0100), are usable; restricted (0x0002) and preview & print
- * (0x0004) are not, nor is any bitmap-only (0x0200) face. Of several usage bits the least restrictive applies.
- */
-function embeddingRestriction(fsType: number): string | undefined {
-  if (fsType & 0x0200) return 'bitmap embedding only (0x0200), so its outlines may not be embedded';
-  if (fsType & 0x0008) return undefined;
-  if (fsType & 0x0004) return 'preview & print embedding only (0x0004), which makes an embedding Deck read-only';
-  if (fsType & 0x0002) return 'restricted licence embedding (0x0002)';
-  return undefined;
 }
 
 function buildEntry(outcome: Extract<Resolution, { kind: 'error' }>, slide: number, selector: string): Entry {
@@ -287,19 +237,6 @@ function buildEntry(outcome: Extract<Resolution, { kind: 'error' }>, slide: numb
       ? `Generic family ${outcome.generic ?? outcome.family} appears before any resolvable concrete family`
       : `No deck-provided or installed family resolved in stack ${outcome.stackKey}`),
     hint: substituteHint(spec.hint, params),
-  };
-}
-
-function buildEntryForSafeWarning(slide: number, selector: string, family: string): Entry {
-  const spec = FONT_ENTRY_SPECS.FONT_NOT_SAFE;
-  return {
-    code: 'FONT_NOT_SAFE',
-    kind: spec.kind,
-    severity: spec.severity,
-    slide,
-    locator: { selector },
-    reason: `Resolved font ${family} is not in the safe set`,
-    hint: spec.hint,
   };
 }
 

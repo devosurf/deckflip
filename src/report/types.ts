@@ -1,6 +1,6 @@
 // Conversion report schema (docs/spec/01-cli.md, 08-report-codes.md).
 
-import type { ResolvedFont } from '../model/index.js';
+import type { EmbeddedFontMetadata, ResolvedFont } from '../model/index.js';
 
 export type EntryKind = 'error' | 'rasterised' | 'flattened' | 'substituted' | 'dropped' | 'preserved' | 'overridden' | 'flagged';
 export type Severity = 'error' | 'warning' | 'info';
@@ -28,6 +28,8 @@ export interface Report {
   canvas: { width: number; height: number; source: 'default' | 'deck-meta' | 'flag' };
   /** `convert`/`validate`: each selected face once, with its asset identity and where its bytes came from */
   fonts?: ResolvedFont[];
+  /** Original package slots, including MTX payloads whose decoded face identity is unavailable. */
+  embeddedFonts?: EmbeddedFontMetadata[];
   summary: {
     slides: number;
     native: number;

@@ -120,10 +120,6 @@ _Avoid_: Font name
 The legacy family and regular, bold, italic or bold-italic style-linking position that PowerPoint uses to address a selected face.
 _Avoid_: CSS weight, preferred family
 
-**Safe font**:
-A family present on every supported PowerPoint installation on Windows and macOS, so it needs no embedding.
-_Avoid_: Web-safe font, system font, standard font
-
 **Bundled default**:
-A font supplied with deckflip for text that inherits no authored family. It makes authoring independent of installed fonts, not proof of embedding or membership in the Safe font set.
+A font supplied with deckflip for text that inherits no authored family. Its exact faces make authoring independent of installed fonts and are embedded by default for portable, editable output.
 _Avoid_: Safe default, platform default, fallback font

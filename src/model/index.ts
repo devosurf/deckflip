@@ -15,6 +15,8 @@ export interface Deck {
   lang: string;
   canvas: Canvas;
   slides: Slide[];
+  /** Source-package font slots, including opaque MTX payloads that have no decoded sfnt identity. */
+  embeddedFonts?: EmbeddedFont[];
 }
 
 export interface Slide {
@@ -292,6 +294,8 @@ export interface RunStyle {
   fontStack: string[];
   /** filled by fonts/; undefined until resolution ran */
   font?: ResolvedFont;
+  /** A source-package slot carried verbatim, not a locally resolved font asset. */
+  embeddedFont?: EmbeddedFont;
   /** numeric computed `font-weight` */
   weight: number;
   /** computed `font-stretch` percentage; absent at normal (100) */
@@ -320,10 +324,9 @@ export interface FontMetrics {
   descender: number;
 }
 
-export type FontClass = 'safe' | 'deck-provided' | 'installed';
-
 /** The four Office style-linking positions, also used by embeddedFont slots. */
-export type OfficeFontStyle = 'regular' | 'bold' | 'italic' | 'boldItalic';
+export const OFFICE_FONT_STYLES = ['regular', 'bold', 'italic', 'boldItalic'] as const;
+export type OfficeFontStyle = typeof OFFICE_FONT_STYLES[number];
 
 export interface OfficeFontIdentity {
   family: string;
@@ -342,7 +345,9 @@ export type FontSource =
   /** a `data:` URI in the Deck's CSS */
   | { kind: 'data'; format: FontFormat; sha256: string }
   /** the package's pinned default; `file` is a basename, never a machine path */
-  | { kind: 'bundled'; family: string; version: string; file: string; format: FontFormat; sha256: string };
+  | { kind: 'bundled'; family: string; version: string; file: string; format: FontFormat; sha256: string }
+  /** A decoded face from an existing package EOT part; provenance is distinct from payload kind. */
+  | { kind: 'embedded'; part: string };
 
 export interface FontAsset {
   /** SHA-256 of the face's sfnt bytes, decoded from WOFF/WOFF2 where supplied so: the asset identity */
@@ -359,13 +364,47 @@ export interface ResolvedFont {
   aliases: string[];
   asset: FontAsset;
   office: OfficeFontIdentity;
-  class: FontClass;
   metrics: FontMetrics;
   /** OS/2 fsType; embedding permission */
   fsType: number;
   /** The declared `unicode-range` of a Deck-provided subset face; absent when the face covers every code point it has. */
   unicodeRange?: string;
+  /** Conversion plans the final status before reporting and emission; validation records eligibility only. */
+  embedding?: {
+    status: 'embedded' | 'eligible' | 'not-embedded' | 'preserved';
+    part?: string;
+    subset?: boolean;
+    compressed?: boolean;
+  };
 }
+
+/** An existing package font: presentation family/slot and EOT identity are deliberately distinct. */
+export interface EmbeddedFont {
+  family: string;
+  slot: OfficeFontStyle;
+  part: string;
+  relationshipId: string;
+  /** SHA-256 of the decoded sfnt; absent for opaque or unreadable payloads. */
+  sha256?: string;
+  /** Payload representation, separate from its preserved-package provenance. */
+  kind?: 'complete' | 'subset' | 'mtx' | 'xor';
+  version?: number;
+  flags?: number;
+  fsType?: number;
+  subset?: boolean;
+  compressed?: boolean;
+  familyName?: string;
+  styleName?: string;
+  /** Unsupported or malformed source payloads stay inspectable, but cannot satisfy portability. */
+  formatError?: string;
+  embedding: { status: 'preserved'; part: string; subset?: boolean; compressed?: boolean };
+  /** Browser-readable decoded bytes. Never serialized in inspection/report. */
+  sfnt?: Uint8Array;
+  /** Decoded face metadata, cached with the payload and addressed through its source Office slot. */
+  resolved?: ResolvedFont;
+}
+
+export type EmbeddedFontMetadata = Omit<EmbeddedFont, 'sfnt' | 'resolved'>;
 
 /** Every text body an element owns, with the owner's selector and name to report against: shapes have at most one, tables one per origin cell, groups recurse. */
 export function* textBodiesOf(element: Element): Generator<{ body: TextBody; selector: string; name: string }> {

@@ -40,7 +40,7 @@ function deckWith(elements: Element[]): Deck {
 }
 
 async function roundTrip(deck: Deck): Promise<Deck> {
-  return parsePptx(await emitPptx(deck, { created, appVersion: '0.0.0' }));
+  return parsePptx(await emitPptx(deck, { embedFonts: false, created, appVersion: '0.0.0' }));
 }
 
 describe('parsePptx', () => {

@@ -30,7 +30,7 @@ export interface AcquiredFont {
   sha256: string;
   sfnt: Buffer;
   font: FontKitFont | FontKitCollection;
-  source: Exclude<FontSource, { kind: 'installed' }>;
+  source: Exclude<FontSource, { kind: 'installed' | 'embedded' }>;
 }
 
 /** What the browser's request for a remote URL returned. */

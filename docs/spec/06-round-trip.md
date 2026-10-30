@@ -23,6 +23,7 @@ Decided in [#14](https://github.com/devosurf/deckflip/issues/14).
 | Speaker notes | Represented | `aside.notes` | notes slide re-emitted verbatim when untouched; else regenerated on the preserved notes master (its own, on a theme part of its own, if the deck has none: PowerPoint repairs a deck whose masters share a theme part). Notes are never measured, so the regenerated body carries text, emphasis, links, alignment and list levels, and the notes master governs typeface, size, colour and spacing |
 | Sections | Represented | `data-section` on first Slide | `p14:sectionLst` regenerated from the Deck: each `data-section` opens a section holding every Slide up to the next, a section keeps the GUID of the source section of the same name (or failing that of the one its first Slide sat in), Slides ahead of the first `data-section` fall in `Default Section` as they would in PowerPoint, and a Deck spelling out no section at all has no list |
 | Placeholders | Represented | `data-placeholder="<type>[:idx]"` on the shape, picture or table | untouched -> original XML; touched -> `p:ph` kept, properties written explicitly |
+| Embedded fonts | Preserved payloads; represented when decodable | extracted `@font-face` for uncompressed non-XOR EOT; opaque MTX remains in `source.pptx` | always preserve rights, family/RIBBI, payload bytes and subset/compression flags, including when new embedding is disabled; report source parts separately in `embeddedFonts[]` |
 | Masters, layouts, themes, notes masters, handout master | Opaque (deck-level) | theme tokens as CSS custom properties; `data-layout` names the layout per Slide | copied verbatim; new Slides instantiate the named layout or `Blank`; editing masters is out of scope |
 | Charts (classic), ChartEx | Opaque | `div[data-preserve="chart"]`, an empty labelled box (a LibreOffice-rendered preview `img` when LibreOffice is available is a later slice) | chart parts, embedded workbook, style/colour parts copied |
 | SmartArt | Opaque | `div[data-preserve="smartart"]`, an empty labelled box (a read-only shape tree rendered from `drawingN.xml` is a later slice) | data/layout/colours/style/drawing parts copied |
@@ -40,7 +41,7 @@ PPTX -> HTML writes `<name>.html` and `<name>.assets/`:
 
 - `source.pptx`: the input package, verbatim. This is the blob store; nothing is duplicated into data attributes.
 - `media/`: extracted pictures and media (content-hash names) referenced by the HTML.
-- `fonts/`: extracted embedded fonts (#15).
+- `fonts/`: decoded sfnt extracted from uncompressed non-XOR embedded EOT for HTML `@font-face`. Compressed MTX payloads remain verbatim in `source.pptx`; HTML decoding limitations report `FONT_EMBED_FORMAT` (warning), not proof of a different newly embedded face.
 - `previews/`: chart/SmartArt/OLE preview PNGs.
 - `deckflip.json`: the manifest: `{ schemaVersion, source: { sha256 }, slides: [{ id, partName, fingerprint, spids, shapes: [{ shapeId, fingerprint, spids, partRefs, nested? }] }] }`. `spids` are the `p:cNvPr` ids an element stands for in z-order (a picture and its border shape, a table and its caption, the section and its background shape); `nested` marks shapes inside a group.
 

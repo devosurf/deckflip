@@ -3,9 +3,9 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, type Dirent } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { Font as FontKitFont, FontCollection as FontKitCollection, Os2Table } from 'fontkit';
+import type { Font as FontKitFont, FontCollection as FontKitCollection } from 'fontkit';
 import type { FontAsset, FontMetrics, OfficeFontIdentity, OfficeFontStyle } from '../model/index.js';
-import { decodeFont, sha256 } from './sfnt.js';
+import { decodeFont, sha256, sniffFontFormat } from './sfnt.js';
 
 export interface FontFace {
   aliases: string[];
@@ -37,12 +37,15 @@ export interface DeclaredFontFace {
   /** `failed`: Chromium needed the face and none of its sources loaded; `unused`: Chromium never asked for it */
   state: 'loaded' | 'failed' | 'unused';
   /** the loaded face, with `font` for coverage; present exactly when `state` is `loaded` */
-  loaded?: { face: FontFace; font: FontKitFont };
+  loaded?: { face: FontFace; font: FontKitFont; sfnt: Buffer };
 }
 
 type FontExtension = '.ttf' | '.otf' | '.ttc' | '.woff' | '.woff2';
 
 type FontLike = FontKitFont & {
+  /** Fontkit keeps each decoded sfnt's table offsets and backing bytes, including collection members. */
+  directory?: { tables: Record<string, { offset: number; length: number }> };
+  stream?: { buffer: Uint8Array };
   head?: {
     macStyle?: {
       italic?: boolean;
@@ -54,11 +57,19 @@ type FontLike = FontKitFont & {
 interface CatalogFace extends FontFace {
   order: number;
   file: string;
+  /** Source-file identity at scan time, before decoding webfont containers. */
+  fileSha256: string;
+  collection?: 'TTC' | 'dfont';
 }
 
 interface ScanResult {
   faces: CatalogFace[];
   skipped: number;
+}
+
+interface InstalledSnapshot {
+  bytes: Buffer;
+  decoded?: Promise<Buffer | undefined>;
 }
 
 const FONT_EXTENSIONS: Record<FontExtension, true> = {
@@ -76,6 +87,9 @@ export class FontCatalog {
   readonly skipped: number;
   /** opened lazily for installed faces, registered up front for declared ones */
   private readonly fonts = new Map<string, FontKitFont | undefined>();
+  private readonly declaredBytes = new Map<string, Buffer>();
+  /** Only used files are retained; the first read is checked against scan identity. */
+  private readonly installedSnapshots = new Map<string, InstalledSnapshot | undefined>();
 
   private constructor(
     private readonly installed: readonly CatalogFace[],
@@ -86,7 +100,11 @@ export class FontCatalog {
     for (const families of declaredBySlide.values()) {
       for (const faces of families.values()) {
         for (const face of faces) {
-          if (face.loaded) this.fonts.set(fontAssetKey(face.loaded.face.asset), face.loaded.font);
+          if (face.loaded) {
+            const key = fontAssetKey(face.loaded.face.asset);
+            this.fonts.set(key, face.loaded.font);
+            this.declaredBytes.set(key, face.loaded.sfnt);
+          }
         }
       }
     }
@@ -131,10 +149,53 @@ export class FontCatalog {
   }
 
   /** Whether the selected face has a glyph for `codePoint`; installed fonts are opened on first use. */
-  hasGlyph(face: FontFace, codePoint: number): boolean {
+  hasGlyph(face: Pick<FontFace, 'asset'>, codePoint: number): boolean {
     const key = fontAssetKey(face.asset);
-    if (!this.fonts.has(key)) this.fonts.set(key, openInstalled(face.asset));
+    if (!this.fonts.has(key)) {
+      const scanned = this.installed.find((candidate) => fontAssetKey(candidate.asset) === key);
+      const snapshot = scanned === undefined ? undefined : this.installedSnapshot(scanned);
+      this.fonts.set(key, snapshot === undefined ? undefined : openFace(snapshot.bytes, face.asset.faceIndex));
+    }
     return this.fonts.get(key)?.hasGlyphForCodePoint(codePoint) ?? false;
+  }
+
+  /** Collection identity is retained at scan time, before a dfont could be mistaken for an undecodable sfnt. */
+  collectionKind(asset: FontAsset): 'TTC' | 'dfont' | undefined {
+    const key = fontAssetKey(asset);
+    if (asset.source.kind === 'installed') {
+      return this.installed.find((candidate) => fontAssetKey(candidate.asset) === key)?.collection;
+    }
+    const bytes = this.declaredBytes.get(key);
+    return bytes !== undefined && sniffFontFormat(bytes) === 'ttc' ? 'TTC' : undefined;
+  }
+
+  /** The trusted measured buffer, or one verified installed snapshot decoded exactly as during scanning. */
+  async sfnt(asset: FontAsset): Promise<Buffer | undefined> {
+    const key = fontAssetKey(asset);
+    if (asset.source.kind !== 'installed') return this.declaredBytes.get(key);
+    const file = asset.source.file;
+    const scanned = this.installed.find((face) => face.file === file && fontAssetKey(face.asset) === key);
+    if (scanned === undefined) return undefined;
+    const snapshot = this.installedSnapshot(scanned);
+    if (snapshot === undefined || scanned.collection === 'dfont') return undefined;
+    snapshot.decoded ??= decodeFont(snapshot.bytes).then(({ sfnt }) => sfnt, () => undefined);
+    const sfnt = await snapshot.decoded;
+    if (sfnt !== undefined && !this.fonts.has(key)) this.fonts.set(key, openFace(sfnt, asset.faceIndex));
+    return sfnt;
+  }
+
+  private installedSnapshot(scanned: CatalogFace): InstalledSnapshot | undefined {
+    if (!this.installedSnapshots.has(scanned.file)) {
+      let snapshot: InstalledSnapshot | undefined;
+      try {
+        const bytes = readFileSync(scanned.file);
+        if (sha256(bytes) === scanned.fileSha256) snapshot = { bytes };
+      } catch {
+        // An unavailable or changed file cannot establish the selected scan identity.
+      }
+      this.installedSnapshots.set(scanned.file, snapshot);
+    }
+    return this.installedSnapshots.get(scanned.file);
   }
 }
 
@@ -164,11 +225,10 @@ export function fontAssetKey(asset: Pick<FontAsset, 'sha256' | 'faceIndex'>): st
   return `${asset.sha256}:${asset.faceIndex}`;
 }
 
-function openInstalled(asset: FontAsset): FontKitFont | undefined {
-  if (asset.source.kind !== 'installed') return undefined;
+function openFace(bytes: Buffer, faceIndex: number): FontKitFont | undefined {
   try {
-    const opened = fontkit.create(readFileSync(asset.source.file));
-    return isCollection(opened) ? opened.fonts[asset.faceIndex] : opened;
+    const opened = fontkit.create(bytes);
+    return isCollection(opened) ? opened.fonts[faceIndex] : opened;
   } catch {
     return undefined;
   }
@@ -193,7 +253,7 @@ async function scanFiles(files: readonly string[]): Promise<ScanResult> {
     seen.add(resolved);
 
     const ext = path.extname(resolved).toLowerCase();
-    if (ext === DFONT_EXTENSION || !isFontExtension(ext)) {
+    if (!isFontExtension(ext) && ext !== DFONT_EXTENSION) {
       skipped += 1;
       continue;
     }
@@ -201,34 +261,36 @@ async function scanFiles(files: readonly string[]): Promise<ScanResult> {
     const parsed = await scanFontFile(resolved);
     skipped += parsed.skipped;
     for (const face of parsed.faces) {
-      faces.push({ ...face.face, aliases: face.aliases, order: order++, file: resolved });
+      faces.push({
+        ...face.face, aliases: face.aliases, order: order++, file: resolved, fileSha256: parsed.fileSha256!,
+        ...(parsed.collection === undefined ? {} : { collection: parsed.collection }),
+      });
     }
   }
 
   return { faces, skipped };
 }
 
-async function scanFontFile(file: string): Promise<{ faces: BuiltFace[]; skipped: number }> {
+async function scanFontFile(file: string): Promise<{ faces: BuiltFace[]; skipped: number; fileSha256?: string; collection?: 'TTC' | 'dfont' }> {
   try {
-    const { sfnt } = await decodeFont(readFileSync(file));
-    const digest = sha256(sfnt);
+    const bytes = readFileSync(file);
+    const fileSha256 = sha256(bytes);
+    const sfnt = path.extname(file).toLowerCase() === DFONT_EXTENSION ? bytes : (await decodeFont(bytes)).sfnt;
+    const digest = sfnt === bytes ? fileSha256 : sha256(sfnt);
     const source = { kind: 'installed' as const, file };
     const opened = fontkit.create(sfnt);
     if (isCollection(opened)) {
-      if (opened.type === 'DFont') {
-        return { faces: [], skipped: 1 };
-      }
-
       const faces: BuiltFace[] = [];
       for (const [faceIndex, font] of opened.fonts.entries()) {
         const built = buildFace(font, { sha256: digest, faceIndex, source });
         if (built) faces.push(built);
       }
-      return { faces, skipped: faces.length === 0 ? 1 : 0 };
+      const collection = path.extname(file).toLowerCase() === DFONT_EXTENSION ? 'dfont' : 'TTC';
+      return { faces, skipped: faces.length === 0 ? 1 : 0, fileSha256, collection };
     }
 
     const built = buildFace(opened, { sha256: digest, faceIndex: 0, source });
-    return built ? { faces: [built], skipped: 0 } : { faces: [], skipped: 1 };
+    return built ? { faces: [built], skipped: 0, fileSha256 } : { faces: [], skipped: 1 };
   } catch {
     return { faces: [], skipped: 1 };
   }
@@ -254,7 +316,8 @@ function buildFace(font: FontLike, asset: Omit<FontAsset, 'postscriptName'>): Bu
   const weight = normalizeWeight(os2.usWeightClass, subfamily);
   const stretch = WIDTH_CLASS_STRETCH[os2.usWidthClass] ?? 100;
   const italic = normalizeItalic(os2.fsSelection.italic, font.head?.macStyle?.italic, subfamily);
-  const fsType = normalizeFsType(os2.fsType);
+  const fsType = rawFsType(font);
+  if (fsType === undefined) return undefined;
   const unitsPerEm = Number(font.unitsPerEm);
   if (!Number.isFinite(unitsPerEm) || unitsPerEm <= 0) return undefined;
 
@@ -339,14 +402,13 @@ function normalizeItalic(fsSelectionItalic: boolean | undefined, macStyleItalic:
   return /italic|oblique/i.test(subfamily);
 }
 
-function normalizeFsType(fsType: Os2Table['fsType']): number {
-  return (
-    (fsType.noEmbedding ? 0b10 : 0) |
-    (fsType.viewOnly ? 0b100 : 0) |
-    (fsType.editable ? 0b1000 : 0) |
-    (fsType.noSubsetting ? 0x100 : 0) |
-    (fsType.bitmapOnly ? 0x200 : 0)
-  );
+/** Preserve reserved/unknown bits too: fontkit's named flag object omits them. */
+function rawFsType(font: FontLike): number | undefined {
+  const table = font.directory?.tables['OS/2'];
+  const bytes = font.stream?.buffer;
+  if (table === undefined || bytes === undefined || table.length < 10 ||
+      !Number.isInteger(table.offset) || table.offset < 0 || table.offset + 10 > bytes.length) return undefined;
+  return (bytes[table.offset + 8]! << 8) | bytes[table.offset + 9]!;
 }
 
 function cloneFace(face: CatalogFace): FontFace {
@@ -484,7 +546,7 @@ function walkFontRoot(root: string, files: string[], seen: Set<string>): void {
     const resolved = path.resolve(fullPath);
     if (seen.has(resolved)) continue;
     const ext = path.extname(resolved).toLowerCase();
-    if (!isFontExtension(ext)) continue;
+    if (!isFontExtension(ext) && ext !== DFONT_EXTENSION) continue;
     seen.add(resolved);
     files.push(resolved);
   }

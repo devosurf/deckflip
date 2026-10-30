@@ -20,5 +20,49 @@
     },
     "reason": "a line of p ends 6.2 px from its wrap width and the next word would fit 0.6 px further; PowerPoint's line widths differ from Chromium's by up to 4.1 px",
     "hint": "Reword p or change its width by a few px so no line ends right at its wrap width; PowerPoint may break it elsewhere"
+  },
+  {
+    "code": "FONT_NOT_EMBEDDED",
+    "kind": "flagged",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(1)"
+    },
+    "reason": "Arial (ArialMT) is not embedded; recipients need this exact face installed",
+    "hint": "Install Arial on every recipient machine, or remove --no-embed-fonts to produce portable editable output"
+  },
+  {
+    "code": "FONT_NOT_EMBEDDED",
+    "kind": "flagged",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(2)"
+    },
+    "reason": "Georgia (Georgia) is not embedded; recipients need this exact face installed",
+    "hint": "Install Georgia on every recipient machine, or remove --no-embed-fonts to produce portable editable output"
+  },
+  {
+    "code": "FONT_NOT_EMBEDDED",
+    "kind": "flagged",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(3)"
+    },
+    "reason": "Verdana (Verdana) is not embedded; recipients need this exact face installed",
+    "hint": "Install Verdana on every recipient machine, or remove --no-embed-fonts to produce portable editable output"
+  },
+  {
+    "code": "FONT_NOT_EMBEDDED",
+    "kind": "flagged",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(4)"
+    },
+    "reason": "Times New Roman (TimesNewRomanPSMT) is not embedded; recipients need this exact face installed",
+    "hint": "Install Times New Roman on every recipient machine, or remove --no-embed-fonts to produce portable editable output"
   }
 ]

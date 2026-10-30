@@ -74,7 +74,7 @@ describe('emitPptx with a preserved source', () => {
     const plan = planSplice(measured, sectionsOf(edited), manifest, source);
     expect(plan.entries.map((entry) => entry.code)).toEqual(['PRESERVE_OPAQUE_ANIMATION', 'PRESERVE_OPAQUE_MASTER']);
 
-    const bytes = await emitPptx(measured, { appVersion: 'test', created, preserved: { source, plan } });
+    const bytes = await emitPptx(measured, { embedFonts: false, appVersion: 'test', created, preserved: { source, plan } });
     const out = await entries(bytes);
 
     // untouched slide and the deck skeleton: byte for byte
@@ -155,7 +155,7 @@ describe('emitPptx with a preserved source', () => {
       ['PRESERVE_OPAQUE_VBA', 'info', undefined],
     ]);
 
-    const bytes = await emitPptx(measured, { appVersion: 'test', created, preserved: { source, plan } });
+    const bytes = await emitPptx(measured, { embedFonts: false, appVersion: 'test', created, preserved: { source, plan } });
     const out = await entries(bytes);
     const slide1 = textOf(out.get('ppt/slides/slide1.xml'));
     expect(slide1).toContain(chart.replace('<p:xfrm><a:off x="914400" y="914400"/><a:ext cx="1828800" cy="914400"/></p:xfrm>', '<p:xfrm rot="600000"><a:off x="2857500" y="952500"/><a:ext cx="1905000" cy="952500"/></p:xfrm>').replace('r:id="rId2"', 'r:id="rId2"'));

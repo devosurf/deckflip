@@ -12,7 +12,7 @@ Build-ready spec for `deckflip`: a bidirectional HTML <-> PPTX CLI and agent ski
 | 04 | [Text box mapping](04-text-mapping.md) | box, insets, baseline correction, line spacing, lists, runs, tables |
 | 05 | [Raster fallback](05-raster.md) | granularity, capture, DPI, `data-raster`, fix-it loop |
 | 06 | [Round-trip preservation](06-round-trip.md) | preservation matrix, asset directory, manifest, untouched detection |
-| 07 | [Font policy](07-fonts.md) | CSS matching, selected asset/face, Office family/RIBBI, safe set, truthful portability, embedding dependencies |
+| 07 | [Font policy](07-fonts.md) | CSS matching, selected asset/face, Office family/RIBBI, portable editable embedding, rights and subset policy |
 | 08 | [Report codes](08-report-codes.md) | every code with kind, severity, trigger and hint |
 | 09 | [`inspect` output](09-inspect.md) | the JSON shape |
 | 10 | [Rendering, verification and environment](10-rendering-and-verification.md) | supported host, renderers, Chromium policy, comparator gates, corpus, CI |
@@ -25,7 +25,7 @@ Canvas `1280x720` CSS px = `960x540` pt = `12192000x6858000` EMU; `1 px = 0.75 p
 
 ## Settled outside tickets (during charting)
 
-Node/TypeScript on npm; Playwright-measured layout; own OOXML emitter and parser; native first, raster only where OOXML cannot express the construct, editability over pixel identity; both directions first class; validated authoring subset rather than a component vocabulary; v1 flattens animations; fonts referenced by name, embedding requests currently rejected until implementation; one text box per HTML block with autofit off; 16:9 default with 4:3 and custom via meta, no scaling; single-file `<section>` Deck canonical; every conversion verifies its own output, and CI compares Chromium with a PowerPoint oracle bound to the emitted package (LibreOffice optional); Claude Code first via a harness-neutral skill.
+Node/TypeScript on npm; Playwright-measured layout; own OOXML emitter and parser; native first, raster only where OOXML cannot express the construct, editability over pixel identity; both directions first class; validated authoring subset rather than a component vocabulary; v1 flattens animations; exact measured font faces embedded by default, explicit machine-dependent opt-out; one text box per HTML block with autofit off; 16:9 default with 4:3 and custom via meta, no scaling; single-file `<section>` Deck canonical; every conversion verifies its own output, and CI compares Chromium with a PowerPoint oracle bound to the emitted package (LibreOffice optional); Claude Code first via a harness-neutral skill.
 
 ## Not in this spec (out of scope for v1)
 

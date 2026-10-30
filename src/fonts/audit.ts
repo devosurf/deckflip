@@ -6,7 +6,8 @@
 
 import { entry } from '../report/codes.js';
 import type { Entry } from '../report/types.js';
-import { countableCodePoints, inUnicodeRange, resolveFont } from './resolve.js';
+import { applyEmbeddingOptOut } from './embedding.js';
+import { countableCodePoints, inUnicodeRange, listCodePoints, resolveFont } from './resolve.js';
 import type { FontCatalog, FontFace } from './scan.js';
 import { fontAssetKey } from './scan.js';
 
@@ -33,10 +34,8 @@ export interface VisibleText {
   fonts: PlatformFontUsage[];
 }
 
-const MAX_LISTED = 8;
-
 /** `FONT_GLYPH_FALLBACK` once per owner and selected face whose text Chromium drew with anything but that face. */
-export function auditVisibleFonts(visible: readonly VisibleText[], catalog: FontCatalog): Entry[] {
+export function auditVisibleFonts(visible: readonly VisibleText[], catalog: FontCatalog, opts: { embedFonts: boolean }): Entry[] {
   const entries: Entry[] = [];
   const reported = new Set<string>();
   const installedCache = new Map<string, FontFace | undefined>();
@@ -47,12 +46,13 @@ export function auditVisibleFonts(visible: readonly VisibleText[], catalog: Font
     }, catalog, installedCache);
     if (outcome.kind !== 'resolved') continue;
     const { face, font } = outcome;
-    const declared = font.class === 'deck-provided' ? catalog.declared(node.slide, font.cssFamily) : [];
+    const custom = font.asset.source.kind !== 'installed';
+    const declared = custom ? catalog.declared(node.slide, font.cssFamily) : [];
     const range = declared.find((candidate) => candidate.loaded?.face === face);
     const missing = countableCodePoints(node.text).filter((codePoint) =>
       (range !== undefined && !inUnicodeRange(range, codePoint)) || !catalog.hasGlyph(face, codePoint));
     const others = node.fonts.filter((used) => used.glyphCount > 0 &&
-      !(used.postScriptName === face.asset.postscriptName && used.isCustomFont === (font.class === 'deck-provided')));
+      !(used.postScriptName === face.asset.postscriptName && used.isCustomFont === custom));
     if (missing.length === 0 && others.length === 0) continue;
 
     const key = `${node.slide}\u0000${node.selector}\u0000${fontAssetKey(face.asset)}`;
@@ -65,17 +65,14 @@ export function auditVisibleFonts(visible: readonly VisibleText[], catalog: Font
     const selected = `${font.office.family} (${font.cssFamily})`;
     const reason = missing.length === 0 ? `${selected}: Chromium also drew the text with ${drawn}`
       : `${selected} has no glyph for ${listCodePoints(missing)}${others.length > 0 ? `; Chromium drew them with ${drawn}` : ''}`;
-    entries.push(entry('FONT_GLYPH_FALLBACK', {
+    const reportEntry = entry('FONT_GLYPH_FALLBACK', {
       slide: node.slide,
       locator: { selector: node.selector },
       reason,
       params: { family: font.cssFamily },
-    }));
+    });
+    entries.push(applyEmbeddingOptOut(reportEntry, opts.embedFonts));
   }
   return entries;
 }
 
-function listCodePoints(codePoints: readonly number[]): string {
-  const shown = codePoints.slice(0, MAX_LISTED).map((codePoint) => `U+${codePoint.toString(16).toUpperCase().padStart(4, '0')} ${String.fromCodePoint(codePoint)}`);
-  return codePoints.length > MAX_LISTED ? `${shown.join(', ')} and ${codePoints.length - MAX_LISTED} more` : shown.join(', ');
-}

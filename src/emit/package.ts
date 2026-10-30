@@ -3,6 +3,7 @@ import { pxToEmu } from '../ooxml/emu.js';
 import { CT, REL, OpcPackage } from '../ooxml/opc.js';
 import { el, serialize, type XmlNode } from '../ooxml/xml.js';
 import { MediaStore } from './media.js';
+import { emitEmbeddedFontList, type PlannedFont } from './fonts.js';
 import { emitNotesMaster, emitNotesSlide, notesSlidePartName, NOTES_MASTER_PART } from './notes.js';
 import { emitPreservedPptx, type PreservedSource } from './preserved.js';
 import { deckSections, sectionExtNode } from './sections.js';
@@ -14,6 +15,9 @@ export interface EmitOptions {
   appVersion: string;
   /** the round trip's source package and plan: the deck is emitted over it instead of the built-in master */
   preserved?: PreservedSource;
+  /** Eligible, exact measured faces; absent for machine-dependent output. */
+  fonts?: readonly PlannedFont[];
+  embedFonts: boolean;
 }
 
 const DEFAULT_DATE = new Date('1980-01-01T00:00:00.000Z');
@@ -28,7 +32,7 @@ const APP_PART = '/docProps/app.xml';
 export async function emitPptx(deck: Deck, opts: EmitOptions): Promise<Buffer> {
   const created = opts.created ?? DEFAULT_DATE;
   if (opts.preserved) {
-    return emitPreservedPptx(deck, opts.preserved, created);
+    return emitPreservedPptx(deck, opts.preserved, created, { fonts: opts.embedFonts ? opts.fonts ?? [] : [] });
   }
   const pkg = new OpcPackage();
   const slidePartById = new Map(deck.slides.map((slide) => [slide.id, slidePartName(slide.index)] as const));
@@ -47,7 +51,8 @@ export async function emitPptx(deck: Deck, opts: EmitOptions): Promise<Buffer> {
 
   pkg.addPart(CORE_PART, CT.core, serialize(buildCoreXml(deck, created)));
   pkg.addPart(APP_PART, CT.app, serialize(buildAppXml(opts.appVersion, deck.slides.length)));
-  pkg.addPart(PRESENTATION_PART, CT.presentation, serialize(buildPresentationXml(deck, presentationMasterId, notesMasterId, presentationSlideIds)));
+  const embeddedFonts = emitEmbeddedFontList(pkg, PRESENTATION_PART, opts.embedFonts ? opts.fonts ?? [] : []);
+  pkg.addPart(PRESENTATION_PART, CT.presentation, serialize(buildPresentationXml(deck, presentationMasterId, notesMasterId, presentationSlideIds, embeddedFonts)));
   pkg.addPart(MASTER_PART, CT.slideMaster, serialize(buildMasterXml(masterLayoutId)));
   pkg.addPart(LAYOUT_PART, CT.slideLayout, serialize(buildLayoutXml()));
   if (notesMasterId) {
@@ -68,17 +73,18 @@ export async function emitPptx(deck: Deck, opts: EmitOptions): Promise<Buffer> {
   return pkg.toBuffer({ date: created, compression: 'DEFLATE' });
 }
 
-function buildPresentationXml(deck: Deck, masterId: string, notesMasterId: string | undefined, slideIds: string[]): XmlNode {
+function buildPresentationXml(deck: Deck, masterId: string, notesMasterId: string | undefined, slideIds: string[], embeddedFonts?: XmlNode): XmlNode {
   const sldIds = slideIds.map((_, index) => 256 + index);
   const sections = deckSections(deck.slides, sldIds);
   return el(
     'p:presentation',
-    pptNs(),
+    { ...pptNs(), ...(embeddedFonts === undefined ? {} : { embedTrueTypeFonts: '1' }) },
     el('p:sldMasterIdLst', {}, el('p:sldMasterId', { id: 2147483648, 'r:id': masterId })),
     notesMasterId ? el('p:notesMasterIdLst', {}, el('p:notesMasterId', { 'r:id': notesMasterId })) : undefined,
     el('p:sldIdLst', {}, ...slideIds.map((rId, index) => el('p:sldId', { id: sldIds[index], 'r:id': rId }))),
     el('p:sldSz', { cx: pxToEmu(deck.canvas.width), cy: pxToEmu(deck.canvas.height) }),
     el('p:notesSz', { cx: 6858000, cy: 9144000 }),
+    embeddedFonts,
     // CT_Presentation puts extensions last
     sections.length === 0 ? undefined : el('p:extLst', {}, sectionExtNode(sections)),
   );

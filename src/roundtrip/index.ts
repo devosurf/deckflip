@@ -8,6 +8,7 @@ import { basename, dirname, extname, join } from 'node:path';
 import type { PreservedSource } from '../emit/preserved.js';
 import type { Deck, Element } from '../model/index.js';
 import { OpcReader } from '../ooxml/opc.js';
+import { attachEmbeddedFonts } from '../parse/fonts.js';
 import { entry as reportEntry } from '../report/codes.js';
 import type { Entry } from '../report/types.js';
 import type { HtmlNode } from './fingerprint.js';
@@ -39,7 +40,7 @@ export async function resolveRoundTrip(deck: Deck, sections: HtmlNode[], deckFil
   if (manifest === undefined) {
     return missing(`${basename(dir)}/${MANIFEST_FILE} is missing or unreadable`);
   }
-  const bytes = await readFile(join(dir, SOURCE_FILE)).then((buffer) => new Uint8Array(buffer)).catch(() => undefined);
+  const bytes = await readFile(join(dir, SOURCE_FILE)).catch(() => undefined);
   if (bytes === undefined) {
     return missing(`${basename(dir)}/${SOURCE_FILE} is missing`);
   }
@@ -48,6 +49,7 @@ export async function resolveRoundTrip(deck: Deck, sections: HtmlNode[], deckFil
   }
 
   const source = await indexSource(await OpcReader.load(bytes));
+  attachEmbeddedFonts(deck, source.embeddedFonts);
   const plan = planSplice(deck, sections, manifest, source);
   return { preserved: { source, plan }, ...(plan.identical ? { identical: bytes } : {}), entries: plan.entries };
 }

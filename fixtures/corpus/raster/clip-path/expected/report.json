@@ -20,5 +20,16 @@
     },
     "reason": "clip-path: polygon(0px 0px, 100% 0px, 85% 100%, 0px 100%) on div.tile has no DrawingML equivalent",
     "hint": "Use border-radius, overflow: hidden with a rectangle, or pre-crop the image"
+  },
+  {
+    "code": "FONT_NOT_EMBEDDED",
+    "kind": "flagged",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(1)"
+    },
+    "reason": "Arial (ArialMT) is not embedded; recipients need this exact face installed",
+    "hint": "Install Arial on every recipient machine, or remove --no-embed-fonts to produce portable editable output"
   }
 ]

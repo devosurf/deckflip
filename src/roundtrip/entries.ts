@@ -1,11 +1,13 @@
 // `PRESERVE_OPAQUE_*` (docs/spec/08-report-codes.md): what a round trip carries opaquely. PPTX -> HTML and
 // `validate deck.pptx` list everything the source holds; the way back lists what it actually carried.
 
-import type { Deck, Element, Slide } from '../model/index.js';
+import { ACCEPTED_EDITABLE_FSTYPE_MASK } from '../fonts/embedding.js';
+import { textBodiesOf, type Deck, type Element, type EmbeddedFont, type Slide } from '../model/index.js';
 import { REL } from '../ooxml/opc.js';
 import { entry as reportEntry } from '../report/codes.js';
 import type { Entry, Locator } from '../report/types.js';
 import type { SourceIndex, SourceSlide } from './source.js';
+import type { SplicePlan } from './plan.js';
 
 const VBA_REL = /\/vbaProject$/;
 const COMMENTS_REL = /\/comments$/;
@@ -71,4 +73,67 @@ export function sourceEntries(deck: Deck, source: SourceIndex): Entry[] {
   }
   entries.push(...deckEntries(source));
   return entries;
+}
+
+/** Source payloads are preserved, never advertised as newly embedded complete faces. */
+export function embeddedFontEntries(deck: Deck, plan?: SplicePlan): Entry[] {
+  const entries: Entry[] = [];
+  const edited = editedEmbeddedFonts(deck, plan);
+  for (const font of deck.embeddedFonts ?? []) {
+    const identity = `${font.family} (${font.slot}, ${font.part})`;
+    const fields = (reason: string) => ({ reason, params: { family: font.family } });
+    if (font.formatError) {
+      entries.push({
+        ...reportEntry('FONT_EMBED_FORMAT', fields(`${identity} is preserved, but cannot be read as supported EOT: ${font.formatError}`)),
+        severity: 'warning', kind: 'flagged',
+        hint: 'Keep source.pptx and deckflip.json together; supply the complete original font for a readable preview without replacing the preserved source payload',
+      });
+    }
+    if (font.fsType !== undefined && (font.fsType & ~ACCEPTED_EDITABLE_FSTYPE_MASK) !== 0) {
+      entries.push({
+        ...reportEntry('FONT_EMBED_RESTRICTED', fields(`${identity} retains source fsType 0x${font.fsType.toString(16).padStart(4, '0')}, which does not permit editable outline embedding; the original payload is preserved without granting new rights`)),
+        severity: 'warning', kind: 'flagged',
+        hint: 'Preservation retains the original permission bits and grants no new embedding rights; check the font licence and obtain the rights needed for editing and redistribution',
+      });
+    }
+    if (edited.has(font) && (font.subset || font.compressed)) {
+      entries.push(reportEntry('FONT_EMBED_SUBSET', fields(`${identity} is preserved, but edited text coverage cannot be verified; new characters may fall back in PowerPoint`)));
+    } else if (font.subset) {
+      entries.push(reportEntry('FONT_EMBED_SUBSET', fields(`${identity} is a preserved EOT subset with limited editing; characters outside the original subset can fall back in PowerPoint`)));
+    }
+    if (font.compressed) {
+      entries.push({
+        ...reportEntry('FONT_EMBED_FORMAT', fields(`${identity} is preserved verbatim as MTX-compressed EOT; Chromium cannot decode this payload and HTML previews can use a fallback, while the source package retains the original font`)),
+        kind: 'preserved', severity: 'warning',
+        hint: 'Keep source.pptx and deckflip.json together; supply the complete original font for a faithful HTML preview',
+      });
+    }
+  }
+  return entries;
+}
+
+/** Only text bodies rebuilt by the splice plan need a new coverage warning. */
+function editedEmbeddedFonts(deck: Deck, plan: SplicePlan | undefined): Set<EmbeddedFont> {
+  const edited = new Set<EmbeddedFont>();
+  if (!plan) return edited;
+  for (const [index, slide] of deck.slides.entries()) {
+    const slidePlan = plan.slides[index];
+    if (slidePlan?.untouched) continue;
+    const visit = (element: Element): void => {
+      if (slidePlan?.splices.has(element)) return;
+      if (element.kind === 'group') {
+        element.children.forEach(visit);
+        return;
+      }
+      for (const { body } of textBodiesOf(element)) {
+        for (const paragraph of body.paragraphs) {
+          for (const run of paragraph.runs) {
+            if (run.kind === 'text' && run.style.embeddedFont) edited.add(run.style.embeddedFont);
+          }
+        }
+      }
+    };
+    slide.elements.forEach(visit);
+  }
+  return edited;
 }

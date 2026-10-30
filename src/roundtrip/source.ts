@@ -6,6 +6,8 @@
 import { SaxesParser } from 'saxes';
 import { OpcReader, REL, type Relationship } from '../ooxml/opc.js';
 import { parseXml, type XmlNode } from '../ooxml/xml.js';
+import type { EmbeddedFont } from '../model/index.js';
+import { readEmbeddedFonts } from '../parse/fonts.js';
 
 export interface SourceShape {
   /** `p:cNvPr/@id` */
@@ -43,6 +45,7 @@ export interface SourceSlide {
 export interface SourceIndex {
   reader: OpcReader;
   presentation: { partName: string; xml: string; rels: Relationship[] };
+  embeddedFonts: EmbeddedFont[];
   slides: SourceSlide[];
   /** layout name (`p:cSld/@name`) -> layout part, first master first */
   layouts: Map<string, string>;
@@ -79,7 +82,7 @@ export async function indexSource(reader: OpcReader): Promise<SourceIndex> {
     }
   }
 
-  return { reader, presentation: { partName: presentationPart, xml: presentationXml, rels: presentationRels }, slides, layouts, contentType: await reader.contentTypes() };
+  return { reader, presentation: { partName: presentationPart, xml: presentationXml, rels: presentationRels }, embeddedFonts: await readEmbeddedFonts(reader, presentation, presentationRels), slides, layouts, contentType: await reader.contentTypes() };
 }
 
 function element(node: XmlNode | undefined, name: string): XmlNode | undefined {

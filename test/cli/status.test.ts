@@ -1,5 +1,4 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -198,53 +197,6 @@ describe('CLI severity and strict-mode status', () => {
       expect(validated.status, validated.stderr).toBe(0);
       expect(JSON.parse(validated.stdout).entries).toEqual([]);
     }
-  });
-
-  // macOS supplies this non-safe face with editable embedding permission (fsType=8).
-  it.skipIf(!browserAvailable || !existsSync('/System/Library/Fonts/Supplemental/Andale Mono.ttf')).each([
-    '--embed-fonts', '--embed-fonts=Arial',
-  ])('rejects unsupported %s without hiding portability or replacing a Deck', async (embedding) => {
-    const dir = await workspace();
-    const input = join(dir, 'font.html');
-    const output = join(dir, 'font.pptx');
-    await writeFile(input, `<!doctype html><html><head><style>
-      body { font: 24px/32px "Andale Mono", Arial }
-      </style></head><body><section><p id="brand">Brand text</p></section></body></html>`);
-    for (const command of ['convert', 'validate']) {
-      for (const flags of [[], ['--strict']]) {
-        const result = cli(command, input, ...(command === 'convert' ? ['-o', output] : []), embedding, '--json', ...flags);
-        const report: Report = JSON.parse(result.stdout);
-        expect(report.entries).toContainEqual(expect.objectContaining({
-          code: 'FONT_NOT_SAFE', severity: 'warning', locator: { selector: '#brand' }, reason: expect.stringContaining('Andale Mono'),
-        }));
-        expect(report.entries).toContainEqual(expect.objectContaining({
-          code: 'FONT_EMBED_UNSUPPORTED', kind: 'error', severity: 'error',
-        }));
-        expect(result.status, result.stderr).toBe(2);
-        expect(await reportAt(command === 'convert' ? `${output}.report.json` : join(dir, 'font.report.json'))).toEqual(report);
-        if (command === 'convert') {
-          if (flags.length === 0) {
-            await expect(stat(output)).rejects.toMatchObject({ code: 'ENOENT' });
-            await writeFile(output, 'Existing Deck');
-          } else {
-            expect(await readFile(output, 'utf8')).toBe('Existing Deck');
-          }
-        }
-      }
-    }
-  });
-
-  it.each(['convert', 'validate'])('rejects an explicit embedding request for PPTX %s even when the Deck has no text', async (command) => {
-    const dir = await workspace();
-    const input = join(dir, 'source.pptx');
-    const output = join(dir, 'source.html');
-    await writeFile(input, await buildPptx());
-    const result = cli(command, input, ...(command === 'convert' ? ['-o', output] : []), '--embed-fonts', '--strict', '--json');
-    const report: Report = JSON.parse(result.stdout);
-    expect(report.entries).toContainEqual(expect.objectContaining({ code: 'FONT_EMBED_UNSUPPORTED', severity: 'error' }));
-    expect(result.status, result.stderr).toBe(2);
-    await expect(stat(output)).rejects.toMatchObject({ code: 'ENOENT' });
-    await expect(stat(join(dir, 'source.assets'))).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
   it('rejects HTML conversion without creating or replacing the destination, including strict mode', async () => {

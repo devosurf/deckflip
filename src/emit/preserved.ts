@@ -5,12 +5,13 @@
 // part is the source's with its slide list rewritten.
 
 import path from 'node:path';
-import type { Deck, Slide } from '../model/index.js';
+import { OFFICE_FONT_STYLES, type Deck, type Slide } from '../model/index.js';
 import { OpcPackage, REL, type OpcReader } from '../ooxml/opc.js';
 import { pxToEmu } from '../ooxml/emu.js';
 import { el, parseXml, raw, serialize, type XmlNode } from '../ooxml/xml.js';
 import type { ElementSplice, SlidePlan, SplicePlan } from '../roundtrip/plan.js';
 import type { SourceIndex, SourceShape, SourceSlide } from '../roundtrip/source.js';
+import { emitEmbeddedFontList, type PlannedFont } from './fonts.js';
 import { MediaStore } from './media.js';
 import { emitNotesMaster, emitNotesSlide, NOTES_MASTER_PART } from './notes.js';
 import { deckSections, listedSlideIds, sectionExtNode, sectionNode, SECTION_EXT_URI, type DeckSection } from './sections.js';
@@ -21,7 +22,12 @@ export interface PreservedSource {
   plan: SplicePlan;
 }
 
+export interface PreservedFontOptions {
+  fonts: readonly PlannedFont[];
+}
+
 const COMMENTS_REL = /\/(comments|commentAuthors)$/;
+const FONT_CHILD_ORDER: readonly string[] = ['p:font', ...OFFICE_FONT_STYLES.map((slot) => `p:${slot}`)];
 
 interface SlideIdentity {
   id: number;
@@ -29,7 +35,7 @@ interface SlideIdentity {
   partName: string;
 }
 
-export async function emitPreservedPptx(deck: Deck, preserved: PreservedSource, created: Date): Promise<Buffer> {
+export async function emitPreservedPptx(deck: Deck, preserved: PreservedSource, created: Date, opts: PreservedFontOptions): Promise<Buffer> {
   const { source, plan } = preserved;
   const reader = source.reader;
   const pkg = new OpcPackage();
@@ -61,7 +67,7 @@ export async function emitPreservedPptx(deck: Deck, preserved: PreservedSource, 
   const sourceNotesMaster = source.presentation.rels.find((rel) => rel.type === REL.notesMaster && !rel.external)?.target;
   const ownNotesMaster = sourceNotesMaster === undefined && deck.slides.some((slide) => slide.notes);
   const identities = assignSlideIdentities(plan, source, reader);
-  await emitPresentation(pkg, deck, source, plan, identities, copy, ownNotesMaster);
+  await emitPresentation(pkg, deck, source, plan, identities, copy, ownNotesMaster, opts);
   if (ownNotesMaster) {
     emitNotesMaster(pkg, deck.canvas, freePart(pkg, reader, (index) => `/ppt/theme/theme${index}.xml`));
   }
@@ -118,7 +124,7 @@ function assignSlideIdentities(plan: SplicePlan, source: SourceIndex, reader: Op
 }
 
 /** The source presentation part with `p:sldIdLst` (and a `p14:sectionLst`) following the Deck's slides; every other relationship kept under its id. */
-async function emitPresentation(pkg: OpcPackage, deck: Deck, source: SourceIndex, plan: SplicePlan, identities: Map<SlidePlan, SlideIdentity>, copy: (part: string) => Promise<void>, ownNotesMaster: boolean): Promise<void> {
+async function emitPresentation(pkg: OpcPackage, deck: Deck, source: SourceIndex, plan: SplicePlan, identities: Map<SlidePlan, SlideIdentity>, copy: (part: string) => Promise<void>, ownNotesMaster: boolean, opts: PreservedFontOptions): Promise<void> {
   const part = source.presentation.partName;
   const ordered = plan.slides.map((slide) => identities.get(slide)!);
   const tree = parseXml(source.presentation.xml);
@@ -132,7 +138,6 @@ async function emitPresentation(pkg: OpcPackage, deck: Deck, source: SourceIndex
     const after = tree.children.findIndex((child) => typeof child !== 'string' && child.name === 'p:sldMasterIdLst');
     tree.children.splice(after + 1, 0, el('p:notesMasterIdLst', {}, el('p:notesMasterId', { 'r:id': notesMasterRel.id })));
   }
-  pkg.addPart(part, source.contentType(part) ?? 'application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml', serialize(tree));
 
   const kept = new Set(ordered.filter((identity, index) => plan.slides[index]!.source).map((identity) => identity.partName));
   for (const rel of source.presentation.rels) {
@@ -148,6 +153,37 @@ async function emitPresentation(pkg: OpcPackage, deck: Deck, source: SourceIndex
   }
   if (notesMasterRel) {
     pkg.addRelationship(part, REL.notesMaster, notesMasterRel.target, { id: notesMasterRel.id });
+  }
+  if (opts.fonts.length > 0) {
+    mergeEmbeddedFonts(tree, emitEmbeddedFontList(pkg, part, opts.fonts));
+    tree.attrs.embedTrueTypeFonts = '1';
+    delete tree.attrs.saveSubsetFonts;
+  }
+  pkg.addPart(part, source.contentType(part) ?? 'application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml', serialize(tree));
+}
+
+/** Keep source family attributes and nonstandard slots; new faces only fill unoccupied slots. */
+function mergeEmbeddedFonts(presentation: XmlNode, added: XmlNode | undefined): void {
+  if (!added) return;
+  const existing = find(presentation, 'p:embeddedFontLst');
+  if (!existing) {
+    const notes = presentation.children.findIndex((node) => typeof node !== 'string' && node.name === 'p:notesSz');
+    presentation.children.splice(notes + 1, 0, added);
+    return;
+  }
+  for (const node of added.children) {
+    if (typeof node === 'string') continue;
+    const family = node.children.find((child): child is XmlNode => typeof child !== 'string' && child.name === 'p:font')?.attrs.typeface;
+    const target = existing.children.find((child): child is XmlNode => typeof child !== 'string' && child.children.some((font) => typeof font !== 'string' && font.name === 'p:font' && font.attrs.typeface === family));
+    if (!target) {
+      existing.children.push(node);
+      continue;
+    }
+    for (const slot of node.children) {
+      if (typeof slot === 'string' || slot.name === 'p:font') continue;
+      if (!target.children.some((child) => typeof child !== 'string' && child.name === slot.name)) target.children.push(slot);
+    }
+    target.children.sort((left, right) => (typeof left === 'string' ? -1 : FONT_CHILD_ORDER.indexOf(left.name)) - (typeof right === 'string' ? -1 : FONT_CHILD_ORDER.indexOf(right.name)));
   }
 }
 

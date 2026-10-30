@@ -67,7 +67,8 @@ describe.skipIf(!browserAvailable)('PPTX -> HTML -> PPTX round trip', () => {
     const output = join(dir, 'back.pptx');
     const result = await convertHtmlToPptx(html, { ...options, browser, output });
     expect(result.exitCode).toBe(0);
-    expect(result.report.entries.map((entry) => [entry.code, entry.slide])).toEqual([['PRESERVE_OPAQUE_ANIMATION', 1], ['PRESERVE_OPAQUE_CHART', 2], ['PRESERVE_OPAQUE_MASTER', undefined]]);
+    expect(result.report.entries.some((entry) => entry.code === 'FONT_NOT_EMBEDDED')).toBe(true);
+    expect(result.report.entries.filter((entry) => entry.code !== 'FONT_NOT_EMBEDDED').map((entry) => [entry.code, entry.slide])).toEqual([['PRESERVE_OPAQUE_ANIMATION', 1], ['PRESERVE_OPAQUE_CHART', 2], ['PRESERVE_OPAQUE_MASTER', undefined]]);
     expect(await parts(await readFile(output))).toEqual(await parts(pptx));
   });
 
@@ -81,7 +82,8 @@ describe.skipIf(!browserAvailable)('PPTX -> HTML -> PPTX round trip', () => {
     const validated = await validateHtml(html, { ...options, browser });
     const result = await convertHtmlToPptx(html, { ...options, browser, output });
     expect(result.exitCode).toBe(0);
-    expect(result.report.entries.map((entry) => [entry.code, entry.slide])).toEqual([['DROPPED_ANIMATION', 1], ['PRESERVE_OPAQUE_CHART', 2], ['PRESERVE_OPAQUE_MASTER', undefined]]);
+    expect(result.report.entries.some((entry) => entry.code === 'FONT_NOT_EMBEDDED')).toBe(true);
+    expect(result.report.entries.filter((entry) => entry.code !== 'FONT_NOT_EMBEDDED').map((entry) => [entry.code, entry.slide])).toEqual([['DROPPED_ANIMATION', 1], ['PRESERVE_OPAQUE_CHART', 2], ['PRESERVE_OPAQUE_MASTER', undefined]]);
     expect(validated.report.entries).toEqual(result.report.entries);
 
     const after = await parts(await readFile(output));
@@ -302,8 +304,9 @@ describe.skipIf(!browserAvailable)('PPTX -> HTML -> PPTX round trip', () => {
     const output = join(dir, 'back.pptx');
     const result = await convertHtmlToPptx(html, { ...options, browser, output });
     expect(result.exitCode).toBe(0);
-    expect(result.report.entries.map((entry) => [entry.code, entry.severity])).toEqual([['PRESERVE_SOURCE_MISSING', 'warning']]);
-    expect(result.report.entries[0]!.hint).toContain('deck.assets');
+    expect(result.report.entries.some((entry) => entry.code === 'FONT_NOT_EMBEDDED')).toBe(true);
+    expect(result.report.entries.filter((entry) => entry.code !== 'FONT_NOT_EMBEDDED').map((entry) => [entry.code, entry.severity])).toEqual([['PRESERVE_SOURCE_MISSING', 'warning']]);
+    expect(result.report.entries.find((entry) => entry.code === 'PRESERVE_SOURCE_MISSING')!.hint).toContain('deck.assets');
     const after = await parts(await readFile(output));
     expect(after.has('ppt/charts/chart1.xml')).toBe(false);
     expect(after.has('ppt/slides/slide2.xml')).toBe(true);
