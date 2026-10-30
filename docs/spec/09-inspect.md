@@ -20,10 +20,10 @@
       "cssFamily": "Heebo",
       "aliases": ["heebo", "heebo medium"],
       "asset": {
-        "file": "/deck/fonts/Heebo-Medium.ttf",
         "sha256": "cba4ce1a4c8ebaf36d0ac34d1941bc4d8a0117e343fac28c46a01635a08a92f1",
         "faceIndex": 0,
-        "postscriptName": "Heebo-Medium"
+        "postscriptName": "Heebo-Medium",
+        "source": { "kind": "file", "file": "/deck/fonts/Heebo-Medium.ttf", "format": "ttf", "sha256": "cba4ce1a4c8ebaf36d0ac34d1941bc4d8a0117e343fac28c46a01635a08a92f1" }
       },
       "office": { "family": "Heebo Medium", "style": "regular" },
       "class": "deck-provided",
@@ -82,6 +82,6 @@ Element fields:
 | `opaque` | `{ "class": "chart" \| "smartart" \| "ole" \| "vector" \| "text-effects", "parts": ["ppt/charts/chart1.xml", ...] }` |
 | `entries` | codes of report entries attached to this element |
 
-`fonts[]` contains one Resolved font per asset digest/member face, not one per filename or preferred family. `cssFamily` is the matched CSS stack entry; `aliases` contains normalized matching aliases; `office.family` and `office.style` are the legacy Office address. `asset.faceIndex` distinguishes collection members; `asset.sha256` binds the identity to bytes. `class` is `safe`, `deck-provided` or `installed`. These fields report selection, not embedding or renderer evidence. `deck.master.source` is `built-in` or `preserved`.
+`fonts[]` contains one Resolved font per asset digest/member face, not one per filename or preferred family. `cssFamily` is the matched CSS stack entry; `aliases` contains normalized matching aliases; `office.family` and `office.style` are the legacy Office address. `asset.faceIndex` distinguishes collection members; `asset.sha256` binds the identity to the face's sfnt bytes, decoded when the source is WOFF/WOFF2. `asset.source` is where those bytes came from: `installed` (`file`), `file`, `remote` (`url` without credentials or query values, `pinned` copy in the Asset directory) or `data`, each Deck-provided kind with its acquired `format` and `sha256` ([07](07-fonts.md#deck-font-assets)). `unicodeRange` marks a Deck-provided subset face. `class` is `safe`, `deck-provided` or `installed`. These fields report selection, not embedding or renderer evidence. `deck.master.source` is `built-in` or `preserved`.
 
 The document is deterministic for a given input and tool version. Text is the only free-form content; everything else is enumerated, so agents can `jq` it safely.

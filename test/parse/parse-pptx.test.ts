@@ -32,7 +32,6 @@ function deckWith(elements: Element[]): Deck {
     title: 'Parse round trip',
     lang: 'sv-SE',
     canvas: { width: 960, height: 720, source: 'deck-meta' },
-    fontFaces: [],
     slides: [
       { index: 1, id: 'slide-1', name: 'Opening', layout: 'Blank', elements },
       { index: 2, id: 'slide-2', name: 'Closing', layout: 'Blank', elements: [] },
@@ -51,7 +50,6 @@ describe('parsePptx', () => {
       title: 'deckflip',
       lang: 'en',
       canvas: { width: 1280, height: 720, source: 'deck-meta' },
-      fontFaces: [],
       slides: [{ index: 1, id: 'slide-1', name: 'Slide 1', layout: 'Blank', elements: [] }],
     });
   });

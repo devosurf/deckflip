@@ -17,8 +17,8 @@ Three rules hold across families:
 | `VALIDATE_UNKNOWN_META` | `meta[name^="deckflip:"]` not in the dialect | Remove it or check the spelling; known names: `deckflip:canvas` |
 | `VALIDATE_STRAY_CONTENT` | element in `body` outside any `section` | Move it into a `<section>`; only sections are Slides |
 | `VALIDATE_SLIDE_SIZE` | a section's border box is not the Canvas | Do not set width/height on sections, or match `{W}x{H}` exactly |
-| `VALIDATE_REMOTE_ASSET` | `http(s):` or other non-local URL | Save the file into the Deck's asset directory and reference it relatively |
-| `VALIDATE_MISSING_ASSET` | local asset not found | Check the path relative to `{file}` |
+| `VALIDATE_REMOTE_ASSET` | `http(s):` or other non-local URL, other than a stylesheet or `@font-face` source (those are pinned, [07](07-fonts.md#deck-font-assets)) | Save the file into the Deck's asset directory and reference it relatively |
+| `VALIDATE_MISSING_ASSET` | local asset not found, including a linked stylesheet or an `@font-face` source a Slide needs | Check the path relative to `{file}` |
 | `VALIDATE_IMAGE_ASSET` | invalid embedded image data, unsupported image format, or image decoding failure | Use a valid PNG, JPEG, GIF, WebP or SVG image; check the data URI encoding for embedded images |
 | `VALIDATE_ELEMENT` | `script`, `iframe`, `object`, `embed`, `canvas`, form controls, `details`, `dialog`, `marquee` | Replace `{el}` with static HTML; scripts are never run |
 | `VALIDATE_TEXT_CSS` | `hyphens: auto`, `text-wrap: balance\|pretty`, vertical `writing-mode`, `column-*`, `text-orientation`, `font-size-adjust`, `font-stretch` | Remove `{decl}`: PowerPoint cannot reproduce its line breaks |
@@ -36,8 +36,11 @@ Three rules hold across families:
 | `FONT_GENERIC_ONLY` | error | the first resolvable entry is a generic family | Put a concrete family before `{generic}` |
 | `FONT_IDENTITY_INVALID` | error | selected face has insufficient/conflicting Office identity metadata, an unsupported legacy subfamily, or an unsupported variable instance | Choose a font face with consistent legacy family, subfamily and RIBBI metadata; do not rewrite font tables or remap CSS weights |
 | `FONT_EMBED_UNSUPPORTED` | error | explicit all-font or named-family embedding request; embedding is not implemented | Remove `--embed-fonts` and use a safe font such as Arial, or install the Resolved font on every viewing machine |
+| `FONT_ASSET_UNAVAILABLE` | error | a stylesheet or `@font-face` source a Slide needs could not be downloaded and is not pinned, its pinned copy is missing or modified, or Chromium never requested a listed stylesheet | Convert once with network access so deckflip pins it in the Asset directory, or save the file next to the Deck and reference it relatively |
+| `FONT_ASSET_UNSUPPORTED` | error | an `@font-face` rule a Slide needs lists only `local()` sources or no loadable format, its bytes are no TTF/OTF/WOFF/WOFF2 font, or a `data:` stylesheet declares fonts | Supply the face as a TTF, OTF, WOFF or WOFF2 file through url(); deckflip never measures local() faces |
 | `FONT_NOT_SAFE` | warning | Resolved font outside the safe set and not embedded; requesting embedding never suppresses it | Use a safe font, or install the Resolved font on every viewing machine; font embedding is not supported |
-| `FONT_EMBED_RESTRICTED` | warning | reserved for the embedding milestone: `fsType` forbids editable embedding | The licence of `{family}` forbids embedding; choose another font |
+| `FONT_GLYPH_FALLBACK` | warning | the selected face lacks characters of a text node (outside its `cmap` or `unicode-range`), or Chromium drew some of its glyphs with another font; once per owner and face | Use a face of `{family}` that covers every character, or remove the characters; a unicode-range subset covers only its range |
+| `FONT_EMBED_RESTRICTED` | warning | a selected Deck-provided face's `fsType` rules out editable embedding: restricted (`0x0002`), preview & print (`0x0004`) without editable, or bitmap-only (`0x0200`) | The licence of `{family}` forbids embedding; choose another font |
 | `FONT_EMBED_FORMAT` | warning | reserved for the embedding milestone: WOFF2 or TTC source cannot be embedded | Provide `{family}` as TTF, OTF or WOFF |
 | `FONT_MISSING_FOR_LAYOUT` | warning | PPTX->HTML: source font not installed, not embedded | Install `{family}` before editing to keep layout faithful |
 

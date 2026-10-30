@@ -6,11 +6,13 @@ import type { Browser, Page } from 'playwright-core';
 import { textBodiesOf } from '../model/index.js';
 import { groupToCanvas, transformedBounds, type Matrix2d } from '../model/geometry.js';
 import type { Box, Canvas, Deck, Element, ImageFill, PictureElement, ShapeElement, Slide, TextBody } from '../model/index.js';
+import type { PlatformFontUsage, VisibleText } from '../fonts/audit.js';
 import { entry as reportEntry } from '../report/codes.js';
 import type { Entry } from '../report/types.js';
-import type { BrowserCensus, BrowserElement, BrowserImageFill, BrowserMeasureResult, BrowserPicture, BrowserRaster } from './browser-script.js';
+import type { BrowserCensus, BrowserElement, BrowserImageFill, BrowserMeasureResult, BrowserPicture, BrowserRaster, BrowserVisibleText } from './browser-script.js';
 import { loadMedia, reencodeToPng } from './media.js';
-import { FREEZE_ATTR, measureSlideDocument, preloadBackgroundImages } from './browser-script.js';
+import { FREEZE_ATTR, measureSlideDocument, preloadBackgroundImages, preparePageScript, VISIBLE_TEXT_GLOBAL } from './browser-script.js';
+import { DeckFontSession, type DeckFonts } from './fonts.js';
 import type { LoadedDeck, SlideDocument } from './load.js';
 import { readNotes } from './notes.js';
 import { captureRaster, captureStablePng } from './raster.js';
@@ -40,6 +42,10 @@ export interface MeasuredDeckResult {
   sections: HtmlNode[];
   /** each Slide's census, in Slide order: what Verification compares the output against */
   census: BrowserCensus[];
+  /** each Slide's declared `@font-face` faces, as Chromium loaded them */
+  fonts: DeckFonts;
+  /** every text node Chromium drew, with the platform fonts it drew it with: what the font audit reads */
+  visibleText: VisibleText[];
 }
 
 const SLIDE_SIZE_HINT = 'Do not set width/height on sections, or match {W}x{H} exactly';
@@ -48,17 +54,20 @@ const FLATTEN_OFFCANVAS_HINT = 'PowerPoint clips at the slide edge; move {el} in
 
 export async function measureDeck(loaded: LoadedDeck, opts: MeasureOptions): Promise<MeasuredDeckResult> {
   const context = await opts.browser.newContext({ viewport: { width: loaded.canvas.width, height: loaded.canvas.height }, deviceScaleFactor: 1 });
+  const session = await DeckFontSession.open(loaded);
   const entries: Entry[] = [...loaded.entries];
   const slides: Slide[] = [];
   const sections: HtmlNode[] = [];
   const census: BrowserCensus[] = [];
-  const fontFaces = new Map<string, { family: string; file: string; weight?: number; italic?: boolean }>();
+  const visibleText: VisibleText[] = [];
 
+  let fonts: DeckFonts;
   try {
     for (const document of loaded.documents) {
       const page = await context.newPage();
       try {
-        const result = await measureDocumentPage(page, document);
+        await session.attach(page, document.index, document.sourceFile);
+        const result = await measureDocumentPage(page, document, session);
         if (result.sectionBox.w !== loaded.canvas.width || result.sectionBox.h !== loaded.canvas.height) {
           entries.push(errorEntry('VALIDATE_SLIDE_SIZE', `Section size ${result.sectionBox.w}x${result.sectionBox.h} does not match canvas ${loaded.canvas.width}x${loaded.canvas.height}`, SLIDE_SIZE_HINT, 'body > section', document.index));
         }
@@ -68,14 +77,7 @@ export async function measureDeck(loaded: LoadedDeck, opts: MeasureOptions): Pro
 
         const measuredElements = await resolveElements({ page, slide: document.index, canvas: loaded.canvas, origin: { x: result.sectionBox.x, y: result.sectionBox.y }, rasterDpi: opts.rasterDpi ?? 192 }, result.shapes, entries);
 
-        for (const face of result.fontFaces) {
-          const normalized = { ...face, file: fileURLToPath(face.file) };
-          const key = `${normalized.family}\u0000${normalized.file}\u0000${normalized.weight ?? ''}\u0000${normalized.italic ? '1' : '0'}`;
-          if (!fontFaces.has(key)) {
-            fontFaces.set(key, normalized);
-          }
-        }
-
+        visibleText.push(...await readVisibleText(page, document.index, result.visibleText));
         const notes = readNotes(result.tree);
         const slide: Slide = {
           index: document.index,
@@ -95,9 +97,11 @@ export async function measureDeck(loaded: LoadedDeck, opts: MeasureOptions): Pro
     }
   } finally {
     await context.close();
+    // Pins already written stay usable when a page fails: record them either way.
+    fonts = await session.close();
   }
 
-  entries.push(...linkTargetEntries(slides));
+  entries.push(...fonts.entries, ...linkTargetEntries(slides));
 
   return {
     deck: {
@@ -105,12 +109,47 @@ export async function measureDeck(loaded: LoadedDeck, opts: MeasureOptions): Pro
       lang: loaded.lang,
       canvas: loaded.canvas,
       slides,
-      fontFaces: Array.from(fontFaces.values()),
     },
     entries,
     sections,
     census,
+    fonts,
+    visibleText,
   };
+}
+
+/** The platform fonts Chromium drew each Visible text node with (CDP `CSS.getPlatformFontsForNode`). */
+async function readVisibleText(page: Page, slide: number, texts: BrowserVisibleText[]): Promise<VisibleText[]> {
+  if (texts.length === 0) return [];
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    // Enabling the CSS agent refetches every stylesheet for DevTools, past page.route: block the network first,
+    // so a pinned remote stylesheet is never requested again.
+    await cdp.send('Network.enable');
+    await cdp.send('Network.setBlockedURLs', { urls: ['*'] });
+    await cdp.send('DOM.enable');
+    await cdp.send('CSS.enable');
+    await cdp.send('DOM.getDocument', { depth: 0 });
+    const { result } = await cdp.send('Runtime.evaluate', { expression: `window.${VISIBLE_TEXT_GLOBAL}` });
+    const objectIds = new Map<number, string>();
+    if (result.objectId !== undefined) {
+      const { result: properties } = await cdp.send('Runtime.getProperties', { objectId: result.objectId, ownProperties: true });
+      for (const property of properties) {
+        if (/^\d+$/.test(property.name) && property.value?.objectId !== undefined) objectIds.set(Number(property.name), property.value.objectId);
+      }
+    }
+    return await Promise.all(texts.map(async (text, index): Promise<VisibleText> => {
+      const objectId = objectIds.get(index);
+      let fonts: PlatformFontUsage[] = [];
+      if (objectId !== undefined) {
+        const { nodeId } = await cdp.send('DOM.requestNode', { objectId });
+        fonts = (await cdp.send('CSS.getPlatformFontsForNode', { nodeId })).fonts;
+      }
+      return { slide, ...text, fonts };
+    }));
+  } finally {
+    await cdp.detach();
+  }
 }
 
 /** `VALIDATE_LINK_TARGET` once per text body and unknown `#<slide id>` jump (spec 02: internal hyperlinks target a section id). */
@@ -144,21 +183,23 @@ function linkTargetEntries(slides: Slide[]): Entry[] {
   return entries;
 }
 
-async function measureDocumentPage(page: Page, slideDoc: SlideDocument): Promise<BrowserMeasureResult> {
+async function measureDocumentPage(page: Page, slideDoc: SlideDocument, fonts: DeckFontSession): Promise<BrowserMeasureResult> {
   const tempPath = join(dirname(slideDoc.sourceFile), `.deckflip-${slideDoc.index}-${randomUUID().slice(0, 8)}.html`);
   await writeFile(tempPath, slideDoc.html, 'utf8');
   try {
     const blockedImages = new Set<string>();
-    // Enforce the image policy before fetching, including inside rasterised subtrees.
+    // Enforce the image policy before fetching, including inside rasterised subtrees. Everything else falls back
+    // to the font session's handler, which answers stylesheets and fonts.
     await page.route('**/*', (route) => {
       const request = route.request();
       if (request.resourceType() === 'image' && !/^(file|data):/.test(request.url())) {
         blockedImages.add(request.url());
         return route.abort();
       }
-      return route.continue();
+      return route.fallback();
     });
     await page.goto(pathToFileURL(tempPath).href, { waitUntil: 'load' });
+    await fonts.settle(page, slideDoc.index);
     await page.emulateMedia({ reducedMotion: 'reduce' });
     // Tagged so the page script can lift it while reading `transition` (see `validateDocument`). Animations are
     // also rewound to their first frame so a paused animation does not leave a timing-dependent state behind.
@@ -171,9 +212,7 @@ async function measureDocumentPage(page: Page, slideDoc: SlideDocument): Promise
         animation.currentTime = 0;
       }
     });
-    // esbuild-transpiled builds (tsx, vitest) wrap nested function declarations in a `__name` helper that only
-    // exists in the Node bundle; the serialised page script needs an identity shim for it.
-    await page.evaluate('globalThis.__name = globalThis.__name || ((fn) => fn)');
+    await preparePageScript(page);
     await page.evaluate(preloadBackgroundImages);
     return await page.evaluate(measureSlideDocument, [...blockedImages]);
   } finally {

@@ -29,8 +29,8 @@ Exit codes: `0` ok · `1` no output (Chromium or renderer failure) · `2` valida
 - One `<section>` directly under `<body>` per Slide, in order. Nothing else in `<body>`.
 - Per-Slide attributes on the section: `id` (stable anchor, `<a href="#id">` jumps to it), `data-title` (slide name in PowerPoint's outline), `data-section="Name"` on the first Slide of a PowerPoint section.
 - Speaker notes: `<aside class="notes">` inside the section; `p`, `ul`/`ol`, `strong`/`em`, `a` allowed.
-- Assets live next to the deck and are referenced relatively (`img src="assets/x.png"`). Remote URLs are an error. `data:` URIs are fine.
-- Fonts: name a concrete family first and end the stack with a safe one (`font-family: Georgia, "Times New Roman", serif`). Safe families need no embedding; details in `reference/fonts.md`.
+- Assets live next to the deck and are referenced relatively (`img src="assets/x.png"`). Remote URLs are an error, except stylesheets and `@font-face` fonts (Google Fonts included), which are downloaded once and pinned in `<name>.assets/fonts/`: keep that directory with the deck. `data:` URIs are fine.
+- Fonts: name a concrete family first and end the stack with a safe one (`font-family: Georgia, "Times New Roman", serif`). Safe families need no embedding; webfonts, pinning and `local()` are in `reference/fonts.md`.
 - Layout is free: flex, grid, absolute, `calc()`, custom properties. Chromium lays the slide out; PowerPoint receives the measured boxes.
 
 ## Authoring rules that avoid entries
@@ -46,7 +46,7 @@ Exit codes: `0` ok · `1` no output (Chromium or renderer failure) · `2` valida
 9. `data-raster` on an element when a picture is acceptable (an HTML-built chart, a diagram with effects, a logo lock-up): the whole subtree, text included, becomes one PNG with an info entry instead of a warning. Never on a `section`.
 10. `data-group` on a container when the user should move its children together: emits a PowerPoint group.
 
-Rejected outright (`VALIDATE_*` errors, exit 2): `script`, `iframe`, `object`, `embed`, `canvas`, form controls, `details`, `dialog`, `marquee`; `position: fixed|sticky`, `zoom`, `@page`; `hyphens: auto`, `text-wrap: balance|pretty`, vertical `writing-mode`, `column-*`, `text-orientation`, `font-size-adjust`, `font-stretch`; elements outside sections; missing or remote assets; `data-raster` on a section. Animations and transitions are flattened to their first frame (info).
+Rejected outright (`VALIDATE_*` errors, exit 2): `script`, `iframe`, `object`, `embed`, `canvas`, form controls, `details`, `dialog`, `marquee`; `position: fixed|sticky`, `zoom`, `@page`; `hyphens: auto`, `text-wrap: balance|pretty`, vertical `writing-mode`, `column-*`, `text-orientation`, `font-size-adjust`, `font-stretch`; elements outside sections; missing assets and remote images; `data-raster` on a section. Animations and transitions are flattened to their first frame (info).
 
 Everything else in CSS is allowed and only influences the measured geometry. Full native / rasterised / rejected lists: `reference/authoring-subset.md`.
 
@@ -61,7 +61,7 @@ Everything else in CSS is allowed and only influences the measured geometry. Ful
 ## Reading the report
 
 - `entries[]` each carry `code`, `kind` (`error | rasterised | flattened | substituted | dropped | preserved | overridden | flagged`), `severity` (`error | warning | info`), `slide` (1-based), `locator.selector`, `reason` (quotes the offending declaration) and `hint` (the edit that makes it native).
-- Families: `VALIDATE_*` and two `FONT_*` errors stop the conversion; `RASTER_*` means a picture was emitted; `FLATTEN_*` means an effect was dropped and the text kept; `SUBSTITUTE_*` is an approximation you can usually accept; `FONT_*` warnings mean the viewer may substitute the font; `LAYOUT_*` flags something the PPTX reproduces faithfully but you rarely intend (text spilling out of its box, text over text, illegible colour, a line PowerPoint may break elsewhere); `DROPPED_*`/`PRESERVE_*` concern round trips and generated content; `OVERRIDE_CANVAS_SIZE` records `--size`; `VERIFY_*` errors are deckflip defects (exit 5).
+- Families: `VALIDATE_*` and `FONT_*` errors stop the conversion; `RASTER_*` means a picture was emitted; `FLATTEN_*` means an effect was dropped and the text kept; `SUBSTITUTE_*` is an approximation you can usually accept; `FONT_*` warnings mean the viewer may substitute the font or its glyphs; `LAYOUT_*` flags something the PPTX reproduces faithfully but you rarely intend (text spilling out of its box, text over text, illegible colour, a line PowerPoint may break elsewhere); `DROPPED_*`/`PRESERVE_*` concern round trips and generated content; `OVERRIDE_CANVAS_SIZE` records `--size`; `VERIFY_*` errors are deckflip defects (exit 5).
 - `--strict` turns any entry into exit 4 while still writing everything. There is no flag to silence rasters: `data-raster` is the way to say "this picture is intended".
 - A warning you did not intend is a bug in your HTML, not in the tool: follow the hint. A `VERIFY_*` error is the opposite: a bug in the tool.
 - Sidecar `<output>.report.json` is always written; `--json` prints the same document; the stderr summary lists one line per Slide and one per entry.

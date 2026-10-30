@@ -6,6 +6,7 @@ import type { Browser } from 'playwright-core';
 import { comparePng, type IgnoreRegion } from '../../src/render/compare.js';
 import { findSoffice, renderPptxLibreOffice } from '../../src/render/libreoffice.js';
 import { launchChromium, renderHtml } from '../../src/render/chromium.js';
+import { DeckFontSession } from '../../src/html/fonts.js';
 import { loadDeck } from '../../src/html/load.js';
 import { convertHtmlToPptx } from '../../src/convert.js';
 import { ORACLE_RECORD, packageDigest, type OracleRecord } from './oracle-record.js';
@@ -77,7 +78,9 @@ export function corpusGate(category: string, fixtures: readonly string[]): void 
 
         const chromiumDir = join(fixtureDir, 'expected', 'chromium');
         await mkdir(chromiumDir, { recursive: true });
-        const chromiumPages = await renderHtml(loaded, { browser: browser!, dpi: 96 });
+        const fonts = await DeckFontSession.open(loaded);
+        const chromiumPages = await renderHtml(loaded, { browser: browser!, dpi: 96, fonts });
+        await fonts.close();
         const libreOfficePages = LIBREOFFICE_GATE && findSoffice() ? await renderPptxLibreOffice(pptxPath, { dpi: 96 }) : undefined;
         const rows: Array<{ slide: number; powerpoint: string; libreoffice?: string }> = [];
         for (const [index, png] of chromiumPages) {

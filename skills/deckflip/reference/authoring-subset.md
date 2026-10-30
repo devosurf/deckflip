@@ -43,7 +43,7 @@ Inside a native group, the raster picture retains child coordinates; ancestor gr
 
 ## Rejected (`VALIDATE_*` error, exit 2)
 
-`script`, `iframe`, `object`, `embed`, `canvas`, `input`, `button`, `select`, `textarea`, `details`, `summary`, `dialog`, `marquee` (`VALIDATE_ELEMENT`); `hyphens: auto`, `text-wrap: balance|pretty`, vertical `writing-mode`, `column-count`/`column-width`, `text-orientation`, `font-size-adjust`, `font-stretch` (`VALIDATE_TEXT_CSS`); `position: fixed|sticky`, `zoom`, `@page` (`VALIDATE_POSITION`); content outside sections; unknown `deckflip:*` meta; remote or missing assets; `li` with block content beyond one `p` and one nested list, or deeper than nine levels; table cells with block content beyond `p`/`ul`/`ol`; `data-raster` on a `section`; unresolvable or generic-only font stacks.
+`script`, `iframe`, `object`, `embed`, `canvas`, `input`, `button`, `select`, `textarea`, `details`, `summary`, `dialog`, `marquee` (`VALIDATE_ELEMENT`); `hyphens: auto`, `text-wrap: balance|pretty`, vertical `writing-mode`, `column-count`/`column-width`, `text-orientation`, `font-size-adjust`, `font-stretch` (`VALIDATE_TEXT_CSS`); `position: fixed|sticky`, `zoom`, `@page` (`VALIDATE_POSITION`); content outside sections; unknown `deckflip:*` meta; missing assets and remote assets other than stylesheets and `@font-face` fonts (those are pinned in `<name>.assets/fonts/`); `li` with block content beyond one `p` and one nested list, or deeper than nine levels; table cells with block content beyond `p`/`ul`/`ol`; `data-raster` on a `section`; unresolvable or generic-only font stacks.
 
 ## Text box mapping in one page
 

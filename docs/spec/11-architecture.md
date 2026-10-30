@@ -9,12 +9,13 @@ Node >= 20.16, TypeScript strict, ESM, single npm package `deckflip` with a `bin
 | `playwright-core` | Chromium measurement, screenshots, raster capture | pinned browser revision; no bundled download at install time |
 | `jszip` | OPC container read/write | folder API, used by `docx`/`exceljs`; ZIP64 write not needed (media stays under 4 GB) |
 | `saxes` | XML parsing of existing parts | strict, namespace-aware, event-based: preserves everything we do not model |
-| `fontkit` | font file parsing (`name`, `OS/2`, `hhea`, `fsType`) | pure JS, TTF/OTF/WOFF |
+| `fontkit` | font file parsing (`name`, `OS/2`, `hhea`, `fsType`, `cmap`) | pure JS, TTF/OTF/WOFF |
+| `wawoff2` | WOFF2 to sfnt for Deck font assets | google/woff2 as WebAssembly, the decoder Chromium uses |
 | `commander` | CLI parsing | boring |
 | `pdfjs-dist` + `@napi-rs/canvas` | rasterising LibreOffice PDFs | no poppler dependency |
 | `odiff-bin` (dev) | corpus comparator | SIMD, `diffPercentage`, ignore regions |
 
-Hand-rolled: `[Content_Types].xml` and `.rels` bookkeeping, the XML serializer (fixed attribute order, `xml:space`, escaping), EMU/pt/px math (`1 px = 9525 EMU = 0.75 pt`), and the platform font-directory scan. Font embedding remains unimplemented; its format contract waits for #33.
+Hand-rolled: `[Content_Types].xml` and `.rels` bookkeeping, the XML serializer (fixed attribute order, `xml:space`, escaping), EMU/pt/px math (`1 px = 9525 EMU = 0.75 pt`), the platform font-directory scan, the `@font-face`/`@import` stylesheet scanner and the WOFF 1.0 decoder. Font embedding remains unimplemented; #33 settled its format contract.
 
 ## Modules
 
@@ -26,8 +27,9 @@ src/
     load.ts     Deck file / directory / per-file Slide documents, asset resolution
     validate.ts static checks (elements, meta, assets) + measured checks (slide size, fonts)
     measure.ts  Playwright session: computed styles, boxes, line boxes, marker widths -> IDM
+    fonts.ts    Deck font session: stylesheet/font requests answered from Deck files, downloads and pins
     raster.ts   isolated captures
-  fonts/        CSS matching, asset/face identity, legacy Office family/RIBBI, classification and metrics
+  fonts/        CSS matching, asset acquisition/pinning/decoding, asset/face identity, legacy Office family/RIBBI, classification, metrics, fallback audit
   ooxml/
     opc.ts      package read/write over jszip, part naming, rels
     xml.ts      serializer + saxes-based reader into a small typed tree

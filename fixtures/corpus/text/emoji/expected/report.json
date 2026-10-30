@@ -1,1 +1,24 @@
-[]
+[
+  {
+    "code": "FONT_GLYPH_FALLBACK",
+    "kind": "substituted",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(1)"
+    },
+    "reason": "Verdana (Verdana) has no glyph for U+304B か, U+306A な, U+5B57 字, U+6F22 漢, U+1F600 😀, U+1F63A 😺, U+1F680 🚀; Chromium drew them with AppleColorEmoji (3 glyphs), HiraginoSans-W3 (2 glyphs), PingFangSC-Regular (2 glyphs)",
+    "hint": "Use a face of Verdana that covers every character, or remove the characters; a unicode-range subset covers only its range"
+  },
+  {
+    "code": "FONT_GLYPH_FALLBACK",
+    "kind": "substituted",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(2)"
+    },
+    "reason": "Verdana (Verdana) has no glyph for U+4E2D 中, U+6587 文, U+65E5 日, U+672C 本, U+8A9E 語, U+1F44D 👍; Chromium drew them with AppleColorEmoji (1 glyph), PingFangSC-Regular (5 glyphs)",
+    "hint": "Use a face of Verdana that covers every character, or remove the characters; a unicode-range subset covers only its range"
+  }
+]

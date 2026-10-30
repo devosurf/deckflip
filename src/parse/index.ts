@@ -98,7 +98,6 @@ export async function parsePptx(bytes: Uint8Array): Promise<Deck> {
     lang: core.lang,
     canvas,
     slides,
-    fontFaces: [],
   };
 }
 

@@ -14,7 +14,7 @@ function resolvedFont(): ResolvedFont {
   return {
     cssFamily: 'Resolved',
     aliases: ['Resolved'],
-    asset: { file: '/fonts/resolved.ttf', sha256: 'fixture', faceIndex: 0, postscriptName: 'Resolved-Regular' },
+    asset: { sha256: 'fixture', faceIndex: 0, postscriptName: 'Resolved-Regular', source: { kind: 'installed', file: '/fonts/resolved.ttf' } },
     office: { family: 'Resolved', style: 'regular' },
     class: 'installed',
     metrics: { ascender: 1854 / 2048, descender: 434 / 2048 },
@@ -68,7 +68,6 @@ function deck(): Deck {
     title: 'Emit smoke test',
     lang: 'en-US',
     canvas: { width: 1280, height: 720, source: 'default' },
-    fontFaces: [],
     slides: [
       {
         index: 1,

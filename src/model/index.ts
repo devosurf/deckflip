@@ -10,19 +10,11 @@ export interface Canvas {
   source: 'default' | 'deck-meta' | 'flag';
 }
 
-export interface DeckFontFace {
-  family: string;
-  file: string;
-  weight?: number;
-  italic?: boolean;
-}
-
 export interface Deck {
   title: string;
   lang: string;
   canvas: Canvas;
   slides: Slide[];
-  fontFaces: DeckFontFace[];
 }
 
 export interface Slide {
@@ -302,6 +294,8 @@ export interface RunStyle {
   font?: ResolvedFont;
   /** numeric computed `font-weight` */
   weight: number;
+  /** computed `font-stretch` percentage; absent at normal (100) */
+  stretch?: number;
   /** CSS px */
   size: number;
   bold: boolean;
@@ -336,12 +330,25 @@ export interface OfficeFontIdentity {
   style: OfficeFontStyle;
 }
 
+export type FontFormat = 'ttf' | 'otf' | 'ttc' | 'woff' | 'woff2';
+
+/** Where a selected face's bytes came from: an installed face, or a Deck-provided `@font-face` source. */
+export type FontSource =
+  | { kind: 'installed'; file: string }
+  /** a local font file the Deck references; `sha256` is the file's, before any WOFF/WOFF2 decoding */
+  | { kind: 'file'; file: string; format: FontFormat; sha256: string }
+  /** a downloaded file: `url` keeps no credentials or query values; `pinned` is its frozen copy in the Asset directory */
+  | { kind: 'remote'; url: string; format: FontFormat; sha256: string; pinned?: string }
+  /** a `data:` URI in the Deck's CSS */
+  | { kind: 'data'; format: FontFormat; sha256: string };
+
 export interface FontAsset {
-  file: string;
+  /** SHA-256 of the face's sfnt bytes, decoded from WOFF/WOFF2 where supplied so: the asset identity */
   sha256: string;
   /** Zero-based face in a collection; zero for a standalone font. */
   faceIndex: number;
   postscriptName: string;
+  source: FontSource;
 }
 
 export interface ResolvedFont {
@@ -354,6 +361,8 @@ export interface ResolvedFont {
   metrics: FontMetrics;
   /** OS/2 fsType; embedding permission */
   fsType: number;
+  /** The declared `unicode-range` of a Deck-provided subset face; absent when the face covers every code point it has. */
+  unicodeRange?: string;
 }
 
 /** Every text body an element owns, with the owner's selector and name to report against: shapes have at most one, tables one per origin cell, groups recurse. */

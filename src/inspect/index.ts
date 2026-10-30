@@ -1,8 +1,8 @@
 // IDM -> inspect JSON (docs/spec/09-inspect.md). Structure only: an agent checks bounds, kinds and provenance
 // without rendering. The full schema is frozen in milestone 5; today's shape is the subset convert already knows.
 
+import { resolvedFontsOf } from '../fonts/index.js';
 import type { Deck, Element, ResolvedFont, TextBody } from '../model/index.js';
-import { textBodiesOf } from '../model/index.js';
 
 export interface InspectElement {
   kind: 'group' | 'picture' | 'table' | 'shape' | 'text' | 'opaque';
@@ -35,7 +35,7 @@ export function inspectDeck(deck: Deck): InspectDocument {
       name: slide.name,
       elements: slide.elements.map(inspectElement),
     })),
-    fonts: uniqueFonts(deck),
+    fonts: resolvedFontsOf(deck),
   };
 }
 
@@ -72,24 +72,4 @@ function previewText(body: TextBody): string {
     text += '\n';
   }
   return text.trimEnd().slice(0, 120);
-}
-
-function uniqueFonts(deck: Deck): ResolvedFont[] {
-  const fonts = new Map<string, ResolvedFont>();
-  for (const slide of deck.slides) {
-    for (const element of slide.elements) {
-      for (const { body } of textBodiesOf(element)) {
-        for (const paragraph of body.paragraphs) {
-          for (const run of paragraph.runs) {
-            if (run.kind !== 'text' || run.style.font === undefined) {
-              continue;
-            }
-            const { asset } = run.style.font;
-            fonts.set(`${asset.sha256}:${asset.faceIndex}`, run.style.font);
-          }
-        }
-      }
-    }
-  }
-  return [...fonts.values()];
 }

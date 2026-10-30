@@ -20,8 +20,8 @@ function runs(deck: Deck) {
 }
 
 it('keeps authored browser weights when Office regular names a Medium or ExtraBold face', async () => {
-  const { deck } = await measureDeck(await loadDeck('fixtures/corpus/fonts/office-identity/deck.html', {}), { browser });
-  const catalog = await FontCatalog.scan({ deckFaces: deck.fontFaces, system: false });
+  const { deck, fonts } = await measureDeck(await loadDeck('fixtures/corpus/fonts/office-identity/deck.html', {}), { browser });
+  const catalog = await FontCatalog.scan({ declared: fonts.declared, system: false });
   expect(runs(deck).map((run) => [run.text, run.style.weight])).toEqual([
     ['Heebo Medium editable', 500], ['Heebo Bold editable', 700], ['Heebo ExtraBold editable', 800],
     ['Source Sans Regular editable', 400], ['Source Sans Bold editable', 700],
@@ -46,8 +46,8 @@ it('uses the base default only for unstyled text and preserves authored inherita
       @font-face { font-family: Heebo; font-weight: 500; src: url('${medium}'); }
       </style></head><body><section><p>Default</p>
       <div style="font-family: Heebo; font-weight: 500"><span>Inherited</span></div></section></body></html>`);
-    const { deck } = await measureDeck(await loadDeck(input, {}), { browser });
-    const catalog = await FontCatalog.scan({ deckFaces: deck.fontFaces, system: false });
+    const { deck, fonts } = await measureDeck(await loadDeck(input, {}), { browser });
+    const catalog = await FontCatalog.scan({ declared: fonts.declared, system: false });
     const entries = resolveDeckFonts(deck, catalog, { embedFonts: false });
     expect(entries.filter((entry) => entry.severity === 'error')).toEqual([]);
     expect(runs(deck).map((run) => [run.text, run.style.fontStack, run.style.weight, run.style.font?.office])).toEqual([

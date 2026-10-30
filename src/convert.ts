@@ -2,7 +2,7 @@ import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, join } from 'node:path';
 import type { Browser } from 'playwright-core';
 import { emitPptx } from './emit/index.js';
-import { FontCatalog, resolveDeckFonts } from './fonts/index.js';
+import { auditVisibleFonts, FontCatalog, resolveDeckFonts, resolvedFontsOf } from './fonts/index.js';
 import type { BrowserCensus } from './html/browser-script.js';
 import { loadDeck } from './html/load.js';
 import { measureDeck, type MeasuredDeckResult } from './html/measure.js';
@@ -110,11 +110,12 @@ async function runHtmlPipeline(
     opts.browser ?? (await launchChromium({ ...(opts.browserPath === undefined ? {} : { browserPath: opts.browserPath }), offline: opts.offline }));
   try {
     const measured = await measureDeck(loaded, { browser, rasterDpi: opts.rasterDpi });
-    const catalog = await FontCatalog.scan({ deckFaces: measured.deck.fontFaces });
-    const fontEntries = resolveDeckFonts(measured.deck, catalog, { embedFonts: opts.embedFonts });
+    const catalog = await FontCatalog.scan({ declared: measured.fonts.declared });
+    const fontEntries = [...resolveDeckFonts(measured.deck, catalog, { embedFonts: opts.embedFonts }), ...auditVisibleFonts(measured.visibleText, catalog)];
     const roundTrip = await resolveRoundTrip(measured.deck, measured.sections, loaded.deckFile);
     const entries = [...baseEntries, ...measured.entries, ...fontEntries, ...roundTrip.entries];
-    const report = buildReport(reportBase(input, outputPath, loaded.canvas, chromiumVersion(browser), mode), entries, measured.deck.slides.length, nativeCount(measured.deck));
+    const base = { ...reportBase(input, outputPath, loaded.canvas, chromiumVersion(browser), mode), fonts: resolvedFontsOf(measured.deck) };
+    const report = buildReport(base, entries, measured.deck.slides.length, nativeCount(measured.deck));
     return hasError(entries) ? { report } : { report, deck: measured.deck, census: measured.census, roundTrip };
   } finally {
     if (opts.browser === undefined) await browser.close();
@@ -186,9 +187,9 @@ export async function convertPptxToHtml(input: string, opts: ConvertToHtmlOption
   const bytes = new Uint8Array(await readFile(input));
   const deck = await parsePptx(bytes);
   const source = await indexSource(await OpcReader.load(bytes));
-  const catalog = await FontCatalog.scan({ extraFiles: [] });
+  const catalog = await FontCatalog.scan();
   const entries = [...resolveDeckFonts(deck, catalog, { embedFonts: opts.embedFonts ?? false }), ...sourceEntries(deck, source)];
-  const base = { ...reportBase(input, outputPath, deck.canvas, undefined, 'convert'), input: { path: input, kind: 'pptx' as const }, output: { path: outputPath, kind: 'html' as const } };
+  const base = { ...reportBase(input, outputPath, deck.canvas, undefined, 'convert'), input: { path: input, kind: 'pptx' as const }, output: { path: outputPath, kind: 'html' as const }, fonts: resolvedFontsOf(deck) };
   if (hasError(entries)) {
     const report = buildReport(base, entries, deck.slides.length, nativeCount(deck));
     await writeSidecar(report, reportPath);
@@ -220,9 +221,9 @@ export async function validatePptx(input: string, opts: { report?: string; embed
   const bytes = new Uint8Array(await readFile(input));
   const deck = await parsePptx(bytes);
   const source = await indexSource(await OpcReader.load(bytes));
-  const catalog = await FontCatalog.scan({ extraFiles: [] });
+  const catalog = await FontCatalog.scan();
   const entries = [...resolveDeckFonts(deck, catalog, { embedFonts: opts.embedFonts ?? false }), ...sourceEntries(deck, source)];
-  const base = { ...reportBase(input, undefined, deck.canvas, undefined, 'validate'), input: { path: input, kind: 'pptx' as const } };
+  const base = { ...reportBase(input, undefined, deck.canvas, undefined, 'validate'), input: { path: input, kind: 'pptx' as const }, fonts: resolvedFontsOf(deck) };
   const report = buildReport(base, entries, deck.slides.length, nativeCount(deck));
   if (opts.report !== undefined) await writeSidecar(report, opts.report);
   return { report, exitCode: hasError(entries) ? 2 : 0 };
