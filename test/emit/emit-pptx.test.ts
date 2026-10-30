@@ -16,7 +16,6 @@ function resolvedFont(): ResolvedFont {
     aliases: ['Resolved'],
     asset: { sha256: 'fixture', faceIndex: 0, postscriptName: 'Resolved-Regular', source: { kind: 'installed', file: '/fonts/resolved.ttf' } },
     office: { family: 'Resolved', style: 'regular' },
-    class: 'installed',
     metrics: { ascender: 1854 / 2048, descender: 434 / 2048 },
     fsType: 0,
   };
@@ -134,8 +133,8 @@ function notes(text: string): TextBody {
 
 describe('emitPptx', () => {
   it('emits reproducible PPTX bytes and the expected slide XML', async () => {
-    const pptx = await emitPptx(deck(), { created, appVersion: '1.2.3' });
-    const again = await emitPptx(deck(), { created, appVersion: '1.2.3' });
+    const pptx = await emitPptx(deck(), { embedFonts: false, created, appVersion: '1.2.3' });
+    const again = await emitPptx(deck(), { embedFonts: false, created, appVersion: '1.2.3' });
 
     expect(Buffer.compare(pptx, again)).toBe(0);
     expect(await zipEntries(pptx)).toEqual([
@@ -170,7 +169,7 @@ describe('emitPptx', () => {
     notesDeck.slides[0]!.notes = notes('Remember the margin');
     notesDeck.slides.push({ index: 2, id: 'slide-2', name: 'Slide 2', layout: 'Blank', elements: [] });
 
-    const pptx = await emitPptx(notesDeck, { created, appVersion: '1.2.3' });
+    const pptx = await emitPptx(notesDeck, { embedFonts: false, created, appVersion: '1.2.3' });
     // the second Slide has no notes, so it gets no notes slide
     expect((await zipEntries(pptx)).filter((name) => name.toLowerCase().includes('notes'))).toEqual([
       'ppt/notesMasters/notesMaster1.xml',
@@ -196,7 +195,7 @@ describe('emitPptx', () => {
   it('gives the notes master a theme part of its own, since PowerPoint repairs a deck whose masters share one', async () => {
     const notesDeck = deck();
     notesDeck.slides[0]!.notes = notes('Remember the margin');
-    const zip = await JSZip.loadAsync(await emitPptx(notesDeck, { created, appVersion: '1.2.3' }));
+    const zip = await JSZip.loadAsync(await emitPptx(notesDeck, { embedFonts: false, created, appVersion: '1.2.3' }));
     const themeTarget = async (rels: string): Promise<string> =>
       /<Relationship [^>]*Type="[^"]*\/theme" Target="([^"]+)"/.exec(await zip.file(rels)!.async('string'))?.[1] ?? '';
 
@@ -218,7 +217,7 @@ describe('emitPptx', () => {
       { ...first, index: 3, id: 'slide-3', name: 'Slide 3', section: 'Body' },
     ];
 
-    const zip = await JSZip.loadAsync(await emitPptx(sectioned, { created, appVersion: '1.2.3' }));
+    const zip = await JSZip.loadAsync(await emitPptx(sectioned, { embedFonts: false, created, appVersion: '1.2.3' }));
     const presentation = await zip.file('ppt/presentation.xml')!.async('string');
     const list = /<p14:sectionLst xmlns:p14="http:\/\/schemas\.microsoft\.com\/office\/powerpoint\/2010\/main">(.*)<\/p14:sectionLst>/.exec(presentation)?.[1];
     expect(list?.replace(/ id="\{[0-9A-F-]+\}"/g, '')).toBe(
@@ -234,7 +233,7 @@ describe('emitPptx', () => {
     const first = sectioned.slides[0]!;
     sectioned.slides = [{ ...first }, { ...first, index: 2, id: 'slide-2', name: 'Slide 2', section: 'Body' }];
 
-    const presentation = await (await JSZip.loadAsync(await emitPptx(sectioned, { created, appVersion: '1.2.3' }))).file('ppt/presentation.xml')!.async('string');
+    const presentation = await (await JSZip.loadAsync(await emitPptx(sectioned, { embedFonts: false, created, appVersion: '1.2.3' }))).file('ppt/presentation.xml')!.async('string');
     expect(presentation).toContain('<p14:section name="Default Section"');
     expect(presentation).toContain('<p14:section name="Body"');
   });
@@ -247,7 +246,7 @@ describe('emitPptx', () => {
     body.paragraphs.push({ ...body.paragraphs[0]!, align: 'ctr', runs: [{ kind: 'text', text: 'Loudly', style: runStyle({ bold: true, italic: true, link: 'https://example.com/' }) }] });
     notesDeck.slides[0]!.notes = body;
 
-    const zip = await JSZip.loadAsync(await emitPptx(notesDeck, { created, appVersion: '1.2.3' }));
+    const zip = await JSZip.loadAsync(await emitPptx(notesDeck, { embedFonts: false, created, appVersion: '1.2.3' }));
     const notesXml = await zip.file('ppt/notesSlides/notesSlide1.xml')!.async('string');
     // nothing in a notes body was ever measured in a browser: an exact line, a fixed gap, a typeface or a
     // size here would override the notes page the deck was authored on
@@ -270,7 +269,7 @@ describe('emitPptx', () => {
     body.paragraphs[0]!.bullet = { type: 'char', char: '\u2022', color: { hex: 'FF0000', alpha: 1 }, sizePct: 100 };
     notesDeck.slides[0]!.notes = body;
 
-    const zip = await JSZip.loadAsync(await emitPptx(notesDeck, { created, appVersion: '1.2.3' }));
+    const zip = await JSZip.loadAsync(await emitPptx(notesDeck, { embedFonts: false, created, appVersion: '1.2.3' }));
     const notesXml = await zip.file('ppt/notesSlides/notesSlide1.xml')!.async('string');
     // the item stays an item: the notes pane shows the marker its markup asked for
     expect(notesXml).toContain('<a:buFontTx/><a:buChar char="\u2022"/>');
@@ -283,7 +282,7 @@ describe('emitPptx', () => {
     // everything the emitter leaves out comes from the master's `p:bodyStyle` and the layout's autofit
     shapeAt(phDeck, 1).placeholder = 'body:1';
 
-    const zip = await JSZip.loadAsync(await emitPptx(phDeck, { created, appVersion: '1.2.3' }));
+    const zip = await JSZip.loadAsync(await emitPptx(phDeck, { embedFonts: false, created, appVersion: '1.2.3' }));
     const slideXml = await zip.file('ppt/slides/slide1.xml')!.async('string');
     const placeholder = slideXml.split('<p:sp>').find((fragment) => fragment.includes('<p:ph type="body" idx="1"/>'))!;
 
@@ -316,7 +315,7 @@ describe('emitPptx', () => {
       paragraph({ indent: 0, marginLeft: 0 }),
     ];
 
-    const zip = await JSZip.loadAsync(await emitPptx(listDeck, { created, appVersion: '1.2.3' }));
+    const zip = await JSZip.loadAsync(await emitPptx(listDeck, { embedFonts: false, created, appVersion: '1.2.3' }));
     const slideXml = await zip.file('ppt/slides/slide1.xml')!.async('string');
     const pPrs = slideXml.match(/<a:pPr[^>]*>.*?<\/a:pPr>/g)!;
 
@@ -354,7 +353,7 @@ describe('emitPptx', () => {
     const text = shapeAt(gradientDeck, 1);
     text.fill = { type: 'gradient', kind: 'radial', stops: [{ position: 0, color: { hex: 'FFFFFF', alpha: 1 } }, { position: 0.3, color: { hex: '000000', alpha: 1 } }] };
 
-    const zip = await JSZip.loadAsync(await emitPptx(gradientDeck, { created, appVersion: '1.2.3' }));
+    const zip = await JSZip.loadAsync(await emitPptx(gradientDeck, { embedFonts: false, created, appVersion: '1.2.3' }));
     const slideXml = await zip.file('ppt/slides/slide1.xml')!.async('string');
 
     // CSS 135deg (to bottom-right) is DrawingML 45deg: ang counts clockwise from "to right".
@@ -375,7 +374,7 @@ describe('emitPptx', () => {
     // tiles at half the natural size, the first one offset by 20x10 px
     shapeAt(imageDeck, 1).fill = { type: 'image', media: { data: png, contentType: 'image/png' }, tile: { x: 20, y: 10, scaleX: 0.5, scaleY: 0.5 } };
 
-    const pptx = await emitPptx(imageDeck, { created, appVersion: '1.2.3' });
+    const pptx = await emitPptx(imageDeck, { embedFonts: false, created, appVersion: '1.2.3' });
     const zip = await JSZip.loadAsync(pptx);
     const slideXml = await zip.file('ppt/slides/slide1.xml')!.async('string');
     const rels = await zip.file('ppt/slides/_rels/slide1.xml.rels')!.async('string');
@@ -391,7 +390,7 @@ describe('emitPptx', () => {
     shapeAt(shadowDeck, 0).shadow = { inset: false, offsetX: 4, offsetY: 6, blur: 12, color: { hex: '000000', alpha: 0.3 } };
     shapeAt(shadowDeck, 1).shadow = { inset: true, offsetX: 0, offsetY: 2, blur: 4, color: { hex: '000000', alpha: 1 } };
 
-    const zip = await JSZip.loadAsync(await emitPptx(shadowDeck, { created, appVersion: '1.2.3' }));
+    const zip = await JSZip.loadAsync(await emitPptx(shadowDeck, { embedFonts: false, created, appVersion: '1.2.3' }));
     const slideXml = await zip.file('ppt/slides/slide1.xml')!.async('string');
 
     // dist = hypot(4, 6) px = 7.2111 px = 68686 EMU; dir = atan2(6, 4) = 56.3099deg = 3378596
@@ -407,7 +406,7 @@ describe('emitPptx', () => {
       left: { width: 2, color: { hex: '0000FF', alpha: 1 }, dash: 'dash' },
     };
 
-    const zip = await JSZip.loadAsync(await emitPptx(borderDeck, { created, appVersion: '1.2.3' }));
+    const zip = await JSZip.loadAsync(await emitPptx(borderDeck, { embedFonts: false, created, appVersion: '1.2.3' }));
     const slideXml = await zip.file('ppt/slides/slide1.xml')!.async('string');
 
     // the shape itself keeps its full border box and no line
@@ -427,7 +426,7 @@ describe('emitPptx', () => {
     const radiiDeck = deck();
     shapeAt(radiiDeck, 0).geometry = { preset: 'custom', radii: { tl: { x: 20, y: 20 }, tr: { x: 0, y: 0 }, br: { x: 40, y: 40 }, bl: { x: 10, y: 5 } } };
 
-    const zip = await JSZip.loadAsync(await emitPptx(radiiDeck, { created, appVersion: '1.2.3' }));
+    const zip = await JSZip.loadAsync(await emitPptx(radiiDeck, { embedFonts: false, created, appVersion: '1.2.3' }));
     const slideXml = await zip.file('ppt/slides/slide1.xml')!.async('string');
 
     expect(slideXml).toContain(
@@ -472,7 +471,7 @@ describe('emitPptx', () => {
       },
     ];
 
-    const pptx = await emitPptx(pictureDeck, { created, appVersion: '1.2.3' });
+    const pptx = await emitPptx(pictureDeck, { embedFonts: false, created, appVersion: '1.2.3' });
     const zip = await JSZip.loadAsync(pptx);
     const slideXml = await zip.file('ppt/slides/slide1.xml')!.async('string');
     const rels = await zip.file('ppt/slides/_rels/slide1.xml.rels')!.async('string');
@@ -518,7 +517,7 @@ describe('emitPptx', () => {
     });
     rasterDeck.slides[0]!.elements = [raster('#a'), raster('#b')];
 
-    const pptx = await emitPptx(rasterDeck, { created, appVersion: '1.2.3' });
+    const pptx = await emitPptx(rasterDeck, { embedFonts: false, created, appVersion: '1.2.3' });
     const media = (await zipEntries(pptx)).filter((name) => name.startsWith('ppt/media/'));
     expect(media).toHaveLength(1);
     expect(media[0]).toMatch(/^ppt\/media\/raster-[0-9a-f]{16}\.png$/);
@@ -535,7 +534,7 @@ describe('emitPptx', () => {
       { kind: 'text', text: 'out', style: runStyle({ link: 'https://example.com/' }) },
     ];
 
-    const pptx = await emitPptx(linkDeck, { created, appVersion: '1.2.3' });
+    const pptx = await emitPptx(linkDeck, { embedFonts: false, created, appVersion: '1.2.3' });
     const zip = await JSZip.loadAsync(pptx);
     const slideXml = await zip.file('ppt/slides/slide1.xml')!.async('string');
     const rels = await zip.file('ppt/slides/_rels/slide1.xml.rels')!.async('string');
@@ -580,7 +579,7 @@ describe('emitPptx', () => {
       },
     ];
 
-    const zip = await JSZip.loadAsync(await emitPptx(tableDeck, { created, appVersion: '1.2.3' }));
+    const zip = await JSZip.loadAsync(await emitPptx(tableDeck, { embedFonts: false, created, appVersion: '1.2.3' }));
     const slideXml = await zip.file('ppt/slides/slide1.xml')!.async('string');
 
     expect(slideXml).toContain(
@@ -615,7 +614,7 @@ describe('emitPptx', () => {
       },
     ];
 
-    const zip = await JSZip.loadAsync(await emitPptx(phDeck, { created, appVersion: '1.2.3' }));
+    const zip = await JSZip.loadAsync(await emitPptx(phDeck, { embedFonts: false, created, appVersion: '1.2.3' }));
     const slideXml = await zip.file('ppt/slides/slide1.xml')!.async('string');
     expect(slideXml).toContain('<p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvGraphicFramePr>');
   });
@@ -635,7 +634,7 @@ describe('emitPptx', () => {
       },
     ];
 
-    const zip = await JSZip.loadAsync(await emitPptx(groupDeck, { created, appVersion: '1.2.3' }));
+    const zip = await JSZip.loadAsync(await emitPptx(groupDeck, { embedFonts: false, created, appVersion: '1.2.3' }));
     const slideXml = await zip.file('ppt/slides/slide1.xml')!.async('string');
 
     expect(slideXml).toContain(
@@ -653,7 +652,7 @@ describe('emitPptx', () => {
     shapeAt(roundedDeck, 0).geometry = { preset: 'roundRect', radius: 10 };
     shapeAt(roundedDeck, 1).geometry = { preset: 'roundRect', radius: 20 };
 
-    const zip = await JSZip.loadAsync(await emitPptx(roundedDeck, { created, appVersion: '1.2.3' }));
+    const zip = await JSZip.loadAsync(await emitPptx(roundedDeck, { embedFonts: false, created, appVersion: '1.2.3' }));
     const slideXml = await zip.file('ppt/slides/slide1.xml')!.async('string');
 
     // text-free: the preset keeps the shape editable as a rounded rectangle
@@ -667,7 +666,7 @@ describe('emitPptx', () => {
   it.skipIf(!sofficeAvailable)('opens in LibreOffice and converts to PDF', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'deckflip-emit-'));
     const pptxPath = join(dir, 'deck.pptx');
-    await writeFile(pptxPath, await emitPptx(deck(), { created, appVersion: '1.2.3' }));
+    await writeFile(pptxPath, await emitPptx(deck(), { embedFonts: false, created, appVersion: '1.2.3' }));
 
     const result = spawnSync('soffice', ['--headless', '--convert-to', 'pdf', '--outdir', dir, pptxPath], {
       encoding: 'utf8',

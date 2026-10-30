@@ -1,24 +1,46 @@
 [
   {
+    "code": "FONT_NOT_EMBEDDED",
+    "kind": "flagged",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(1)"
+    },
+    "reason": "Verdana (Verdana) is not embedded; recipients need this exact face installed",
+    "hint": "Install Verdana on every recipient machine, or remove --no-embed-fonts to produce portable editable output"
+  },
+  {
+    "code": "FONT_EMBED_COVERAGE",
+    "kind": "flagged",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(1)"
+    },
+    "reason": "Verdana (Verdana) has no cmap glyph for U+304B か, U+306A な, U+4E2D 中, U+5B57 字, U+6587 文, U+65E5 日, U+672C 本, U+6F22 漢, U+8A9E 語, U+1F44D 👍, U+1F600 😀, U+1F63A 😺, U+1F680 🚀",
+    "hint": "Supply the complete font file for Verdana covering every listed character; web subsets cannot be merged into one Office family/style slot"
+  },
+  {
     "code": "FONT_GLYPH_FALLBACK",
-    "kind": "substituted",
+    "kind": "flagged",
     "severity": "warning",
     "slide": 1,
     "locator": {
       "selector": "section:nth-of-type(1) > p:nth-child(1)"
     },
     "reason": "Verdana (Verdana) has no glyph for U+304B か, U+306A な, U+5B57 字, U+6F22 漢, U+1F600 😀, U+1F63A 😺, U+1F680 🚀; Chromium drew them with AppleColorEmoji (3 glyphs), HiraginoSans-W3 (2 glyphs), PingFangSC-Regular (2 glyphs)",
-    "hint": "Use a face of Verdana that covers every character, or remove the characters; a unicode-range subset covers only its range"
+    "hint": "Supply the complete font file for Verdana covering every character; unaccounted Chromium glyph fallback cannot be reproduced by embedding the selected face"
   },
   {
     "code": "FONT_GLYPH_FALLBACK",
-    "kind": "substituted",
+    "kind": "flagged",
     "severity": "warning",
     "slide": 1,
     "locator": {
       "selector": "section:nth-of-type(1) > p:nth-child(2)"
     },
     "reason": "Verdana (Verdana) has no glyph for U+4E2D 中, U+6587 文, U+65E5 日, U+672C 本, U+8A9E 語, U+1F44D 👍; Chromium drew them with AppleColorEmoji (1 glyph), PingFangSC-Regular (5 glyphs)",
-    "hint": "Use a face of Verdana that covers every character, or remove the characters; a unicode-range subset covers only its range"
+    "hint": "Supply the complete font file for Verdana covering every character; unaccounted Chromium glyph fallback cannot be reproduced by embedding the selected face"
   }
 ]

@@ -177,7 +177,7 @@ export function measureSlideDocument(blockedImages: string[]): BrowserMeasureRes
   const unreportedImages = new Set(blockedImages);
   /**
    * How far PowerPoint for Mac's line widths stray from Chromium's (spec 04 "Wrap-width guard"): a pixel plus
-   * 0.12 px per em of line length either way. Measured over six safe fonts at 10-32 px, lines of 30-40 em strayed by
+   * 0.12 px per em of line length either way. Measured over six concrete families at 10-32 px, lines of 30-40 em strayed by
    * up to 0.12 px per em (the gap is per-glyph rounding, so it grows with the line), short lines by under a pixel.
    */
   const WRAP_TOLERANCE_PX = 1;

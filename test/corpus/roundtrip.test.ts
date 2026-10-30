@@ -89,7 +89,7 @@ describe.skipIf(!browserAvailable)('roundtrip corpus: PPTX -> IDM -> PPTX part i
       const first = await readFile(firstPath);
 
       const deck = await parsePptx(first);
-      const second = await emitPptx(deck, { created, appVersion: '0.0.0' });
+      const second = await emitPptx(deck, { embedFonts: false, created, appVersion: '0.0.0' });
 
       const before = await slideAndMediaParts(first);
       const after = await slideAndMediaParts(second);

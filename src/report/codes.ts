@@ -91,7 +91,7 @@ export const CODES = {
   FONT_UNRESOLVED: {
     kind: 'error',
     severity: 'error',
-    hint: 'Install {family} or add a safe family such as Arial to the stack',
+    hint: 'Install {family} or supply a concrete font file through @font-face',
   },
   FONT_GENERIC_ONLY: {
     kind: 'error',
@@ -103,25 +103,30 @@ export const CODES = {
     severity: 'error',
     hint: 'Choose a font face with consistent legacy family, subfamily and RIBBI metadata; do not rewrite font tables or remap CSS weights',
   },
-  FONT_NOT_SAFE: {
-    kind: 'substituted',
+  FONT_NOT_EMBEDDED: {
+    kind: 'flagged',
     severity: 'warning',
-    hint: 'Use a safe font, or install the Resolved font on every viewing machine; font embedding is not supported',
-  },
-  FONT_EMBED_UNSUPPORTED: {
-    kind: 'error',
-    severity: 'error',
-    hint: 'Remove --embed-fonts and use a safe font such as Arial, or install the Resolved font on every viewing machine',
+    hint: 'Install {family} on every recipient machine, or remove --no-embed-fonts to produce portable editable output',
   },
   FONT_EMBED_RESTRICTED: {
-    kind: 'substituted',
-    severity: 'warning',
-    hint: 'The licence of {family} forbids embedding; choose another font',
+    kind: 'error',
+    severity: 'error',
+    hint: 'Supply a face of {family} whose licence and fsType permit editable embedding, or use --no-embed-fonts for machine-dependent output',
   },
   FONT_EMBED_FORMAT: {
-    kind: 'substituted',
+    kind: 'error',
+    severity: 'error',
+    hint: 'Supply {family} as a standalone static TTF, OTF, WOFF or WOFF2 file; collection members are not supported for embedding',
+  },
+  FONT_EMBED_COVERAGE: {
+    kind: 'error',
+    severity: 'error',
+    hint: 'Supply the complete font file for {family} covering every listed character; web subsets cannot be merged into one Office family/style slot',
+  },
+  FONT_EMBED_SUBSET: {
+    kind: 'flagged',
     severity: 'warning',
-    hint: 'Provide {family} as TTF, OTF or WOFF',
+    hint: 'Supply the complete font file for {family} for unrestricted editing; additional characters outside the embedded subset may fall back',
   },
   FONT_MISSING_FOR_LAYOUT: {
     kind: 'substituted',
@@ -139,9 +144,9 @@ export const CODES = {
     hint: 'Supply the face as a TTF, OTF, WOFF or WOFF2 file through url(); deckflip never measures local() faces',
   },
   FONT_GLYPH_FALLBACK: {
-    kind: 'substituted',
-    severity: 'warning',
-    hint: 'Use a face of {family} that covers every character, or remove the characters; a unicode-range subset covers only its range',
+    kind: 'error',
+    severity: 'error',
+    hint: 'Supply the complete font file for {family} covering every character; unaccounted Chromium glyph fallback cannot be reproduced by embedding the selected face',
   },
   RASTER_CSS_FILTER: {
     kind: 'rasterised',

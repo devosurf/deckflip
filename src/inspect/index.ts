@@ -2,7 +2,8 @@
 // without rendering. The full schema is frozen in milestone 5; today's shape is the subset convert already knows.
 
 import { resolvedFontsOf } from '../fonts/index.js';
-import type { Deck, Element, ResolvedFont, TextBody } from '../model/index.js';
+import type { Deck, Element, EmbeddedFontMetadata, ResolvedFont, TextBody } from '../model/index.js';
+import { embeddedFontMetadata } from '../parse/fonts.js';
 
 export interface InspectElement {
   kind: 'group' | 'picture' | 'table' | 'shape' | 'text' | 'opaque';
@@ -18,11 +19,17 @@ export interface InspectElement {
   opaque?: { class: 'chart' | 'smartart' | 'ole' | 'vector'; parts: string[] };
 }
 
+/** File inspection describes payload content, not a conversion's preservation decision. */
+export type InspectEmbeddedFont = Omit<EmbeddedFontMetadata, 'embedding'>;
+export type InspectFont = Omit<ResolvedFont, 'embedding'>;
+
 export interface InspectDocument {
   schemaVersion: 1;
   canvas: Deck['canvas'];
   slides: Array<{ index: number; id: string; name: string; elements: InspectElement[] }>;
-  fonts: ResolvedFont[];
+  fonts: InspectFont[];
+  /** Existing package slots; MTX identity is not misrepresented as a decoded Resolved font. */
+  embeddedFonts?: InspectEmbeddedFont[];
 }
 
 export function inspectDeck(deck: Deck): InspectDocument {
@@ -35,7 +42,13 @@ export function inspectDeck(deck: Deck): InspectDocument {
       name: slide.name,
       elements: slide.elements.map(inspectElement),
     })),
-    fonts: resolvedFontsOf(deck),
+    fonts: resolvedFontsOf(deck).map(({ embedding: _embedding, ...font }) => font),
+    ...(deck.embeddedFonts?.length ? {
+      embeddedFonts: deck.embeddedFonts.map((font) => {
+        const { embedding: _embedding, ...metadata } = embeddedFontMetadata(font);
+        return metadata;
+      }),
+    } : {}),
   };
 }
 

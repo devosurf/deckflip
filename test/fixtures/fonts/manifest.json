@@ -1,0 +1,23 @@
+{
+  "origin": "Issue #33 isolated QA proof, PowerPoint for Mac 16.114.2; not customer content",
+  "font": "Heebo Medium 3.100",
+  "licence": "../../../fixtures/corpus/fonts/_assets/heebo/OFL.txt",
+  "files": [
+    {
+      "file": "powerpoint-mtx-all.fntdata",
+      "sha256": "cd96b36db604dc0aa4776e08114461374f28b05f6d1f32d0964ab0e470b5b6a4",
+      "sourcePackage": "prototypes/font-embedding/ref/powerpoint-embed-all.pptx",
+      "sourcePackageSha256": "4805006408c226eb68fa5e22dbd3c3b1264aa53844c62a6ff209674ce814c269",
+      "sourcePart": "/ppt/fonts/font1.fntdata",
+      "flags": 4
+    },
+    {
+      "file": "powerpoint-mtx-subset.fntdata",
+      "sha256": "9c1e23c94bfd76991cc890670576f28074d1e341fd3826fec1f83b92157ec9a3",
+      "sourcePackage": "prototypes/font-embedding/ref/powerpoint-embed-subset.pptx",
+      "sourcePackageSha256": "8e394bb2bce88b43b0939464baf4518ad5c1d79f5637d484022a1d26a421c49c",
+      "sourcePart": "/ppt/fonts/font1.fntdata",
+      "flags": 5
+    }
+  ]
+}

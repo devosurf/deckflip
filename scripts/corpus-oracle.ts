@@ -8,6 +8,7 @@ import { renderPptxPowerPoint } from '../src/render/powerpoint.js';
 import { convertHtmlToPptx } from '../src/convert.js';
 import { VERSION } from '../src/version.js';
 import { ORACLE_RECORD, packageDigest, type OracleRecord } from '../test/corpus/oracle-record.js';
+import { readFixtureConfig } from '../test/corpus/fixture-config.js';
 
 const CORPUS = join('fixtures', 'corpus');
 const POWERPOINT_PLIST = '/Applications/Microsoft PowerPoint.app/Contents/Info.plist';
@@ -42,18 +43,22 @@ async function run(): Promise<void> {
   try {
     for (const { category, name } of await listFixtures(process.argv.slice(2))) {
       const fixtureDir = join(CORPUS, category, name);
+      const config = await readFixtureConfig(fixtureDir);
       const deckPath = join(fixtureDir, 'deck.html');
       const workDir = await mkdtemp(join(tmpdir(), `deckflip-oracle-${name}-`));
       const pptxPath = join(workDir, `${name}.pptx`);
       const { exitCode, report } = await convertHtmlToPptx(deckPath, {
         output: pptxPath,
-        embedFonts: false,
+        embedFonts: config.embedFonts,
         rasterDpi: 192,
         offline: true,
         browser,
       });
       if (exitCode === 5) {
         throw new Error(`${category}/${name} fails Verification; fix that before recording an oracle: ${report.entries.filter((entry) => entry.code.startsWith('VERIFY_')).map((entry) => entry.reason).join('; ')}`);
+      }
+      if (exitCode !== 0) {
+        throw new Error(`${category}/${name} failed conversion (${exitCode}); fix Report entries before recording an oracle: ${report.entries.map((entry) => entry.reason).join('; ')}`);
       }
       const pages = await renderPptxPowerPoint(pptxPath, { dpi: 96 });
       await writeSlides(join(fixtureDir, 'expected', 'powerpoint'), pages);

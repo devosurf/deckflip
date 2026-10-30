@@ -36,7 +36,7 @@ On first use, a missing managed browser is installed automatically. `--offline`,
 - Per-Slide attributes on the section: `id` (stable anchor, `<a href="#id">` jumps to it), `data-title` (slide name in PowerPoint's outline), `data-section="Name"` on the first Slide of a PowerPoint section.
 - Speaker notes: `<aside class="notes">` inside the section; `p`, `ul`/`ol`, `strong`/`em`, `a` allowed.
 - Assets live next to the deck and are referenced relatively (`img src="assets/x.png"`). Remote URLs are an error, except stylesheets and `@font-face` fonts (Google Fonts included), which are downloaded once and pinned in `<name>.assets/fonts/`: keep that directory with the deck. `data:` URIs are fine.
-- Fonts: author a concrete safe family for a clean strict Deck (`font-family: Georgia, "Times New Roman", serif`). Unstyled text uses bundled Liberation Sans 2.1.5: reproducible for authoring, but still `FONT_NOT_SAFE`, not embedded. The template explicitly authors Arial. Safe families, webfonts and pinning are in `reference/fonts.md`.
+- Fonts: name a concrete family or inherit bundled Liberation Sans 2.1.5. Default HTML conversion embeds every used face's exact measured bytes, including installed, supplied and bundled faces; successful packaging appears in `fonts[].embedding`, not a Strict-mode entry. Use `--no-embed-fonts` only for intentional machine-dependent new HTML -> PPTX embedding; source embedded fonts always survive supported round trips, and the flag is invalid for PPTX input (exit 3). Font rights, web subsets, pinning and portability errors: `reference/fonts.md`.
 - Layout is free: flex, grid, absolute, `calc()`, custom properties. Chromium lays the slide out; PowerPoint receives the measured boxes.
 
 ## Authoring rules that avoid entries
@@ -78,6 +78,6 @@ Every code with its trigger and hint: `reference/report-codes.md`.
 
 - `reference/authoring-subset.md`: what is native, rasterised, rejected; the text box mapping in one page.
 - `reference/report-codes.md`: every code, meaning, and the fix it wants.
-- `reference/fonts.md`: the safe set, how a `font-family` stack resolves, embedding.
+- `reference/fonts.md`: exact-face resolution, embedding permissions/errors, web subsets, pinning and the machine-dependent opt-out.
 - `reference/round-trip.md`: editing an existing PPTX once PPTX -> HTML ships.
 - `npx deckflip@latest <convert|validate|verify|render|inspect> --help`: flags and defaults.

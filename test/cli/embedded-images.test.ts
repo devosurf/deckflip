@@ -45,7 +45,7 @@ describe.skipIf(!browserAvailable)('embedded image conversion', () => {
   let browser: Browser;
   beforeAll(async () => { browser = await chromium.launch(); });
   afterAll(async () => { await browser.close(); });
-  const options = { embedFonts: false as const, rasterDpi: 96, offline: true, strict: 'info' as const };
+  const options = { embedFonts: true, rasterDpi: 96, offline: true, strict: 'info' as const };
 
   it('emits the same PNG and JPEG content and geometry for embedded pictures, fills, and local controls', async () => {
     const dir = await workspace();

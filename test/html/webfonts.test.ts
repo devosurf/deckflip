@@ -88,8 +88,8 @@ async function measureFonts(input: string, system: readonly string[] | false = f
   const catalog = await FontCatalog.scan({ declared: measured.fonts.declared, system });
   const entries: Entry[] = [
     ...measured.entries,
-    ...resolveDeckFonts(measured.deck, catalog, { embedFonts: false }),
-    ...auditVisibleFonts(measured.visibleText, catalog),
+    ...resolveDeckFonts(measured.deck, catalog),
+    ...auditVisibleFonts(measured.visibleText, catalog, { embedFonts: false }),
   ];
   return { deck: measured.deck, entries, fonts: resolvedFontsOf(measured.deck) };
 }
@@ -101,7 +101,7 @@ function runs(deck: Deck) {
 }
 
 function withoutPortability(entries: Entry[]): Entry[] {
-  return entries.filter((entry) => entry.code !== 'FONT_NOT_SAFE');
+  return entries.filter((entry) => entry.code !== 'FONT_NOT_EMBEDDED');
 }
 
 it('loads the same pinned faces through local and hosted stylesheets and lays text out alike', async () => {
@@ -160,7 +160,7 @@ it('never lets local() or an installed face of the same family stand in for the 
   // An installed Heebo of another weight is in the catalog; the declared family shadows it, as in Chromium.
   const localFirst = await measureFonts(join(dir, 'local-first.html'), [EXTRABOLD]);
   expect(runs(localFirst.deck).map((run) => run.box)).toEqual(runs(urlOnly.deck).map((run) => run.box));
-  expect(runs(localFirst.deck)[0]!.font).toMatchObject({ class: 'deck-provided', asset: { sha256: MEDIUM_SHA256 }, office: { family: 'Heebo Medium' } });
+  expect(runs(localFirst.deck)[0]!.font).toMatchObject({ asset: { sha256: MEDIUM_SHA256, source: { kind: 'file' } }, office: { family: 'Heebo Medium' } });
   expect(withoutPortability(localFirst.entries)).toEqual([]);
 });
 
@@ -201,7 +201,7 @@ it('loads a data: URI @font-face as a Deck-provided face of its own', async () =
   });
   const { deck, entries } = await measureFonts(join(dir, 'deck.html'));
   expect(withoutPortability(entries)).toEqual([]);
-  expect(runs(deck)[0]!.font).toMatchObject({ class: 'deck-provided', office: { family: 'Heebo Medium' }, asset: { source: { kind: 'data', format: 'woff2' } } });
+  expect(runs(deck)[0]!.font).toMatchObject({ office: { family: 'Heebo Medium' }, asset: { source: { kind: 'data', format: 'woff2' } } });
   expect(JSON.stringify(entries)).not.toContain('base64');
 });
 
@@ -240,7 +240,7 @@ it('flags glyphs the selected face lacks even though Chromium drew them', async 
   });
   const { entries } = await measureFonts(join(dir, 'deck.html'));
   expect(entries).toContainEqual(expect.objectContaining({
-    code: 'FONT_GLYPH_FALLBACK', kind: 'substituted', severity: 'warning',
+    code: 'FONT_GLYPH_FALLBACK', kind: 'flagged', severity: 'warning',
     reason: expect.stringMatching(/^Heebo Medium \(Brand\) has no glyph for U\+5B57 字, U\+6F22 漢; Chromium drew them with \S/),
   }));
 });
@@ -292,7 +292,7 @@ it('matches declared stretch before weight and carries non-normal computed stret
     'bold.ttf': await readFile(BOLD),
   });
   const measured = await measureFonts(join(dir, 'deck.html'));
-  expect(measured.entries.filter((entry) => entry.code.startsWith('FONT_') && entry.code !== 'FONT_NOT_SAFE')).toEqual([]);
+  expect(measured.entries.filter((entry) => entry.code.startsWith('FONT_'))).toEqual([]);
   expect(runs(measured.deck).map((run) => run.font?.office)).toEqual([
     { family: 'Heebo Medium', style: 'regular' }, { family: 'Heebo', style: 'bold' },
   ]);

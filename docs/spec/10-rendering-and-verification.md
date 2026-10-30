@@ -4,7 +4,7 @@ Consolidates the renderer research ([#5](https://github.com/devosurf/deckflip/is
 
 ## Supported host
 
-macOS is the only supported CLI host for now. Windows and Linux implementation paths are retained but are not supported or CI-gated. Cross-platform notes elsewhere in the specs describe retained implementation details or future work, not current release acceptance criteria. This does not change the PPTX format or Safe font policy.
+macOS is the only supported CLI host for now. Windows and Linux implementation paths are retained but are not supported or CI-gated. Cross-platform notes elsewhere in the specs describe retained implementation details or future work, not current release acceptance criteria. This does not change the PPTX format or default portable-embedding policy.
 
 ## Verification
 
@@ -55,17 +55,23 @@ The digest is SHA-256 over the package parts by name, leaving out `docProps/` (t
 
 `fixtures/corpus/<category>/<name>/` with `deck.html` (+ assets; a category may keep shared assets in `fixtures/corpus/<category>/_assets/`, which the oracle script skips) or `source.pptx`, and `expected/` holding `chromium/slide-NNN.png` (generated, not committed), `powerpoint/slide-NNN.png` and `oracle.json` (committed, the PowerPoint oracle and its Oracle record, produced on a Mac with PowerPoint by `npm run corpus:oracle [category[/name] ...]`), `report.json` (committed, the expected entries, never a `VERIFY_*`), and optionally `ignore.json` (`{ "<slide>": [{ "x1", "y1", "x2", "y2" }] }` in CSS px: the comparator's `ignoreRegions` for areas the fixture deliberately renders differently, such as a flattened effect). Categories, each with 3-8 decks:
 
-- `text`: wrapping at boundaries, the wrap-width guard (`wrap-guard`: every first line 0.5 px from its break in four safe fonts at 12 and 20 px; `wrap-guard.test.ts` requires PowerPoint's oracle to end every line where Chromium does), mixed sizes in a line, lists (nested, numbered, `inside`/`outside`), alignment, `pre`, RTL, emoji.
+- `text`: wrapping at boundaries, the wrap-width guard (`wrap-guard`: every first line 0.5 px from its break in four installed fonts at 12 and 20 px; `wrap-guard.test.ts` requires PowerPoint's oracle to end every line where Chromium does), mixed sizes in a line, lists (nested, numbered, `inside`/`outside`), alignment, `pre`, RTL, emoji.
 - `shapes`: fills, gradients, borders (uniform, per-side, dashed), radius, shadows, opacity, rotation.
 - `pictures`: formats, crop via `object-fit`, `clip-path: inset`, SVG file and inline SVG.
 - `tables`: spans, per-edge borders, cell padding, header rows.
 - `layout`: flex and grid compositions, overlapping, off-canvas.
 - `raster`: one deck per `RASTER_*` trigger and its `FLATTEN_*` twin.
-- `fonts`: safe, Office-bundled, deck-provided `@font-face`, embedding, generic-only (expected error).
+- `fonts`: installed, Office-bundled, deck-provided `@font-face`, default embedding, generic-only (expected error).
 - `roundtrip`: PowerPoint-authored decks with charts, SmartArt, notes, sections, animations, comments, groups, placeholders, embedded fonts, a `.pptm`.
 - `templates`: the skill's `templates/` rendered as-is (the skill must pass its own tool with zero warnings).
 
 Renewal: adding a fixture, or changing what a fixture emits, means running `corpus:oracle` for it on a Mac with PowerPoint; the script refuses fixtures that fail Verification. CI regenerates the Chromium side and refuses fixtures without committed `powerpoint/` images, `oracle.json` or `report.json`. Oracle images are regenerated wholesale when the PowerPoint version on the oracle machine changes, in one reviewed commit.
+
+An optional `fixture.json` beside `deck.html` declares conversion settings shared by the corpus gate and oracle generator. Every fixture defaults to `{ "embedFonts": false }`, including when the file or setting is absent; `{ "embedFonts": true }` opts an embedding fixture into the production default. Fixture category/name and Git tracking state never select conversion policy or skip a registered gate. Register a fixture only after its required PowerPoint evidence is available; a registered fixture missing its Oracle record fails.
+
+Existing layout fixtures explicitly use `embedFonts: false`: their Oracle host has the fonts installed, and their emitted packages and Oracle records must stay unchanged. Font-free packages temporarily retain the historical unused `fntdata` content-type declaration solely to preserve Oracle-record digests; actual font parts use `application/x-fontdata`. Remove that inert declaration at the next wholesale Oracle regeneration. The 34 existing records were captured with PowerPoint 16.115; the local 16.116 host is not grounds to regenerate them during #36.
+
+`fonts/embedded` declares `{ "embedFonts": true }` in `fixture.json` and uses unmodified Heebo 500/700/800, Source Sans 3 and bundled-default text in a 1920x1080 layered-CSS Deck. The untracked local fixture remains a QA input, unregistered in `test/corpus/fonts.test.ts`, while its Oracle evidence is pending. Its isolated-host acceptance must bind package identity to the PowerPoint version and a per-face matrix: open with source fonts and same-named Office cloud fonts unavailable, type additional characters, save in place, quit/reopen, and confirm exact faces and retained payloads. Package inspection alone does not close #36; no new Oracle or editability acceptance is claimed before that host run.
 
 The #32 `fonts/office-identity` fixture covers CLI/package identity, authored Chromium weights and an accepted PowerPoint visual gate. On 2026-10-27, an isolated QA Mac running PowerPoint 16.114.2 (bundle 16.114.26102345) with the exact unmodified static faces from `fonts/_assets/manifest.json` edited, saved and reopened all seven native text objects without family/RIBBI changes. Both the original and reopened PDF exports used the seven expected faces without substitution or wrapping. `expected/editability.json` preserves the earlier blocked attempts and this accepted follow-up.
 

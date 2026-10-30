@@ -24,20 +24,6 @@ export interface SizeOverride {
   source: 'flag';
 }
 
-export function parseEmbedFonts(value: boolean | string | undefined): false | true | string[] {
-  if (value === undefined || value === false) {
-    return false;
-  }
-  if (value === true) {
-    return true;
-  }
-  const names = value
-    .split(',')
-    .map((name) => name.trim())
-    .filter((name) => name.length > 0);
-  return names.length === 0 ? true : names;
-}
-
 export function parseSlidesList(value: string): number[] {
   const slides = new Set<number>();
   const tokens = value.split(',').map((token) => token.trim()).filter((token) => token.length > 0);
@@ -82,7 +68,6 @@ export function parseSize(value: string): SizeOverride {
   return { width, height, source: 'flag' };
 }
 
-export const parseEmbedFontsValue = parseEmbedFonts;
 export const parseSizeOverride = parseSize;
 
 function parsePositiveInt(value: string, flag: string): number {
@@ -125,6 +110,9 @@ function printReport(report: Report, options: { json: boolean; quiet: boolean; c
 
 async function handleConvert(input: string, options: ConvertCliOptions): Promise<number> {
   const inputKind = inferKind(input);
+  if (inputKind === 'pptx' && !options.embedFonts) {
+    throw new DeckflipError('--no-embed-fonts is only supported for HTML input; existing PPTX embedded fonts are always preserved', 3);
+  }
   const targetKind = options.to ?? (inputKind === 'html' ? 'pptx' : 'html');
   if (targetKind === inputKind) {
     throw new DeckflipError(`cannot convert ${inputKind} to ${targetKind}`, 3);
@@ -135,14 +123,13 @@ async function handleConvert(input: string, options: ConvertCliOptions): Promise
           ...(options.output === undefined ? {} : { output: options.output }),
           ...(options.report === undefined ? {} : { report: options.report }),
           ...(options.strict === undefined ? {} : { strict: options.strict }),
-          embedFonts: options.embedFonts ?? false,
           ...(options.browser === undefined ? {} : { browserPath: options.browser }),
           offline: options.offline,
         })
       : await convertHtmlToPptx(input, {
           ...(options.output === undefined ? {} : { output: options.output }),
           ...(options.size === undefined ? {} : { size: options.size }),
-          embedFonts: options.embedFonts ?? false,
+          embedFonts: options.embedFonts,
           rasterDpi: options.rasterDpi,
           ...(options.report === undefined ? {} : { report: options.report }),
           ...(options.strict === undefined ? {} : { strict: options.strict }),
@@ -154,12 +141,16 @@ async function handleConvert(input: string, options: ConvertCliOptions): Promise
 }
 
 async function handleValidate(input: string, options: ValidateCliOptions): Promise<number> {
+  const inputKind = inferKind(input);
+  if (inputKind === 'pptx' && !options.embedFonts) {
+    throw new DeckflipError('--no-embed-fonts is only supported for HTML input; existing PPTX embedded fonts are always preserved', 3);
+  }
   const result =
-    inferKind(input) === 'pptx'
-      ? await validatePptx(input, { embedFonts: options.embedFonts ?? false, ...(options.strict === undefined ? {} : { strict: options.strict }) })
+    inputKind === 'pptx'
+      ? await validatePptx(input, { ...(options.strict === undefined ? {} : { strict: options.strict }) })
       : await validateHtml(input, {
           ...(options.size === undefined ? {} : { size: options.size }),
-          embedFonts: options.embedFonts ?? false,
+          embedFonts: options.embedFonts,
           rasterDpi: options.rasterDpi,
           ...(options.strict === undefined ? {} : { strict: options.strict }),
           ...(options.report === undefined ? {} : { report: options.report }),
@@ -221,7 +212,7 @@ async function handleInspect(input: string, options: InspectCliOptions): Promise
   if (inferKind(input) === 'pptx') {
     const deck = await parsePptx(new Uint8Array(await readFile(input)));
     const catalog = await FontCatalog.scan();
-    resolveDeckFonts(deck, catalog, { embedFonts: false });
+    resolveDeckFonts(deck, catalog);
     process.stdout.write(`${JSON.stringify(inspectDeck(deck), null, 2)}\n`);
     return 0;
   }
@@ -233,7 +224,7 @@ async function handleInspect(input: string, options: InspectCliOptions): Promise
   try {
     const measured = await measureDeck(loaded, { browser });
     const catalog = await FontCatalog.scan({ declared: measured.fonts.declared });
-    resolveDeckFonts(measured.deck, catalog, { embedFonts: false });
+    resolveDeckFonts(measured.deck, catalog);
     process.stdout.write(`${JSON.stringify(inspectDeck(measured.deck), null, 2)}\n`);
     return 0;
   } finally {
@@ -255,7 +246,7 @@ type ConvertCliOptions = {
   output?: string;
   to?: 'pptx' | 'html';
   size?: string;
-  embedFonts?: false | true | string[];
+  embedFonts: boolean;
   rasterDpi: number;
   report?: string;
   strict?: Severity;
@@ -268,7 +259,7 @@ type ConvertCliOptions = {
 
 type ValidateCliOptions = {
   size?: string;
-  embedFonts?: false | true | string[];
+  embedFonts: boolean;
   rasterDpi: number;
   report?: string;
   strict?: Severity;
@@ -314,12 +305,12 @@ function buildProgram(): Command {
   program
     .command('convert <input>')
     .description(
-      'Convert HTML or a Deck directory to PPTX, or a PPTX to an HTML Deck with its Asset directory. The direction is inferred from the input unless --to overrides it. Validation runs first; a validation error exits 2 and nothing is written. The written output is then verified against the input: a mismatch is a deckflip defect, reported as VERIFY_* errors with exit 5.',
+      'Convert HTML or a Deck directory to PPTX, or a PPTX to an HTML Deck with its Asset directory. HTML-to-PPTX conversion embeds every used font face for portable, editable text by default; --no-embed-fonts opts into machine-dependent output. The direction is inferred from the input unless --to overrides it. Validation runs first; a validation error exits 2 and nothing is written. The written output is then verified against the input: a mismatch is a deckflip defect, reported as VERIFY_* errors with exit 5.',
     )
     .addOption(new Option('--to <kind>').choices(['pptx', 'html']))
     .option('-o, --output <output>', 'output path')
     .option('--size <size>', 'override the canvas size')
-    .option('--embed-fonts [names]', 'unsupported: any embedding request fails validation (exit 2); fonts remain unembedded', parseEmbedFonts, false)
+    .option('--no-embed-fonts', 'HTML input only: leave newly used fonts unembedded (machine-dependent); source embedded fonts are preserved')
     .option('--raster-dpi <n>', 'raster density for captured subtrees, 96-384', parseRasterDpi, 192)
     .option('--report <path>', 'report sidecar path')
     .addOption(new Option('--strict [severity]', 'fail at or above severity; bare --strict means info; use = for a threshold').choices(['info', 'warning', 'error']))
@@ -335,10 +326,10 @@ function buildProgram(): Command {
   program
     .command('validate <input>')
     .description(
-      'Check an HTML Deck and report what would be flattened or rasterised, or check that a PPTX parses and report what a round trip keeps opaque. The same report format as convert is written and/or printed; this command does not emit anything else.',
+      'Check an HTML Deck, including font embedding eligibility, and report what would be flattened or rasterised, or check that a PPTX parses and report what a round trip keeps opaque. The same report format as convert is written and/or printed; eligibility is not completed embedding, and this command does not emit a Deck.',
     )
     .option('--size <size>', 'override the canvas size')
-    .option('--embed-fonts [names]', 'unsupported: any embedding request fails validation (exit 2); fonts remain unembedded', parseEmbedFonts, false)
+    .option('--no-embed-fonts', 'HTML input only: check machine-dependent output without new embedding; source embedded fonts are preserved')
     .option('--raster-dpi <n>', 'raster density for captured subtrees, 96-384', parseRasterDpi, 192)
     .option('--report <path>', 'report sidecar path')
     .addOption(new Option('--strict [severity]', 'fail at or above severity; bare --strict means info; use = for a threshold').choices(['info', 'warning', 'error']))

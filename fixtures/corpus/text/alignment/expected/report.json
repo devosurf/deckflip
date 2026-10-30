@@ -1,1 +1,24 @@
-[]
+[
+  {
+    "code": "FONT_NOT_EMBEDDED",
+    "kind": "flagged",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(1)"
+    },
+    "reason": "Times New Roman (TimesNewRomanPSMT) is not embedded; recipients need this exact face installed",
+    "hint": "Install Times New Roman on every recipient machine, or remove --no-embed-fonts to produce portable editable output"
+  },
+  {
+    "code": "FONT_NOT_EMBEDDED",
+    "kind": "flagged",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > pre:nth-child(5)"
+    },
+    "reason": "Courier New (CourierNewPSMT) is not embedded; recipients need this exact face installed",
+    "hint": "Install Courier New on every recipient machine, or remove --no-embed-fonts to produce portable editable output"
+  }
+]

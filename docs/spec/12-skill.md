@@ -25,7 +25,7 @@ skills/deckflip/
     authoring-subset.md    # native / raster / rejected lists (#11), text mapping summary (#12)
     report-codes.md        # every code with meaning and the fix it wants (#9, #11, #13, #14, #15)
     round-trip.md          # editing an existing PPTX: assets dir, data-preserve, untouched rules (#14)
-    fonts.md               # safe set, resolution rule, embedding (#15)
+    fonts.md               # selected faces, portable embedding, rights, subsets and opt-out
   templates/
     deck.html              # canonical single-file Deck: head meta, base classes, 6 example Slides
     slides.css             # base stylesheet: Canvas-safe typography scale, layout classes

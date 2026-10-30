@@ -82,6 +82,32 @@ export async function fontCollection(sources: string[], destination: string): Pr
   await writeFile(destination, Buffer.concat(parts));
 }
 
+/** A classic resource-fork dfont containing one unmodified standalone sfnt resource. */
+export async function dfontCollection(source: string, destination: string): Promise<void> {
+  const font = await readFile(source);
+  const dataOffset = 256;
+  const dataLength = 4 + font.length;
+  const mapOffset = dataOffset + dataLength;
+  const mapLength = 50;
+  const bytes = Buffer.alloc(mapOffset + mapLength);
+  bytes.writeUInt32BE(dataOffset, 0);
+  bytes.writeUInt32BE(mapOffset, 4);
+  bytes.writeUInt32BE(dataLength, 8);
+  bytes.writeUInt32BE(mapLength, 12);
+  bytes.writeUInt32BE(font.length, dataOffset);
+  font.copy(bytes, dataOffset + 4);
+  bytes.copy(bytes, mapOffset, 0, 16);
+  bytes.writeUInt16BE(28, mapOffset + 24);
+  bytes.writeUInt16BE(mapLength, mapOffset + 26);
+  bytes.writeUInt16BE(0, mapOffset + 28);
+  bytes.write('sfnt', mapOffset + 30, 'ascii');
+  bytes.writeUInt16BE(0, mapOffset + 34);
+  bytes.writeUInt16BE(10, mapOffset + 36);
+  bytes.writeUInt16BE(128, mapOffset + 38);
+  bytes.writeInt16BE(-1, mapOffset + 40);
+  await writeFile(destination, bytes);
+}
+
 /** WOFF 1.0 of an sfnt: every table zlib-compressed where that is smaller, in tag order. */
 export function woffFromSfnt(sfnt: Buffer): Buffer {
   const tables: Array<{ tag: string; data: Buffer }> = [];

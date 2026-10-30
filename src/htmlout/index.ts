@@ -35,6 +35,17 @@ export function emitHtml(deck: Deck, opts: EmitHtmlOptions = {}): HtmlDeck {
   const ids = new Map(deck.slides.map((slide) => [slide.id, sectionId(slide)] as const));
   const ctx: Omit<ElementContext, 'merged'> = { sheet: new Stylesheet(ids), assetsDir: opts.assetsDir ?? 'deck.assets', assets: new Map() };
   const slides: HtmlSlide[] = [];
+  const fontRules: string[] = [];
+  for (const font of deck.embeddedFonts ?? []) {
+    if (!font.sfnt) continue;
+    const relative = `fonts/${font.sha256}.sfnt`;
+    ctx.assets.set(relative, font.sfnt);
+    const family = JSON.stringify(font.family).replace(/</g, '\\3c ');
+    const url = JSON.stringify(`${ctx.assetsDir}/${relative}`).replace(/</g, '\\3c ');
+    const bold = font.slot === 'bold' || font.slot === 'boldItalic';
+    const italic = font.slot === 'italic' || font.slot === 'boldItalic';
+    fontRules.push(`@font-face { font-family: ${family}; src: url(${url}); font-weight: ${bold ? 700 : 400}; font-style: ${italic ? 'italic' : 'normal'}; }`);
+  }
   const sections = deck.slides.map((slide) => {
     const emitted = emitSlide(slide, ids.get(slide.id)!, { ...ctx, merged: new Map() });
     slides.push(emitted.record);
@@ -50,6 +61,7 @@ export function emitHtml(deck: Deck, opts: EmitHtmlOptions = {}): HtmlDeck {
     '<style>',
     baseStylesheet(deck.canvas.width, deck.canvas.height),
     OPAQUE_STYLESHEET,
+    ...fontRules,
     ...ctx.sheet.rules(),
     '</style>',
     '</head>',

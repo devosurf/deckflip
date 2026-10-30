@@ -9,5 +9,38 @@
     },
     "reason": "text of p.box runs 1308.3 px past its box",
     "hint": "Give p.box room for its text or shorten the text; accept it only if the spill is intended"
+  },
+  {
+    "code": "FONT_NOT_EMBEDDED",
+    "kind": "flagged",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(1)"
+    },
+    "reason": "Georgia (Georgia) is not embedded; recipients need this exact face installed",
+    "hint": "Install Georgia on every recipient machine, or remove --no-embed-fonts to produce portable editable output"
+  },
+  {
+    "code": "FONT_NOT_EMBEDDED",
+    "kind": "flagged",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(2)"
+    },
+    "reason": "Times New Roman (TimesNewRomanPSMT) is not embedded; recipients need this exact face installed",
+    "hint": "Install Times New Roman on every recipient machine, or remove --no-embed-fonts to produce portable editable output"
+  },
+  {
+    "code": "FONT_NOT_EMBEDDED",
+    "kind": "flagged",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(3)"
+    },
+    "reason": "Verdana (Verdana) is not embedded; recipients need this exact face installed",
+    "hint": "Install Verdana on every recipient machine, or remove --no-embed-fonts to produce portable editable output"
   }
 ]

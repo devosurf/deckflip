@@ -321,7 +321,7 @@ export class DeckFontSession {
       if (!face) return undefined;
       this.faces.set(acquired, face);
     }
-    return { face, font };
+    return { face, font, sfnt: acquired.sfnt };
   }
 
   private fail(declaration: Declaration, slide: number, failure: AcquisitionFailure): void {

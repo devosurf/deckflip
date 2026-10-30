@@ -7,7 +7,7 @@ Binary and npm package: **`deckflip`** (`npx deckflip <command>`). Checked: free
 
 ## Commands
 - `deckflip convert <input> [-o <output>]` — direction inferred from the input (`.html` file or Deck directory -> `.pptx`; `.pptx` -> `.html` + asset directory), `--to pptx|html` overrides. Runs `validate` first; a validation error exits 2 with no output written. Default output: input basename with the other extension, next to the input. Once written, the output is verified against the input (Verification, [10](10-rendering-and-verification.md#verification)); PPTX -> HTML therefore also needs Chromium.
-- `deckflip validate <input>` — HTML: checks the Deck against the authoring subset (#10/#11) and reports what would be flattened/rasterised, plus its Layout flags. PPTX: checks the package parses and reports what round-trip will preserve opaquely. Same report format as `convert`.
+- `deckflip validate <input>` — HTML: checks the Deck against the authoring subset (#10/#11), new font embedding eligibility, what would be flattened/rasterised, and Layout flags. Eligibility is not completed packaging; the same default portable policy and `--no-embed-fonts` opt-out apply. PPTX: checks the package parses and reports what round-trip will preserve opaquely; existing source font permission/format limits are warnings, not new-embedding eligibility failures, and never produce `FONT_NOT_EMBEDDED`. Same report format as `convert`.
 - `deckflip verify <source> <output>` — Verification of a conversion done earlier: one HTML Deck and one PPTX, the source's kind deciding the direction. The HTML side is measured afresh. The report holds `VERIFY_*` entries only and is printed (`--json`) or written where `--report` says; no default sidecar, so the conversion's own survives. `--browser`, `--offline`, `--quiet`, `--no-color` as for `convert`.
 - `deckflip render <input> -o <dir>` — one PNG per Slide (`slide-001.png`). HTML input renders in Chromium; PPTX input renders with LibreOffice by default, `--renderer powerpoint` uses real PowerPoint where installed (macOS save-as-PDF path from the spike). `--dpi`, `--slides 1,3-5`. Missing renderer exits 1. A diagnostic, not a step of the agent loop.
 - `deckflip inspect <input> [--browser <path>] [--offline]` — JSON dump of Deck structure: Canvas size, per-Slide elements (kind, bounds in CSS px, text preview, native/rasterised), fonts used, preserved opaque parts. HTML input needs Chromium; PPTX input never launches or requires it, regardless of browser options or environment variables.
@@ -16,7 +16,7 @@ Binary and npm package: **`deckflip`** (`npx deckflip <command>`). Checked: free
 ## Flags
 Run-scoped settings are flags; Deck-intrinsic settings live in deck metadata. No config file in v1.
 - `--size 16:9|4:3|<w>x<h>` overrides deck meta; the override is recorded as a report entry (`OVERRIDE_CANVAS_SIZE`).
-- `--embed-fonts` and `--embed-fonts=<name,...>` request embedding, which is not implemented. Both `convert` and `validate` reject explicit requests with `FONT_EMBED_UNSUPPORTED` (error, exit 2), keeping the report and leaving any destination unchanged. Default off. The request never suppresses `FONT_NOT_SAFE`, including when a named family is only an unused fallback.
+- `--no-embed-fonts` on HTML-input `convert` and `validate` explicitly chooses machine-dependent **new** embedding. Default HTML conversion embeds every used face's exact measured bytes for portable, editable text; validation reports eligibility, not completed embedding. Under the opt-out, each used face without a preserved source embedding gets `FONT_NOT_EMBEDDED` (warning): recipients need that exact face installed. Portability-only format, permission, coverage and glyph-fallback failures become warnings; authoring validation errors still fail. Source embedded parts always remain preserved, including with the library option `embedFonts: false`. Explicit `--no-embed-fonts` with PPTX input is an invocation error (3). The former opt-in `--embed-fonts [names]` option is removed, not an alias.
 - `--raster-dpi <n>` default `192` (2x Canvas).
 - `--report <path>` overrides the sidecar location; `--strict[=info|warning|error]` (Strict mode); `--json`; `--quiet`; `--no-color`.
 - Strict mode applies to `convert` and `validate` for both input kinds. Bare `--strict` is `--strict=info` (any Report entry); `--strict=warning` fails on warnings and errors, and `--strict=error` only on errors. Lower-severity entries stay in JSON and the sidecar. Unknown or empty thresholds are invocation errors (3). A threshold requires `=`: `--strict warning` means bare `--strict` followed by the positional `warning`, never a threshold. With an input already supplied, that extra positional is an invocation error; before the input, bare `--strict` does not consume the input.
@@ -49,14 +49,15 @@ Always written as a sidecar `<output>.report.json` unless `--report <path>` sele
   "canvas": { "width": 1280, "height": 720, "source": "deck-meta" },
   "fonts": [
     {
-      "cssFamily": "Brand", "aliases": ["heebo", "heebo medium"], "class": "deck-provided",
+      "cssFamily": "Brand", "aliases": ["heebo", "heebo medium"],
       "asset": {
         "sha256": "<sha256 of the decoded sfnt>", "faceIndex": 0, "postscriptName": "Heebo-Medium",
         "source": { "kind": "remote", "url": "https://fonts.example.com/s/heebo.woff2", "format": "woff2", "sha256": "<sha256 of the download>", "pinned": "/deck/deck.assets/fonts/<sha256>.woff2" }
       },
       "office": { "family": "Heebo Medium", "style": "regular" },
       "metrics": { "ascender": 1.0478515625, "descender": 0.4208984375 },
-      "fsType": 0
+      "fsType": 0,
+      "embedding": { "status": "embedded", "part": "ppt/fonts/font1.fntdata" }
     }
   ],
   "summary": { "slides": 12, "native": 140, "rasterised": 3, "flattened": 2, "substituted": 1, "dropped": 0, "preserved": 0, "overridden": 0, "flagged": 0, "errors": 0 },
@@ -75,7 +76,8 @@ Always written as a sidecar `<output>.report.json` unless `--report <path>` sele
 ```
 - `kind`: `rasterised | flattened | substituted | dropped | preserved | overridden | flagged | error`; `severity`: `error | warning | info`. `error` entries come from validation (exit 2) or from Verification (`VERIFY_*`, exit 5); `flagged` entries are Layout flags.
 - Locator: `{selector}` for HTML input, `{shapeId, name}` for PPTX input; `slide` is 1-based. Verification locates an output-only finding by its paired source element where it has one.
-- `fonts` (`convert` and `validate`): each selected face once, the Resolved font `inspect` also lists ([07](07-fonts.md#resolution-and-office-identity)). It is provenance, not a Report entry, so it never affects Strict mode.
+- `fonts` (`convert` and `validate`): each selected face once, the Resolved font `inspect` also lists ([07](07-fonts.md#resolution-and-office-identity)). Provenance and `embedding` status (`embedded`, `eligible`, `not-embedded`, `preserved`, with optional part/subset/compression metadata) are not Report entries and never affect Strict mode. `embedded` means successful packaging; validation uses `eligible`, not a claim of emitted parts.
+- `embeddedFonts` records existing source EOT parts separately from decoded selected `fonts`, including family/Office slot, part and relationship ID, `kind` (`complete`, `subset`, `mtx`, `xor`), optional decoded sfnt SHA-256, rights, subset/compression flags and preserved status. An MTX source part may be preserved without decoded sfnt identity. Opting out of new embedding never removes these source parts.
 - Codes are an enumerated list, stable once published, grouped by family: `VALIDATE_*`, `RASTER_*`, `FLATTEN_*`, `SUBSTITUTE_*`, `FONT_*`, `PRESERVE_*`, `DROPPED_*`, `OVERRIDE_*`, `RENDER_*`, `LAYOUT_*`, `VERIFY_*`. The complete list with hint templates is [08-report-codes.md](08-report-codes.md).
 - `hint` is mandatory for every non-error entry: it is what makes the agent loop converge.
 

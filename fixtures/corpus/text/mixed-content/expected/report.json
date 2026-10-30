@@ -1,1 +1,35 @@
-[]
+[
+  {
+    "code": "FONT_NOT_EMBEDDED",
+    "kind": "flagged",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > div:nth-child(1)"
+    },
+    "reason": "Arial (ArialMT) is not embedded; recipients need this exact face installed",
+    "hint": "Install Arial on every recipient machine, or remove --no-embed-fonts to produce portable editable output"
+  },
+  {
+    "code": "FONT_NOT_EMBEDDED",
+    "kind": "flagged",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > div:nth-child(1)"
+    },
+    "reason": "Arial (Arial-BoldMT) is not embedded; recipients need this exact face installed",
+    "hint": "Install Arial on every recipient machine, or remove --no-embed-fonts to produce portable editable output"
+  },
+  {
+    "code": "FONT_NOT_EMBEDDED",
+    "kind": "flagged",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > div:nth-child(1)"
+    },
+    "reason": "Arial (Arial-ItalicMT) is not embedded; recipients need this exact face installed",
+    "hint": "Install Arial on every recipient machine, or remove --no-embed-fonts to produce portable editable output"
+  }
+]

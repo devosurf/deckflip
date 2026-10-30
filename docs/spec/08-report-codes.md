@@ -1,6 +1,6 @@
 # Report codes
 
-The complete, stable list of Report entry codes. Codes are never renamed once published; new ones may be added. Every non-error entry carries a `hint`; the templates below are the hints, with `{decl}` replaced by the offending CSS declaration and `{el}` by the element name.
+The complete list of current Report entry codes. New codes may be added; an explicit breaking-policy cutover may retire misleading codes. Every non-error entry carries a `hint`; the templates below are the hints, with `{decl}` replaced by the offending CSS declaration and `{el}` by the element name.
 
 Kinds (extends [01-cli.md](01-cli.md) with `preserved` and `flagged`; `summary` gains a count for each): `error | rasterised | flattened | substituted | dropped | preserved | overridden | flagged`.
 
@@ -32,21 +32,32 @@ Human stderr groups occurrences by severity, then code (errors first), showing t
 | `VALIDATE_RASTER_SLIDE` | `data-raster` on a `section` | Rasterise parts, not the Slide; use `deckflip render` for PNGs |
 | `VALIDATE_LINK_TARGET` | `a[href^="#"]` whose target is not a Slide id | Point `{href}` at a section id; Slides: `{slides}` |
 
-## FONT_* (errors, then warnings; kind `substituted` for warnings)
+## FONT_* (errors and warnings; kinds `error`, `flagged` or `substituted`)
+
+Default hint templates are defined by `src/report/codes.ts`; the table below reproduces those runtime templates rather than alternative advice. Source-preservation overrides from `src/roundtrip/entries.ts` are listed separately below. New-embedding errors apply to HTML input only. Existing source embedding rights, format and coverage limitations warn without blocking preservation, including when new embedding is disabled.
 
 | Code | Severity | Trigger | Hint |
 | --- | --- | --- | --- |
-| `FONT_UNRESOLVED` | error | no family in the stack is deck-provided or installed | Install `{family}` or add a safe family such as Arial to the stack |
-| `FONT_GENERIC_ONLY` | error | the first resolvable entry is a generic family | Put a concrete family before `{generic}` |
+| `FONT_UNRESOLVED` | error | no family in the stack is deck-provided or installed | Install {family} or supply a concrete font file through @font-face |
+| `FONT_GENERIC_ONLY` | error | the first resolvable entry is a generic family | Put a concrete family before {generic} |
 | `FONT_IDENTITY_INVALID` | error | selected face has insufficient/conflicting Office identity metadata, an unsupported legacy subfamily, or an unsupported variable instance | Choose a font face with consistent legacy family, subfamily and RIBBI metadata; do not rewrite font tables or remap CSS weights |
-| `FONT_EMBED_UNSUPPORTED` | error | explicit all-font or named-family embedding request; embedding is not implemented | Remove `--embed-fonts` and use a safe font such as Arial, or install the Resolved font on every viewing machine |
-| `FONT_ASSET_UNAVAILABLE` | error | a stylesheet or `@font-face` source a Slide needs could not be downloaded and is not pinned, its pinned copy is missing or modified, Chromium never requested a listed stylesheet, or a bundled font is missing or fails its manifest SHA-256 check | Restore Deck assets or convert once with network access to pin them; for a bundled default failure, reinstall deckflip |
+| `FONT_ASSET_UNAVAILABLE` | error | a stylesheet or `@font-face` source a Slide needs could not be downloaded and is not pinned, its pinned copy is missing or modified, Chromium never requested a listed stylesheet, or a bundled font is missing or fails its manifest SHA-256 check | Convert once with network access so deckflip pins it in the Asset directory, or save the file next to the Deck and reference it relatively |
 | `FONT_ASSET_UNSUPPORTED` | error | an `@font-face` rule a Slide needs lists only `local()` sources or no loadable format, its bytes are no TTF/OTF/WOFF/WOFF2 font, or a `data:` stylesheet declares fonts | Supply the face as a TTF, OTF, WOFF or WOFF2 file through url(); deckflip never measures local() faces |
-| `FONT_NOT_SAFE` | warning | Resolved font outside the safe set and not embedded; requesting embedding never suppresses it | Use a safe font, or install the Resolved font on every viewing machine; font embedding is not supported |
-| `FONT_GLYPH_FALLBACK` | warning | the selected face lacks characters of a text node (outside its `cmap` or `unicode-range`), or Chromium drew some of its glyphs with another font; once per owner and face | Use a face of `{family}` that covers every character, or remove the characters; a unicode-range subset covers only its range |
-| `FONT_EMBED_RESTRICTED` | warning | a selected Deck-provided face's `fsType` rules out editable embedding: restricted (`0x0002`), preview & print (`0x0004`) without editable, or bitmap-only (`0x0200`) | The licence of `{family}` forbids embedding; choose another font |
-| `FONT_EMBED_FORMAT` | warning | reserved for the embedding milestone: WOFF2 or TTC source cannot be embedded | Provide `{family}` as TTF, OTF or WOFF |
-| `FONT_MISSING_FOR_LAYOUT` | warning | PPTX->HTML: source font not installed, not embedded | Install `{family}` before editing to keep layout faithful |
+| `FONT_NOT_EMBEDDED` | warning (`flagged`) | explicit HTML-input opt-out: once per used selected face without a preserved source embedding, `{family} ({postscriptName}) is not embedded; recipients need this exact face installed`; never emitted for PPTX-input conversion/validation | Install {family} on every recipient machine, or remove --no-embed-fonts to produce portable editable output |
+| `FONT_GLYPH_FALLBACK` | error by default; warning with opt-out | the selected face lacks characters of a text node (outside its `cmap` or `unicode-range`), or Chromium drew some of its glyphs with another font; once per owner and face | Supply the complete font file for {family} covering every character; unaccounted Chromium glyph fallback cannot be reproduced by embedding the selected face |
+| `FONT_EMBED_RESTRICTED` | error by default; warning with opt-out or preserved source | any selected face, installed included, has `fsType` other than 0, 0x8, 0x100 or 0x108: restricted, preview & print, bitmap-only or unsupported permission combination; existing source rights never block preservation | Supply a face of {family} whose licence and fsType permit editable embedding, or use --no-embed-fonts for machine-dependent output |
+| `FONT_EMBED_FORMAT` | error by default; warning with opt-out or opaque source preview | selected bytes cannot be packaged faithfully (collection members or unsupported sfnt format), or a preserved MTX/XOR source payload cannot be decoded for HTML preview | Supply {family} as a standalone static TTF, OTF, WOFF or WOFF2 file; collection members are not supported for embedding |
+| `FONT_EMBED_COVERAGE` | error by default; warning with opt-out | a required character or used face is not covered by the single selected asset for an Office family/style slot; characters are listed | Supply the complete font file for {family} covering every listed character; web subsets cannot be merged into one Office family/style slot |
+| `FONT_EMBED_SUBSET` | warning | a web `unicode-range` subset or preserved EOT subset has limited editing coverage, even when current Slide text is covered; edited text using a preserved subset or opaque MTX has unverifiable coverage and new characters may fall back | Supply the complete font file for {family} for unrestricted editing; additional characters outside the embedded subset may fall back |
+| `FONT_MISSING_FOR_LAYOUT` | warning | PPTX->HTML: source font not installed, not embedded | Install {family} before editing to keep layout faithful |
+
+Source-preservation warnings use context-specific hints rather than suggesting the new-embedding opt-out:
+
+- `FONT_EMBED_RESTRICTED`: Preservation retains the original permission bits and grants no new embedding rights; check the font licence and obtain the rights needed for editing and redistribution
+- `FONT_EMBED_FORMAT`, malformed source EOT: Keep source.pptx and deckflip.json together; supply the complete original font for a readable preview without replacing the preserved source payload
+- `FONT_EMBED_FORMAT`, opaque MTX preview: Keep source.pptx and deckflip.json together; supply the complete original font for a faithful HTML preview
+
+Successful newly embedded faces are recorded in `fonts[].embedding`, not an informational entry; validation reports `eligible`, and copied source parts report `preserved`. The former safe-font and unimplemented-embedding codes are retired by #36. A name whitelist never satisfies the portable requirement.
 
 ## RASTER_* (kind `rasterised`, severity `warning`; `RASTER_EXPLICIT` is `info`)
 

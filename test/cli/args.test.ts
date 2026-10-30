@@ -1,14 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { parseEmbedFonts, parseRasterDpi, parseSize, parseSlidesList } from '../../src/cli/main.js';
+import { parseRasterDpi, parseSize, parseSlidesList } from '../../src/cli/main.js';
 
 describe('CLI argument helpers', () => {
-  it('parses embed-fonts forms', () => {
-    expect(parseEmbedFonts(undefined)).toBe(false);
-    expect(parseEmbedFonts(true)).toBe(true);
-    expect(parseEmbedFonts('')).toBe(true);
-    expect(parseEmbedFonts('Inter, Aptos')).toEqual(['Inter', 'Aptos']);
-  });
-
   it('parses slide ranges', () => {
     expect(parseSlidesList('1,3-5')).toEqual([1, 3, 4, 5]);
   });

@@ -2,7 +2,8 @@ import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, extname, join } from 'node:path';
 import type { Browser } from 'playwright-core';
 import { emitPptx } from './emit/index.js';
-import { auditVisibleFonts, FontCatalog, resolveDeckFonts, resolvedFontsOf } from './fonts/index.js';
+import { planFontParts, type PlannedFont } from './emit/fonts.js';
+import { auditVisibleFonts, FontCatalog, prepareFontEmbedding, resolveDeckFonts, resolvedFontsOf } from './fonts/index.js';
 import type { BrowserCensus } from './html/browser-script.js';
 import { loadDeck } from './html/load.js';
 import { measureDeck, type MeasuredDeckResult } from './html/measure.js';
@@ -10,11 +11,12 @@ import { emitHtml } from './htmlout/index.js';
 import type { Canvas, Deck } from './model/index.js';
 import { OpcReader } from './ooxml/opc.js';
 import { parsePptx } from './parse/index.js';
+import { embeddedFontMetadata } from './parse/fonts.js';
 import { chromiumVersion, launchChromium } from './render/chromium.js';
 import { entry as reportEntry } from './report/codes.js';
 import { buildReport, exceedsStrictThreshold, withEntries, writeSidecar } from './report/index.js';
 import { DeckflipError, type Entry, type Report, type Severity } from './report/types.js';
-import { hasVba, sourceEntries } from './roundtrip/entries.js';
+import { embeddedFontEntries, hasVba, sourceEntries } from './roundtrip/entries.js';
 import { buildManifest, MANIFEST_FILE, sha256, SOURCE_FILE } from './roundtrip/manifest.js';
 import { resolveRoundTrip, type RoundTrip } from './roundtrip/index.js';
 import { indexSource } from './roundtrip/source.js';
@@ -32,7 +34,7 @@ export interface ChromiumOptions {
 export interface ConvertOptions extends ChromiumOptions {
   output?: string;
   size?: string;
-  embedFonts: false | true | string[];
+  embedFonts: boolean;
   rasterDpi: number;
   report?: string;
   strict?: Severity;
@@ -88,6 +90,7 @@ interface PipelineRun {
   census?: BrowserCensus[];
   /** the round trip's findings when the Deck came from a PPTX whose Asset directory is still there */
   roundTrip?: RoundTrip;
+  fonts?: PlannedFont[];
 }
 
 /** load -> measure -> fonts -> round trip; the report carries every entry, `deck` is present only when no error stopped the run. */
@@ -111,12 +114,34 @@ async function runHtmlPipeline(
   try {
     const measured = await measureDeck(loaded, { browser, rasterDpi: opts.rasterDpi });
     const catalog = await FontCatalog.scan({ declared: measured.fonts.declared });
-    const fontEntries = [...resolveDeckFonts(measured.deck, catalog, { embedFonts: opts.embedFonts }), ...auditVisibleFonts(measured.visibleText, catalog)];
+    // Source font identities must be attached before local resolution: preserved MTX has no decoded sfnt.
     const roundTrip = await resolveRoundTrip(measured.deck, measured.sections, loaded.deckFile);
+    const resolvedEntries = resolveDeckFonts(measured.deck, catalog);
+    const prepared = await prepareFontEmbedding(measured.deck, catalog, { embedFonts: opts.embedFonts });
+    const fonts = planFontParts(prepared.fonts, roundTrip.preserved?.source.reader.partNames() ?? []);
+    const preservedFamilies = new Set(measured.deck.embeddedFonts?.map((font) => font.family.toLowerCase()) ?? []);
+    const visibleText = measured.visibleText.filter((request) => {
+      const primary = request.fontStack[0] ?? '';
+      // MTX cannot be decoded for Chromium. Audit any newly declared face rather than masking it with source identity.
+      return !preservedFamilies.has(primary.toLowerCase()) || catalog.declared(request.slide, primary).length > 0;
+    });
+    const fontEntries = [...resolvedEntries, ...prepared.entries, ...auditVisibleFonts(visibleText, catalog, { embedFonts: opts.embedFonts }), ...embeddedFontEntries(measured.deck, roundTrip.preserved?.plan)];
     const entries = [...baseEntries, ...measured.entries, ...fontEntries, ...roundTrip.entries];
-    const base = { ...reportBase(input, outputPath, loaded.canvas, chromiumVersion(browser), mode), fonts: resolvedFontsOf(measured.deck) };
+    const willEmbed = mode === 'convert' && !hasError(entries);
+    for (const { font, part, subset } of fonts) {
+      font.embedding = {
+        status: willEmbed ? 'embedded' : 'eligible',
+        ...(willEmbed ? { part } : {}),
+        ...(subset ? { subset: true } : {}),
+      };
+    }
+    const base = {
+      ...reportBase(input, outputPath, loaded.canvas, chromiumVersion(browser), mode),
+      fonts: resolvedFontsOf(measured.deck),
+      ...(measured.deck.embeddedFonts === undefined ? {} : { embeddedFonts: measured.deck.embeddedFonts.map(embeddedFontMetadata) }),
+    };
     const report = buildReport(base, entries, measured.deck.slides.length, nativeCount(measured.deck));
-    return hasError(entries) ? { report } : { report, deck: measured.deck, census: measured.census, roundTrip };
+    return hasError(entries) ? { report } : { report, deck: measured.deck, census: measured.census, roundTrip, fonts };
   } finally {
     if (opts.browser === undefined) await browser.close();
   }
@@ -143,17 +168,19 @@ export async function convertHtmlToPptx(
   const reportPath = opts.report ?? `${outputPath}.report.json`;
 
   const epoch = process.env.SOURCE_DATE_EPOCH;
-  const pptx =
-    run.roundTrip?.identical ??
+  const canReuseSourcePackage = (run.fonts?.length ?? 0) === 0;
+  const pptx = (canReuseSourcePackage ? run.roundTrip?.identical : undefined) ??
     (await emitPptx(run.deck, {
       ...(epoch === undefined ? {} : { created: new Date(Number(epoch) * 1000) }),
       appVersion: VERSION,
+      embedFonts: opts.embedFonts,
+      fonts: run.fonts ?? [],
       ...(run.roundTrip?.preserved === undefined ? {} : { preserved: run.roundTrip.preserved }),
     }));
 
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, pptx);
-  const verified = verifyDecks({ deck: run.deck, census: run.census ?? [] }, await parsePptx(pptx), 'html');
+  const verified = verifyDecks({ deck: run.deck, census: run.census ?? [] }, await parsePptx(pptx, { embeddedFonts: false }), 'html');
   const report = withEntries(run.report, verified);
   await writeSidecar(report, reportPath);
 
@@ -170,7 +197,6 @@ export interface ConvertToHtmlOptions extends Partial<ChromiumOptions> {
   output?: string;
   report?: string;
   strict?: Severity;
-  embedFonts?: ConvertOptions['embedFonts'];
 }
 
 /**
@@ -185,11 +211,18 @@ export async function convertPptxToHtml(input: string, opts: ConvertToHtmlOption
   const reportPath = opts.report ?? `${outputPath}.report.json`;
   const assetsDir = replaceExtension(outputPath, '.assets');
   const bytes = new Uint8Array(await readFile(input));
-  const deck = await parsePptx(bytes);
-  const source = await indexSource(await OpcReader.load(bytes));
+  const reader = await OpcReader.load(bytes);
+  const deck = await parsePptx(reader);
+  const source = await indexSource(reader);
   const catalog = await FontCatalog.scan();
-  const entries = [...resolveDeckFonts(deck, catalog, { embedFonts: opts.embedFonts ?? false }), ...sourceEntries(deck, source)];
-  const base = { ...reportBase(input, outputPath, deck.canvas, undefined, 'convert'), input: { path: input, kind: 'pptx' as const }, output: { path: outputPath, kind: 'html' as const }, fonts: resolvedFontsOf(deck) };
+  const resolvedEntries = resolveDeckFonts(deck, catalog);
+  const entries = [...resolvedEntries, ...embeddedFontEntries(deck), ...sourceEntries(deck, source)];
+  const base = {
+    ...reportBase(input, outputPath, deck.canvas, undefined, 'convert'),
+    input: { path: input, kind: 'pptx' as const }, output: { path: outputPath, kind: 'html' as const },
+    fonts: resolvedFontsOf(deck),
+    ...(deck.embeddedFonts === undefined ? {} : { embeddedFonts: deck.embeddedFonts.map(embeddedFontMetadata) }),
+  };
   if (hasError(entries)) {
     const report = buildReport(base, entries, deck.slides.length, nativeCount(deck));
     await writeSidecar(report, reportPath);
@@ -217,13 +250,18 @@ export async function convertPptxToHtml(input: string, opts: ConvertToHtmlOption
 }
 
 /** `validate deck.pptx` (spec 01): the package parses, and the report lists what a round trip would carry opaquely. */
-export async function validatePptx(input: string, opts: { report?: string; embedFonts?: ConvertOptions['embedFonts']; strict?: Severity } = {}): Promise<{ report: Report; exitCode: 0 | 2 | 4 }> {
-  const bytes = new Uint8Array(await readFile(input));
-  const deck = await parsePptx(bytes);
-  const source = await indexSource(await OpcReader.load(bytes));
+export async function validatePptx(input: string, opts: { report?: string; strict?: Severity } = {}): Promise<{ report: Report; exitCode: 0 | 2 | 4 }> {
+  const reader = await OpcReader.load(await readFile(input));
+  const deck = await parsePptx(reader);
+  const source = await indexSource(reader);
   const catalog = await FontCatalog.scan();
-  const entries = [...resolveDeckFonts(deck, catalog, { embedFonts: opts.embedFonts ?? false }), ...sourceEntries(deck, source)];
-  const base = { ...reportBase(input, undefined, deck.canvas, undefined, 'validate'), input: { path: input, kind: 'pptx' as const }, fonts: resolvedFontsOf(deck) };
+  const resolvedEntries = resolveDeckFonts(deck, catalog);
+  const entries = [...resolvedEntries, ...embeddedFontEntries(deck), ...sourceEntries(deck, source)];
+  const base = {
+    ...reportBase(input, undefined, deck.canvas, undefined, 'validate'),
+    input: { path: input, kind: 'pptx' as const }, fonts: resolvedFontsOf(deck),
+    ...(deck.embeddedFonts === undefined ? {} : { embeddedFonts: deck.embeddedFonts.map(embeddedFontMetadata) }),
+  };
   const report = buildReport(base, entries, deck.slides.length, nativeCount(deck));
   if (opts.report !== undefined) await writeSidecar(report, opts.report);
   return { report, exitCode: hasError(entries) ? 2 : exceedsStrictThreshold(entries, opts.strict) ? 4 : 0 };
@@ -241,7 +279,7 @@ export async function verifyConversion(source: string, output: string, opts: Ver
     throw new DeckflipError(`verify needs one HTML Deck and one PPTX, got two ${sourceKind} inputs`, 3);
   }
   const [htmlPath, pptxPath] = sourceKind === 'html' ? [source, output] : [output, source];
-  const pptx = await parsePptx(new Uint8Array(await readFile(pptxPath)));
+  const pptx = await parsePptx(new Uint8Array(await readFile(pptxPath)), { embeddedFonts: false });
   const laidOut = await measureHtmlSide(htmlPath, opts);
   const base = {
     ...reportBase(source, output, laidOut.canvas, laidOut.browser, 'verify'),

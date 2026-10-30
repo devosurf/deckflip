@@ -1,46 +1,79 @@
 [
   {
-    "code": "FONT_NOT_SAFE",
-    "kind": "substituted",
+    "code": "FONT_NOT_EMBEDDED",
+    "kind": "flagged",
     "severity": "warning",
     "slide": 1,
     "locator": {
       "selector": "section:nth-of-type(1) > p:nth-child(1)"
     },
-    "reason": "Resolved font Heebo Medium is not in the safe set",
-    "hint": "Use a safe font, or install the Resolved font on every viewing machine; font embedding is not supported"
+    "reason": "Heebo Medium (Heebo-Medium) is not embedded; recipients need this exact face installed",
+    "hint": "Install Heebo Medium on every recipient machine, or remove --no-embed-fonts to produce portable editable output"
   },
   {
-    "code": "FONT_NOT_SAFE",
-    "kind": "substituted",
+    "code": "FONT_NOT_EMBEDDED",
+    "kind": "flagged",
     "severity": "warning",
     "slide": 1,
     "locator": {
       "selector": "section:nth-of-type(1) > p:nth-child(2)"
     },
-    "reason": "Resolved font Heebo is not in the safe set",
-    "hint": "Use a safe font, or install the Resolved font on every viewing machine; font embedding is not supported"
+    "reason": "Heebo (Heebo-Bold) is not embedded; recipients need this exact face installed",
+    "hint": "Install Heebo on every recipient machine, or remove --no-embed-fonts to produce portable editable output"
   },
   {
-    "code": "FONT_NOT_SAFE",
-    "kind": "substituted",
+    "code": "FONT_NOT_EMBEDDED",
+    "kind": "flagged",
     "severity": "warning",
     "slide": 1,
     "locator": {
       "selector": "section:nth-of-type(1) > p:nth-child(3)"
     },
-    "reason": "Resolved font Heebo ExtraBold is not in the safe set",
-    "hint": "Use a safe font, or install the Resolved font on every viewing machine; font embedding is not supported"
+    "reason": "Heebo ExtraBold (Heebo-ExtraBold) is not embedded; recipients need this exact face installed",
+    "hint": "Install Heebo ExtraBold on every recipient machine, or remove --no-embed-fonts to produce portable editable output"
   },
   {
-    "code": "FONT_NOT_SAFE",
-    "kind": "substituted",
+    "code": "FONT_NOT_EMBEDDED",
+    "kind": "flagged",
     "severity": "warning",
     "slide": 1,
     "locator": {
       "selector": "section:nth-of-type(1) > p:nth-child(4)"
     },
-    "reason": "Resolved font Source Sans 3 is not in the safe set",
-    "hint": "Use a safe font, or install the Resolved font on every viewing machine; font embedding is not supported"
+    "reason": "Source Sans 3 (SourceSans3-Regular) is not embedded; recipients need this exact face installed",
+    "hint": "Install Source Sans 3 on every recipient machine, or remove --no-embed-fonts to produce portable editable output"
+  },
+  {
+    "code": "FONT_NOT_EMBEDDED",
+    "kind": "flagged",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(5)"
+    },
+    "reason": "Source Sans 3 (SourceSans3-Bold) is not embedded; recipients need this exact face installed",
+    "hint": "Install Source Sans 3 on every recipient machine, or remove --no-embed-fonts to produce portable editable output"
+  },
+  {
+    "code": "FONT_NOT_EMBEDDED",
+    "kind": "flagged",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(6)"
+    },
+    "reason": "Source Sans 3 (SourceSans3-It) is not embedded; recipients need this exact face installed",
+    "hint": "Install Source Sans 3 on every recipient machine, or remove --no-embed-fonts to produce portable editable output"
+  },
+  {
+    "code": "FONT_NOT_EMBEDDED",
+    "kind": "flagged",
+    "severity": "warning",
+    "slide": 1,
+    "locator": {
+      "selector": "section:nth-of-type(1) > p:nth-child(7)"
+    },
+    "reason": "Source Sans 3 (SourceSans3-BoldIt) is not embedded; recipients need this exact face installed",
+    "hint": "Install Source Sans 3 on every recipient machine, or remove --no-embed-fonts to produce portable editable output"
   }
 ]

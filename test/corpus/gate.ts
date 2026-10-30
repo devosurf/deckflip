@@ -10,6 +10,7 @@ import { DeckFontSession } from '../../src/html/fonts.js';
 import { loadDeck } from '../../src/html/load.js';
 import { convertHtmlToPptx } from '../../src/convert.js';
 import { ORACLE_RECORD, packageDigest, type OracleRecord } from './oracle-record.js';
+import { readFixtureConfig } from './fixture-config.js';
 
 /**
  * Optional `expected/ignore.json`: `{ "<slide>": [{ x1, y1, x2, y2 }] }` in CSS px, for regions the fixture
@@ -55,12 +56,14 @@ export function corpusGate(category: string, fixtures: readonly string[]): void 
       it(name, async () => {
         const fixtureDir = join('fixtures', 'corpus', category, name);
         const deckPath = join(fixtureDir, 'deck.html');
+        const config = await readFixtureConfig(fixtureDir);
+        const recordText = await readFile(join(fixtureDir, 'expected', ORACLE_RECORD), 'utf8').catch(() => undefined);
         const loaded = await loadDeck(deckPath, {});
         const workDir = await mkdtemp(join(tmpdir(), `deckflip-corpus-${name}-`));
         const pptxPath = join(workDir, `${name}.pptx`);
         const { report } = await convertHtmlToPptx(deckPath, {
           output: pptxPath,
-          embedFonts: false,
+          embedFonts: config.embedFonts,
           rasterDpi: 192,
           offline: true,
           browser: browser!,
@@ -70,7 +73,6 @@ export function corpusGate(category: string, fixtures: readonly string[]): void 
         expect(normaliseEntries(report.entries)).toEqual(normaliseEntries(expectedEntries));
 
         const reoracle = `run \`npm run corpus:oracle ${category}/${name}\` on a Mac with PowerPoint and review the renders`;
-        const recordText = await readFile(join(fixtureDir, 'expected', ORACLE_RECORD), 'utf8').catch(() => undefined);
         expect(recordText, `${category}/${name} has no ${ORACLE_RECORD}: ${reoracle}`).toBeDefined();
         const record = JSON.parse(recordText!) as OracleRecord;
         expect(await packageDigest(await readFile(pptxPath)), `${category}/${name} emits another package than PowerPoint rendered: ${reoracle}`).toBe(record.digest);

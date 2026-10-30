@@ -32,7 +32,7 @@ it('keeps authored browser weights when Office regular names a Medium or ExtraBo
     ['Source Sans Regular editable', 400], ['Source Sans Bold editable', 700],
     ['Source Sans Italic editable', 400], ['Source Sans Bold Italic editable', 700],
   ]);
-  resolveDeckFonts(deck, catalog, { embedFonts: false });
+  resolveDeckFonts(deck, catalog);
   expect(runs(deck).slice(0, 3).map((run) => [run.style.weight, run.style.font?.office])).toEqual([
     [500, { family: 'Heebo Medium', style: 'regular' }],
     [700, { family: 'Heebo', style: 'bold' }],
@@ -60,12 +60,12 @@ it.each([
       </style></head><body><section style="${section}"><p style="${inline}">Authored text</p></section></body></html>`);
     const measured = await measureDeck(await loadDeck(input, {}), { browser });
     const catalog = await FontCatalog.scan({ declared: measured.fonts.declared, system: false });
-    const entries = [...measured.entries, ...resolveDeckFonts(measured.deck, catalog, { embedFonts: false }), ...auditVisibleFonts(measured.visibleText, catalog)];
-    expect(entries.filter((entry) => entry.code !== 'FONT_NOT_SAFE')).toEqual([]);
+    const entries = [...measured.entries, ...resolveDeckFonts(measured.deck, catalog), ...auditVisibleFonts(measured.visibleText, catalog, { embedFonts: true })];
+    expect(entries).toEqual([]);
     const [run] = runs(measured.deck);
     expect(run?.style.font?.office).toEqual({ family, style: 'regular' });
     expect(run?.style.fontStack).toEqual([family === 'Source Sans 3' ? 'Brand' : 'Heebo']);
-    const pptx = await parsePptx(await emitPptx(measured.deck, { appVersion: 'test' }));
+    const pptx = await parsePptx(await emitPptx(measured.deck, { appVersion: 'test', embedFonts: false }));
     expect(runs(pptx).map((run) => run.style.fontStack)).toEqual([[family]]);
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -81,9 +81,8 @@ it('measures all four unstyled faces from checked bundled bytes without installe
       </section></body></html>`);
     const measured = await measureDeck(await loadDeck(input, {}), { browser });
     const catalog = await FontCatalog.scan({ declared: measured.fonts.declared, system: false });
-    const entries = [...measured.entries, ...resolveDeckFonts(measured.deck, catalog, { embedFonts: false }), ...auditVisibleFonts(measured.visibleText, catalog)];
-    expect(entries.filter((entry) => entry.code !== 'FONT_NOT_SAFE')).toEqual([]);
-    expect(entries.filter((entry) => entry.code === 'FONT_NOT_SAFE')).toHaveLength(1);
+    const entries = [...measured.entries, ...resolveDeckFonts(measured.deck, catalog), ...auditVisibleFonts(measured.visibleText, catalog, { embedFonts: true })];
+    expect(entries).toEqual([]);
     const selected = runs(measured.deck).map((run) => run.style.font!);
     expect(selected.map((font) => font.office)).toEqual(
       ['regular', 'bold', 'italic', 'boldItalic'].map((style) => ({ family: 'Liberation Sans', style })));
@@ -95,12 +94,11 @@ it('measures all four unstyled faces from checked bundled bytes without installe
         sha256: face.sha256, faceIndex: 0,
         source: { kind: 'bundled', family: 'Liberation Sans', version: '2.1.5', file: face.file, format: 'ttf', sha256: face.sha256 },
       });
-      expect(font.class).toBe('deck-provided');
       expect(font.fsType).toBe(0);
       const tags = Array.from({ length: bytes.readUInt16BE(4) }, (_, i) => bytes.toString('ascii', 12 + i * 16, 16 + i * 16));
       expect(tags).not.toContain('fvar');
     }
-    const pptx = await parsePptx(await emitPptx(measured.deck, { appVersion: 'test' }));
+    const pptx = await parsePptx(await emitPptx(measured.deck, { appVersion: 'test', embedFonts: false }));
     expect(runs(pptx).map((run) => [run.style.fontStack, run.style.bold, run.style.italic])).toEqual([
       [['Liberation Sans'], false, false], [['Liberation Sans'], true, false],
       [['Liberation Sans'], false, true], [['Liberation Sans'], true, true],
@@ -121,7 +119,7 @@ it('reports an explicitly missing brand family without appending the bundled def
     await writeFile(input, '<!doctype html><html style="font-family: MissingBrand35"><head></head><body><section><p>Brand</p></section></body></html>');
     const measured = await measureDeck(await loadDeck(input, {}), { browser });
     const catalog = await FontCatalog.scan({ declared: measured.fonts.declared, system: false });
-    expect(resolveDeckFonts(measured.deck, catalog, { embedFonts: false })).toContainEqual(expect.objectContaining({ code: 'FONT_UNRESOLVED' }));
+    expect(resolveDeckFonts(measured.deck, catalog)).toContainEqual(expect.objectContaining({ code: 'FONT_UNRESOLVED' }));
     expect(runs(measured.deck)[0]?.style.fontStack).toEqual(['MissingBrand35']);
     expect(runs(measured.deck)[0]?.style.font).toBeUndefined();
   } finally {

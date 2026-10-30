@@ -5,6 +5,7 @@ import type { Deck, Media, Slide, TextBody } from '../model/index.js';
 import { REL, OpcReader, type Relationship } from '../ooxml/opc.js';
 import type { XmlNode } from '../ooxml/xml.js';
 import { readColorScheme, readFontScheme } from './drawing.js';
+import { attachEmbeddedFonts, readEmbeddedFonts } from './fonts.js';
 import { inheritanceReader } from './inherit.js';
 import { readNotes } from './notes.js';
 import { readSlide } from './slide.js';
@@ -14,8 +15,8 @@ import { child, children, textOf } from './xml.js';
 
 const DEFAULT_LANG = 'en';
 
-export async function parsePptx(bytes: Uint8Array): Promise<Deck> {
-  const pkg = await OpcReader.load(bytes);
+export async function parsePptx(input: Uint8Array | OpcReader, opts?: { embeddedFonts?: boolean }): Promise<Deck> {
+  const pkg = input instanceof OpcReader ? input : await OpcReader.load(input);
   const presentationRel = await pkg.related('/', REL.officeDocument);
   if (!presentationRel) {
     throw new Error('Not a PresentationML package: no officeDocument relationship');
@@ -93,12 +94,14 @@ export async function parsePptx(bytes: Uint8Array): Promise<Deck> {
     slides.push(slide);
   }
 
-  return {
+  const deck: Deck = {
     title: core.title,
     lang: core.lang,
     canvas,
     slides,
   };
+  if (opts?.embeddedFonts !== false) attachEmbeddedFonts(deck, await readEmbeddedFonts(pkg, presentation, presentationRels));
+  return deck;
 }
 
 /**

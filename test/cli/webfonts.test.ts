@@ -48,7 +48,7 @@ it('reports where each hosted face came from in the Conversion report and inspec
   const report = JSON.parse(converted.stdout) as Report;
   const brand = report.fonts?.find((font) => font.cssFamily === 'Brand');
   expect(brand).toMatchObject({
-    class: 'deck-provided', office: { family: 'Heebo Medium', style: 'regular' },
+    office: { family: 'Heebo Medium', style: 'regular' },
     asset: { source: { kind: 'remote', format: 'woff2', url: `${origin}/s/brand.woff2?…`, pinned: expect.stringMatching(/deck\.assets\/fonts\/[0-9a-f]{64}\.woff2$/) } },
   });
 

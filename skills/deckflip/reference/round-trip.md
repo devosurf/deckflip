@@ -24,6 +24,12 @@ Charts, SmartArt, OLE objects, connectors and metafile pictures (`data-preserve=
 - Animations survive on untouched Slides, and on touched Slides as long as every shape they reference still exists (`DROPPED_ANIMATION` otherwise).
 - Deleting `deck.assets/` or `source.pptx`, or editing `source.pptx`, makes everything "touched": the deck is re-emitted from scratch on the built-in master (`PRESERVE_SOURCE_MISSING`, warning).
 
+## Embedded fonts
+
+Supported round trips always preserve source EOT/MTX payloads, rights, Office family/style slots and subset/compression flags, including when new embedding is disabled. `embeddedFonts[]` identifies copied parts separately from selected decoded `fonts[]`; a preserved source payload is not a newly embedded sfnt face. Uncompressed non-XOR EOT can supply extracted HTML `@font-face` assets. MTX remains in `source.pptx`; an HTML preview decoding warning does not discard the preserved part.
+
+`FONT_EMBED_SUBSET` means limited editing, even if current text is covered. New characters outside a preserved subset may fall back; opaque MTX coverage of edited text is unknown and warns. PPTX-input `convert`/`validate` do not apply new-embedding eligibility or `FONT_NOT_EMBEDDED`, and existing source rights/format limits only warn. Explicit `--no-embed-fonts` is an HTML-input option; using it with PPTX input exits 3. Font provenance, permissions and portable-output fixes: [fonts.md](fonts.md).
+
 ## Entries to expect
 
 `PRESERVE_OPAQUE_*` (info) per opaque element carried through; `PRESERVE_SOURCE_MISSING` (warning); `DROPPED_EDIT_OPAQUE`, `DROPPED_ANIMATION`, `DROPPED_TEXT_EFFECTS` (warning); `DROPPED_EXTENSION` (info); `FONT_MISSING_FOR_LAYOUT` (warning) when a source font is neither installed nor embedded.

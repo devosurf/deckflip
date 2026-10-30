@@ -15,7 +15,7 @@ Node >= 20.16, TypeScript strict, ESM, single npm package `deckflip` with a `bin
 | `pdfjs-dist` + `@napi-rs/canvas` | rasterising LibreOffice PDFs | no poppler dependency |
 | `odiff-bin` (dev) | corpus comparator | SIMD, `diffPercentage`, ignore regions |
 
-Hand-rolled: `[Content_Types].xml` and `.rels` bookkeeping, the XML serializer (fixed attribute order, `xml:space`, escaping), EMU/pt/px math (`1 px = 9525 EMU = 0.75 pt`), the platform font-directory scan, the `@font-face`/`@import` stylesheet scanner and the WOFF 1.0 decoder. Font embedding remains unimplemented; #33 settled its format contract.
+Hand-rolled: `[Content_Types].xml` and `.rels` bookkeeping, the XML serializer (fixed attribute order, `xml:space`, escaping), EMU/pt/px math (`1 px = 9525 EMU = 0.75 pt`), the platform font-directory scan, the `@font-face`/`@import` stylesheet scanner, WOFF 1.0 decoder and EOT 2.2 flags-0 wrapper. Default embedding packages the exact decoded sfnt Chromium measured, following #33's PowerPoint proof and #36's portable policy.
 
 ## Modules
 

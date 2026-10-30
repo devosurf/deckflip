@@ -31,7 +31,7 @@ export const CT = {
   app: 'application/vnd.openxmlformats-officedocument.extended-properties+xml',
   notesSlide: 'application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml',
   notesMaster: 'application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml',
-  fontData: 'application/vnd.openxmlformats-officedocument.obfuscatedFont',
+  fontData: 'application/x-fontdata',
 } as const;
 
 interface PartRecord {
@@ -208,7 +208,8 @@ function buildContentTypesXml(parts: Map<string, PartRecord>): string {
     ['jpeg', 'image/jpeg'],
     ['gif', 'image/gif'],
     ['svg', 'image/svg+xml'],
-    ['fntdata', CT.fontData],
+    // Keep the inert declaration for font-free Oracle-record digests until the next wholesale Oracle regeneration.
+    ['fntdata', [...parts.values()].some((part) => part.contentType === CT.fontData) ? CT.fontData : 'application/vnd.openxmlformats-officedocument.obfuscatedFont'],
   ];
 
   return serialize(
