@@ -15,13 +15,13 @@ Vocabulary: a **Deck** is one HTML file (or a directory of them); a **Slide** is
 
 1. Start from `templates/deck.html` + `templates/slides.css` (copy both next to your deck). Compose Slides from `templates/layouts/`. Keep the typography scale: it is tuned to wrap safely at Canvas size.
 2. `npx deckflip@latest validate deck.html --json`. Fix every `severity: error` (the conversion refuses to run on them). For each `warning` (Layout flags such as `LAYOUT_TEXT_OVERFLOW` included), decide: edit the HTML as the `hint` says, or accept the deviation. Repeat until only accepted entries remain.
-3. `npx deckflip@latest convert deck.html --strict --json -o deck.pptx`. Exit `0` = clean; exit `4` = the PPTX and `deck.pptx.report.json` were written but entries remain; read `entries[].hint` and go back to 2. Exit `2` = validation error, nothing written. Exit `5` = Verification found the PPTX differs from what Chromium shows (`VERIFY_*` errors): a deckflip defect, not yours; the PPTX is written, but report the defect with the report file instead of rewriting the HTML around it.
+3. `npx deckflip@latest convert deck.html --strict=warning --json -o deck.pptx`. Exit `0` = no warnings or errors (info entries remain available); exit `4` = the PPTX and `deck.pptx.report.json` were written but warnings remain; read `entries[].hint` and go back to 2. Exit `2` = validation error, nothing converted. Exit `5` = Verification found the PPTX differs from what Chromium shows (`VERIFY_*` errors): a deckflip defect, not yours; the PPTX is written, but report the defect with the report file instead of rewriting the HTML around it.
 4. Judge the design in Chromium when you need to see it: `npx deckflip@latest render deck.html -o out/` and look at `out/slide-NNN.png`. A clean `convert` means the PPTX shows the same; rendering the PPTX itself (`render deck.pptx`, `--renderer powerpoint` where PowerPoint is installed, LibreOffice otherwise) is only for Opaque elements or a flag that asks you to look.
 5. `npx deckflip@latest inspect deck.html` to confirm structure: every element's kind, bounds, `source` (`native` or `raster`) and the fonts used.
 
-Stop when `convert --strict` exits 0, or exits 4 with only entries you deliberately accepted (`RASTER_EXPLICIT` info entries from `data-raster` are the usual case). `deckflip verify deck.html deck.pptx` re-checks a pair later.
+Stop when `convert --strict=warning` exits 0, or exits 4 with only warnings you deliberately accepted. Review info entries too; they do not fail this authoring loop. `deckflip verify deck.html deck.pptx` re-checks a pair later.
 
-Exit codes: `0` ok · `1` no output (Chromium or renderer failure) · `2` validation failed · `3` bad invocation · `4` strict mode with a non-empty report · `5` output written but Verification failed.
+Exit codes: `0` ok · `1` no output (Chromium or renderer failure) · `2` validation failed · `3` bad invocation · `4` Strict-mode severity threshold reached · `5` output written but Verification failed.
 
 ## Browser setup
 
@@ -68,9 +68,9 @@ Everything else in CSS is allowed and only influences the measured geometry. Ful
 
 - `entries[]` each carry `code`, `kind` (`error | rasterised | flattened | substituted | dropped | preserved | overridden | flagged`), `severity` (`error | warning | info`), `slide` (1-based), `locator.selector`, `reason` (quotes the offending declaration) and `hint` (the edit that makes it native).
 - Families: `VALIDATE_*` and `FONT_*` errors stop the conversion; `RASTER_*` means a picture was emitted; `FLATTEN_*` means an effect was dropped and the text kept; `SUBSTITUTE_*` is an approximation you can usually accept; `FONT_*` warnings mean the viewer may substitute the font or its glyphs; `LAYOUT_*` flags something the PPTX reproduces faithfully but you rarely intend (text spilling out of its box, text over text, illegible colour, a line PowerPoint may break elsewhere); `DROPPED_*`/`PRESERVE_*` concern round trips and generated content; `OVERRIDE_CANVAS_SIZE` records `--size`; `VERIFY_*` errors are deckflip defects (exit 5).
-- `--strict` turns any entry into exit 4 while still writing everything. There is no flag to silence rasters: `data-raster` is the way to say "this picture is intended".
+- `--strict=warning` fails on warnings and errors; bare `--strict` or `--strict=info` fails on any entry; `--strict=error` fails only on errors. All entries stay in the report, and threshold-only failures keep the output. Validation (2) and Verification (5) always take precedence. Use `=` for thresholds: space-separated values are positionals, not severity values. `data-raster` is the way to say "this picture is intended".
 - A warning you did not intend is a bug in your HTML, not in the tool: follow the hint. A `VERIFY_*` error is the opposite: a bug in the tool.
-- Sidecar `<output>.report.json` is always written; `--json` prints the same document; the stderr summary lists one line per Slide and one per entry.
+- Sidecar `<output>.report.json` is always written; `--json` prints the same complete per-occurrence document. Stderr groups entries by severity/code, errors first, with occurrence counts, up to three locations plus `+N more`, and distinct hints once per group. `--json` still prints this summary; add `--quiet` to suppress it.
 
 Every code with its trigger and hint: `reference/report-codes.md`.
 

@@ -61,7 +61,7 @@ The `expected/oracle.json` of a corpus fixture: the digest of the emitted packag
 _Avoid_: Golden hash, snapshot
 
 **Strict mode**:
-A conversion or validation run that treats any Report entry as a failure. Successful conversion output and the Conversion report remain available for nonfatal entries; validation errors prevent conversion regardless of mode, and Verification errors fail the conversion (exit 5) regardless of mode.
+A conversion or validation run that treats Report entries at or above a selected severity as a failure (`info`, `warning` or `error`; bare Strict mode selects `info`, meaning any entry). All entries remain in the Conversion report, and successful conversion output remains available for nonfatal entries. Validation errors prevent conversion regardless of threshold, and Verification errors fail the conversion (exit 5) regardless of threshold.
 _Avoid_: Fail-on-warning, pedantic mode
 
 **Deck file**:

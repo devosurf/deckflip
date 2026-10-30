@@ -15,7 +15,7 @@ import { launchChromium, renderHtml } from '../render/chromium.js';
 import { renderPptxLibreOffice } from '../render/libreoffice.js';
 import { renderPptxPowerPoint } from '../render/powerpoint.js';
 import { formatSummary, writeSidecar } from '../report/index.js';
-import { DeckflipError, type Report } from '../report/types.js';
+import { DeckflipError, type Report, type Severity } from '../report/types.js';
 import { VERSION } from '../version.js';
 
 export interface SizeOverride {
@@ -134,7 +134,7 @@ async function handleConvert(input: string, options: ConvertCliOptions): Promise
       ? await convertPptxToHtml(input, {
           ...(options.output === undefined ? {} : { output: options.output }),
           ...(options.report === undefined ? {} : { report: options.report }),
-          strict: options.strict,
+          ...(options.strict === undefined ? {} : { strict: options.strict }),
           embedFonts: options.embedFonts ?? false,
           ...(options.browser === undefined ? {} : { browserPath: options.browser }),
           offline: options.offline,
@@ -145,7 +145,7 @@ async function handleConvert(input: string, options: ConvertCliOptions): Promise
           embedFonts: options.embedFonts ?? false,
           rasterDpi: options.rasterDpi,
           ...(options.report === undefined ? {} : { report: options.report }),
-          strict: options.strict,
+          ...(options.strict === undefined ? {} : { strict: options.strict }),
           ...(options.browser === undefined ? {} : { browserPath: options.browser }),
           offline: options.offline,
         });
@@ -156,18 +156,19 @@ async function handleConvert(input: string, options: ConvertCliOptions): Promise
 async function handleValidate(input: string, options: ValidateCliOptions): Promise<number> {
   const result =
     inferKind(input) === 'pptx'
-      ? await validatePptx(input, { embedFonts: options.embedFonts ?? false })
+      ? await validatePptx(input, { embedFonts: options.embedFonts ?? false, ...(options.strict === undefined ? {} : { strict: options.strict }) })
       : await validateHtml(input, {
           ...(options.size === undefined ? {} : { size: options.size }),
           embedFonts: options.embedFonts ?? false,
           rasterDpi: options.rasterDpi,
+          ...(options.strict === undefined ? {} : { strict: options.strict }),
           ...(options.report === undefined ? {} : { report: options.report }),
           ...(options.browser === undefined ? {} : { browserPath: options.browser }),
           offline: options.offline,
         });
   await writeSidecar(result.report, options.report ?? defaultValidateReportPath(input));
   printReport(result.report, options);
-  return result.exitCode === 0 && options.strict && result.report.entries.length > 0 ? 4 : result.exitCode;
+  return result.exitCode;
 }
 
 async function handleRender(input: string, options: RenderCliOptions): Promise<number> {
@@ -257,7 +258,7 @@ type ConvertCliOptions = {
   embedFonts?: false | true | string[];
   rasterDpi: number;
   report?: string;
-  strict: boolean;
+  strict?: Severity;
   json: boolean;
   quiet: boolean;
   color?: boolean;
@@ -270,7 +271,7 @@ type ValidateCliOptions = {
   embedFonts?: false | true | string[];
   rasterDpi: number;
   report?: string;
-  strict: boolean;
+  strict?: Severity;
   json: boolean;
   quiet: boolean;
   color?: boolean;
@@ -307,7 +308,7 @@ function buildProgram(): Command {
   program.name('deckflip').version(VERSION).description('HTML slides <-> PowerPoint, built for coding agents.');
   program.exitOverride();
   program.showHelpAfterError();
-  program.addHelpText('after', '\nAgent skill (authoring rules, the validate -> convert --strict -> inspect loop, templates):\n  npx skills add devosurf/deckflip\n\nExit codes: 0 ok · 1 no output produced · 2 validation failed · 3 bad invocation · 4 --strict with a non-empty report · 5 output written but Verification failed\n');
+  program.addHelpText('after', '\nAgent skill (authoring rules, the validate -> convert --strict=warning -> inspect loop, templates):\n  npx skills add devosurf/deckflip\n\nExit codes: 0 ok · 1 no output produced · 2 validation failed · 3 bad invocation · 4 --strict threshold reached · 5 output written but Verification failed\n');
   program.addHelpText('after', '\nChromium (convert, HTML validate/render/inspect, verify):\n  --browser <path> > DECKFLIP_BROWSER > Playwright-managed browser.\n  --offline, DECKFLIP_OFFLINE=1 or CI=true prevent automatic downloads.\n  PLAYWRIGHT_BROWSERS_PATH selects the managed browser cache.\n');
 
   program
@@ -321,7 +322,7 @@ function buildProgram(): Command {
     .option('--embed-fonts [names]', 'unsupported: any embedding request fails validation (exit 2); fonts remain unembedded', parseEmbedFonts, false)
     .option('--raster-dpi <n>', 'raster density for captured subtrees, 96-384', parseRasterDpi, 192)
     .option('--report <path>', 'report sidecar path')
-    .option('--strict', 'treat any report entry as a failure')
+    .addOption(new Option('--strict [severity]', 'fail at or above severity; bare --strict means info; use = for a threshold').choices(['info', 'warning', 'error']))
     .option('--json', 'print the report JSON to stdout')
     .option('--quiet', 'suppress the human summary on stderr')
     .option('--no-color', 'disable ANSI colors')
@@ -340,7 +341,7 @@ function buildProgram(): Command {
     .option('--embed-fonts [names]', 'unsupported: any embedding request fails validation (exit 2); fonts remain unembedded', parseEmbedFonts, false)
     .option('--raster-dpi <n>', 'raster density for captured subtrees, 96-384', parseRasterDpi, 192)
     .option('--report <path>', 'report sidecar path')
-    .option('--strict', 'treat any report entry as a failure')
+    .addOption(new Option('--strict [severity]', 'fail at or above severity; bare --strict means info; use = for a threshold').choices(['info', 'warning', 'error']))
     .option('--json', 'print the report JSON to stdout')
     .option('--quiet', 'suppress the human summary on stderr')
     .option('--no-color', 'disable ANSI colors')
@@ -395,6 +396,25 @@ function buildProgram(): Command {
   return program;
 }
 
+/** Keep bare --strict boolean-like: it must never consume the following input positional. */
+function strictArguments(argv: string[], program: Command): string[] {
+  const command = program.commands.find((candidate) => candidate.name() === argv[0]);
+  if (command === undefined || !['convert', 'validate'].includes(command.name())) return argv;
+  const requiredFlags = new Set(command.options.filter((option) => option.required)
+    .flatMap((option) => [option.short, option.long].filter((flag): flag is string => flag !== undefined)));
+  const result: string[] = [];
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index]!;
+    if (arg === '--') {
+      result.push(...argv.slice(index));
+      break;
+    }
+    result.push(arg === '--strict' ? '--strict=info' : arg);
+    if (requiredFlags.has(arg) && index + 1 < argv.length) result.push(argv[++index]!);
+  }
+  return result;
+}
+
 export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
   const program = buildProgram();
   if (argv.length === 0) {
@@ -402,7 +422,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     return 0;
   }
   try {
-    await program.parseAsync(argv, { from: 'user' });
+    await program.parseAsync(strictArguments(argv, program), { from: 'user' });
     return typeof process.exitCode === 'number' ? process.exitCode : 0;
   } catch (error) {
     if (error instanceof DeckflipError) {

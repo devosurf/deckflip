@@ -70,7 +70,7 @@ describe('CLI severity and strict-mode status', () => {
   it('rejects missing-font PPTX conversion before creating a Deck or Asset directory, even in strict mode', async () => {
     const dir = await workspace();
     const input = await missingFontPptx(dir);
-    for (const flags of [[], ['--strict']]) {
+    for (const flags of [[], ['--strict'], ['--strict=error']]) {
       const output = join(dir, flags.length ? 'strict.html' : 'ordinary.html');
       const result = cli('convert', input, '-o', output, '--json', ...flags);
       const report = await reportAt(`${output}.report.json`);
@@ -110,7 +110,7 @@ describe('CLI severity and strict-mode status', () => {
     const html = join(dir, 'invalid.html');
     await writeFile(html, '<!doctype html><html><body><section><iframe></iframe></section></body></html>');
     for (const [input, code] of [[pptx, 'FONT_UNRESOLVED'], [html, 'VALIDATE_ELEMENT']] as const) {
-      for (const flags of [[], ['--strict']]) {
+      for (const flags of [[], ['--strict'], ['--strict=error']]) {
         const result = cli('validate', input, '--json', ...flags);
         expect(JSON.parse(result.stdout).entries).toContainEqual(expect.objectContaining({ code, severity: 'error' }));
         expect(result.status).toBe(2);
@@ -124,7 +124,7 @@ describe('CLI severity and strict-mode status', () => {
     const input = join(dir, 'source.pptx');
     const source = await buildPptx();
     await writeFile(input, source);
-    for (const [flags, expected] of [[[], 0], [['--strict'], 4]] as const) {
+    for (const [flags, expected] of [[[], 0], [['--strict'], 4], [['--strict=info'], 4], [['--strict=warning'], 0], [['--strict=error'], 0]] as const) {
       const output = join(dir, expected === 4 ? 'strict.html' : 'ordinary.html');
       const result = cli('convert', input, '-o', output, '--json', ...flags);
       const report = await reportAt(`${output}.report.json`);
@@ -143,7 +143,7 @@ describe('CLI severity and strict-mode status', () => {
     const dir = await workspace();
     const input = join(dir, 'source.pptx');
     await writeFile(input, await buildPptx());
-    for (const [flags, expected] of [[[], 0], [['--strict'], 4]] as const) {
+    for (const [flags, expected] of [[[], 0], [['--strict'], 4], [['--strict=info'], 4], [['--strict=warning'], 0], [['--strict=error'], 0]] as const) {
       const result = cli('validate', input, '--json', ...flags);
       expect(result.status).toBe(expected);
       const report = await reportAt(join(dir, 'source.report.json'));
@@ -159,7 +159,7 @@ describe('CLI severity and strict-mode status', () => {
     await writeFile(input, `<!doctype html><html><head><style>body { font-family: Arial }</style></head><body>
       <section><p style="filter: blur(1px)">Editable</p><div data-raster style="width: 20px; height: 20px; background: red"></div></section>
       </body></html>`);
-    for (const [flags, expected] of [[[], 0], [['--strict'], 4]] as const) {
+    for (const [flags, expected] of [[[], 0], [['--strict'], 4], [['--strict=warning'], 4], [['--strict=error'], 0]] as const) {
       const mode = flags.length ? 'strict' : 'ordinary';
       const output = join(dir, `${mode}.pptx`);
       const destination = join(dir, mode, 'reports', 'conversion.json');
@@ -251,9 +251,10 @@ describe('CLI severity and strict-mode status', () => {
     const dir = await workspace();
     const input = join(dir, 'invalid.html');
     await writeFile(input, '<!doctype html><html><body><section><iframe></iframe></section></body></html>');
-    for (const flags of [[], ['--strict']]) {
-      const output = join(dir, flags.length ? 'strict.pptx' : 'ordinary.pptx');
-      const destination = join(dir, flags.length ? 'strict' : 'ordinary', 'reports', 'conversion.json');
+    for (const flags of [[], ['--strict'], ['--strict=error']]) {
+      const mode = (flags[0] ?? 'ordinary').replace(/^--/, '').replace('=', '-');
+      const output = join(dir, `${mode}.pptx`);
+      const destination = join(dir, mode, 'reports', 'conversion.json');
       const converted = cli('convert', input, '-o', output, '--report', destination, '--json', ...flags);
       expect(converted.status, converted.stderr).toBe(2);
       const report = await reportAt(destination);

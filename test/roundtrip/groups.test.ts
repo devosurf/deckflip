@@ -105,7 +105,7 @@ describe.skipIf(!browserAvailable)('group coordinate spaces', () => {
     expectRectangle(await rectangle(html, 3), [200, 130, 40, 20]);
     await writeFile(html, (await readFile(html, 'utf8')).replace('GROUP_SENTINEL', 'EDITED_CHILD'));
     const result = await convertHtmlToPptx(html, {
-      browser, output: join(dir, 'back.pptx'), embedFonts: false, rasterDpi: 96, strict: false, offline: true,
+      browser, output: join(dir, 'back.pptx'), embedFonts: false, rasterDpi: 96, offline: true,
     });
     expect(result.exitCode).toBe(0);
     expect(result.report.entries.filter((entry) => /^(RASTER|FLATTEN)_/.test(entry.code))).toEqual([]);
@@ -126,7 +126,7 @@ describe.skipIf(!browserAvailable)('group coordinate spaces', () => {
     const before = await corners(html, 3);
     await writeFile(html, (await readFile(html, 'utf8')).replace('GROUP_SENTINEL', 'EDITED_CHILD'));
     const result = await convertHtmlToPptx(html, {
-      browser, output: join(dir, 'back.pptx'), embedFonts: false, rasterDpi: 96, strict: false, offline: true,
+      browser, output: join(dir, 'back.pptx'), embedFonts: false, rasterDpi: 96, offline: true,
     });
     expect(result.exitCode).toBe(0);
     expect(result.report.entries.filter((entry) => /^(RASTER|FLATTEN)_/.test(entry.code))).toEqual([]);
@@ -142,7 +142,7 @@ describe.skipIf(!browserAvailable)('group coordinate spaces', () => {
     expectRectangle(await rectangle(html, 5), [260, 155, 40, 10]);
     await writeFile(html, (await readFile(html, 'utf8')).replace('GROUP_SENTINEL', 'EDITED_CHILD'));
     const result = await convertHtmlToPptx(html, {
-      browser, output: join(dir, 'back.pptx'), embedFonts: false, rasterDpi: 96, strict: false, offline: true,
+      browser, output: join(dir, 'back.pptx'), embedFonts: false, rasterDpi: 96, offline: true,
     });
     expect(result.exitCode).toBe(0);
     expect(result.report.entries.filter((entry) => /OFFCANVAS|^(RASTER|FLATTEN)_/.test(entry.code))).toEqual([]);
@@ -167,7 +167,7 @@ describe.skipIf(!browserAvailable)('group coordinate spaces', () => {
     }
     const output = join(dir, 'raster.pptx');
     const result = await convertHtmlToPptx(html, {
-      browser, output, embedFonts: false, rasterDpi: 96, strict: false, offline: true,
+      browser, output, embedFonts: false, rasterDpi: 96, offline: true,
     });
     expect(result.exitCode).toBe(0);
     expect(result.report.entries.filter((entry) => /OFFCANVAS|^RASTER_/.test(entry.code)).map((entry) => entry.code)).toEqual(['RASTER_EXPLICIT']);
@@ -198,7 +198,7 @@ describe.skipIf(!browserAvailable)('group coordinate spaces', () => {
     const image = canvas.toBuffer('image/png');
     const picture = `<p:pic><p:nvPicPr><p:cNvPr id="4" name="Picture"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="rId2"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>${transform([150, 80, 40, 60])}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
     const { dir, pptx, html } = await fixture(group(2, [100, 100, 400, 100], [10, 20, 200, 200], text(3, [20, 40, 100, 40]) + picture), image);
-    const options = { browser, embedFonts: false as const, rasterDpi: 96, strict: false, offline: true };
+    const options = { browser, embedFonts: false as const, rasterDpi: 96, offline: true };
     const untouched = join(dir, 'untouched.pptx');
     expect((await convertHtmlToPptx(html, { ...options, output: untouched })).exitCode).toBe(0);
     const before = await JSZip.loadAsync(pptx);

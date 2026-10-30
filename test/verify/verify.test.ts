@@ -35,7 +35,7 @@ describe.skipIf(!browserAvailable)('Verification of an HTML Deck against its PPT
     const deck = join(dir, 'deck.html');
     await writeFile(deck, html, 'utf8');
     const pptx = join(dir, 'deck.pptx');
-    await convertHtmlToPptx(deck, { output: pptx, embedFonts: false, rasterDpi: 96, strict: false, offline: true, browser });
+    await convertHtmlToPptx(deck, { output: pptx, embedFonts: false, rasterDpi: 96, offline: true, browser });
     return { deck, pptx };
   }
 
@@ -198,7 +198,7 @@ describe.skipIf(!browserAvailable)('Verification of a PPTX against its HTML Deck
       p { position: absolute; left: 40px; top: 40px; width: 400px }
     </style></head><body><section><p>BORDER_SENTINEL</p></section></body></html>`);
     const pptx = join(dir, 'deck.pptx');
-    expect((await convertHtmlToPptx(deck, { output: pptx, embedFonts: false, rasterDpi: 96, strict: false, offline: true, browser })).exitCode).toBe(0);
+    expect((await convertHtmlToPptx(deck, { output: pptx, embedFonts: false, rasterDpi: 96, offline: true, browser })).exitCode).toBe(0);
 
     const result = await convertPptxToHtml(pptx, { output: join(dir, 'back.html'), offline: true, browser });
 

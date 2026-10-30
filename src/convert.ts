@@ -12,8 +12,8 @@ import { OpcReader } from './ooxml/opc.js';
 import { parsePptx } from './parse/index.js';
 import { chromiumVersion, launchChromium } from './render/chromium.js';
 import { entry as reportEntry } from './report/codes.js';
-import { buildReport, withEntries, writeSidecar } from './report/index.js';
-import { DeckflipError, type Entry, type Report } from './report/types.js';
+import { buildReport, exceedsStrictThreshold, withEntries, writeSidecar } from './report/index.js';
+import { DeckflipError, type Entry, type Report, type Severity } from './report/types.js';
 import { hasVba, sourceEntries } from './roundtrip/entries.js';
 import { buildManifest, MANIFEST_FILE, sha256, SOURCE_FILE } from './roundtrip/manifest.js';
 import { resolveRoundTrip, type RoundTrip } from './roundtrip/index.js';
@@ -35,10 +35,10 @@ export interface ConvertOptions extends ChromiumOptions {
   embedFonts: false | true | string[];
   rasterDpi: number;
   report?: string;
-  strict: boolean;
+  strict?: Severity;
 }
 
-export type ValidateOptions = Omit<ConvertOptions, 'output' | 'strict'>;
+export type ValidateOptions = Omit<ConvertOptions, 'output'>;
 
 export interface VerifyOptions extends ChromiumOptions {
   report?: string;
@@ -157,19 +157,19 @@ export async function convertHtmlToPptx(
   const report = withEntries(run.report, verified);
   await writeSidecar(report, reportPath);
 
-  return { report, outputPath, exitCode: verified.length > 0 ? 5 : opts.strict && report.entries.length > 0 ? 4 : 0 };
+  return { report, outputPath, exitCode: verified.length > 0 ? 5 : exceedsStrictThreshold(report.entries, opts.strict) ? 4 : 0 };
 }
 
-export async function validateHtml(input: string, opts: ValidateOptions): Promise<{ report: Report; exitCode: 0 | 2 }> {
+export async function validateHtml(input: string, opts: ValidateOptions): Promise<{ report: Report; exitCode: 0 | 2 | 4 }> {
   const run = await runHtmlPipeline(input, opts, 'validate');
   if (opts.report !== undefined) await writeSidecar(run.report, opts.report);
-  return { report: run.report, exitCode: run.deck === undefined ? 2 : 0 };
+  return { report: run.report, exitCode: run.deck === undefined ? 2 : exceedsStrictThreshold(run.report.entries, opts.strict) ? 4 : 0 };
 }
 
 export interface ConvertToHtmlOptions extends Partial<ChromiumOptions> {
   output?: string;
   report?: string;
-  strict?: boolean;
+  strict?: Severity;
   embedFonts?: ConvertOptions['embedFonts'];
 }
 
@@ -213,11 +213,11 @@ export async function convertPptxToHtml(input: string, opts: ConvertToHtmlOption
   const verified = laidOut.measured ? verifyDecks(laidOut.measured, deck, 'pptx') : laidOut.errors;
   const report = withEntries(buildReport({ ...base, tool: { ...base.tool, ...(laidOut.browser === undefined ? {} : { browser: laidOut.browser }) } }, entries, deck.slides.length, nativeCount(deck)), verified);
   await writeSidecar(report, reportPath);
-  return { report, outputPath, assetsDir, exitCode: verified.length > 0 ? 5 : opts.strict && report.entries.length > 0 ? 4 : 0 };
+  return { report, outputPath, assetsDir, exitCode: verified.length > 0 ? 5 : exceedsStrictThreshold(report.entries, opts.strict) ? 4 : 0 };
 }
 
 /** `validate deck.pptx` (spec 01): the package parses, and the report lists what a round trip would carry opaquely. */
-export async function validatePptx(input: string, opts: { report?: string; embedFonts?: ConvertOptions['embedFonts'] } = {}): Promise<{ report: Report; exitCode: 0 | 2 }> {
+export async function validatePptx(input: string, opts: { report?: string; embedFonts?: ConvertOptions['embedFonts']; strict?: Severity } = {}): Promise<{ report: Report; exitCode: 0 | 2 | 4 }> {
   const bytes = new Uint8Array(await readFile(input));
   const deck = await parsePptx(bytes);
   const source = await indexSource(await OpcReader.load(bytes));
@@ -226,7 +226,7 @@ export async function validatePptx(input: string, opts: { report?: string; embed
   const base = { ...reportBase(input, undefined, deck.canvas, undefined, 'validate'), input: { path: input, kind: 'pptx' as const }, fonts: resolvedFontsOf(deck) };
   const report = buildReport(base, entries, deck.slides.length, nativeCount(deck));
   if (opts.report !== undefined) await writeSidecar(report, opts.report);
-  return { report, exitCode: hasError(entries) ? 2 : 0 };
+  return { report, exitCode: hasError(entries) ? 2 : exceedsStrictThreshold(entries, opts.strict) ? 4 : 0 };
 }
 
 /**

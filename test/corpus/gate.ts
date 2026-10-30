@@ -62,7 +62,6 @@ export function corpusGate(category: string, fixtures: readonly string[]): void 
           output: pptxPath,
           embedFonts: false,
           rasterDpi: 192,
-          strict: false,
           offline: true,
           browser: browser!,
         });

@@ -49,7 +49,6 @@ async function run(): Promise<void> {
         output: pptxPath,
         embedFonts: false,
         rasterDpi: 192,
-        strict: false,
         offline: true,
         browser,
       });

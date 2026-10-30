@@ -2,6 +2,8 @@
 
 Every entry carries `code`, `kind`, `severity`, `reason` and `hint`; element-level entries also have `slide` and `locator`. `{decl}` in a hint is the offending CSS declaration, `{el}` the element name. Three rules: `VALIDATE_*` and `FONT_*` errors stop the conversion (exit 2); `VERIFY_*` errors mean deckflip wrote output that differs from your source, a deckflip defect (exit 5, output kept): report it, do not work around it; every `RASTER_<X>` has a `FLATTEN_<X>` twin with the same trigger for text-bearing elements.
 
+Use `--strict=warning` in the authoring loop: warnings fail, info entries remain in the report without failing. Bare `--strict` means any entry (`info`); `--strict=error` only fails on errors. Validation (2) and Verification (5) cannot be downgraded. Stderr groups by severity/code with counts, three representative locations and distinct hints; JSON and sidecars retain every occurrence.
+
 ## VALIDATE_* (kind `error`)
 
 | Code | Trigger | Fix |

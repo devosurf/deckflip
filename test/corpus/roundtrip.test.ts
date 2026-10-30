@@ -85,7 +85,7 @@ describe.skipIf(!browserAvailable)('roundtrip corpus: PPTX -> IDM -> PPTX part i
       const deckPath = join('fixtures', 'corpus', category, name, 'deck.html');
       const workDir = await mkdtemp(join(tmpdir(), `deckflip-roundtrip-${name}-`));
       const firstPath = join(workDir, 'first.pptx');
-      await convertHtmlToPptx(deckPath, { output: firstPath, embedFonts: false, rasterDpi: 192, strict: false, offline: true, browser });
+      await convertHtmlToPptx(deckPath, { output: firstPath, embedFonts: false, rasterDpi: 192, offline: true, browser });
       const first = await readFile(firstPath);
 
       const deck = await parsePptx(first);
@@ -125,7 +125,7 @@ describe.skipIf(!browserAvailable)('roundtrip corpus: PPTX -> HTML -> PPTX untou
     it(`${category}/${name}`, async () => {
       const deckPath = join('fixtures', 'corpus', category, name, 'deck.html');
       const workDir = await mkdtemp(join(tmpdir(), `deckflip-untouched-${name}-`));
-      const convert = { embedFonts: false as const, rasterDpi: 192, strict: false, offline: true, browser };
+      const convert = { embedFonts: false as const, rasterDpi: 192, offline: true, browser };
       const firstPath = join(workDir, 'first.pptx');
       await convertHtmlToPptx(deckPath, { ...convert, output: firstPath });
       const { outputPath: htmlPath } = await convertPptxToHtml(firstPath, { output: join(workDir, 'first.html') });

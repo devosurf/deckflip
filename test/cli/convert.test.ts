@@ -47,7 +47,7 @@ describe.skipIf(!browserAvailable)('convert and validate', () => {
       <section><div><p><span>INLINE_SENTINEL</span></p><p>BODY_SENTINEL</p></div></section>
       </body></html>`);
     const output = join(dir, 'mixed.pptx');
-    const result = await convertHtmlToPptx(file, { ...options, browser, strict: true, output });
+    const result = await convertHtmlToPptx(file, { ...options, browser, strict: 'info', output });
     expect(result.exitCode).toBe(0);
     expect(result.report.entries).toEqual([]);
     const zip = await JSZip.loadAsync(await readFile(output));
@@ -68,7 +68,7 @@ describe.skipIf(!browserAvailable)('convert and validate', () => {
       <div>Nested <span>start</span><p>Inner</p>Nested end</div>Final</div>
       </section></body></html>`);
     const output = join(dir, 'mixed.pptx');
-    const result = await convertHtmlToPptx(file, { ...options, browser, strict: true, output });
+    const result = await convertHtmlToPptx(file, { ...options, browser, strict: 'info', output });
     expect(result.report.entries).toEqual([]);
     expect(result.exitCode).toBe(0);
     const deck = await parsePptx(await readFile(output));
@@ -93,7 +93,7 @@ describe.skipIf(!browserAvailable)('convert and validate', () => {
       <div class="hidden">HIDDEN<p>HIDDEN</p></div>
       </section></body></html>`);
     const output = join(dir, 'visibility.pptx');
-    const result = await convertHtmlToPptx(file, { ...options, browser, strict: true, output });
+    const result = await convertHtmlToPptx(file, { ...options, browser, strict: 'info', output });
     expect(result.report.entries).toEqual([]);
     const deck = await parsePptx(await readFile(output));
     const texts = deck.slides[0]!.elements.filter((el) => el.kind === 'shape')
@@ -108,7 +108,7 @@ describe.skipIf(!browserAvailable)('convert and validate', () => {
       <div data-raster><span>Raster before</span><p>Raster body</p>Raster after</div>
       </section></body></html>`);
     const output = join(dir, 'effects.pptx');
-    const result = await convertHtmlToPptx(file, { ...options, browser, strict: true, output });
+    const result = await convertHtmlToPptx(file, { ...options, browser, strict: 'info', output });
     expect(result.exitCode).toBe(4);
     expect(result.report.entries).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'FLATTEN_CSS_FILTER', slide: 1, locator: { selector: '#effect' }, reason: expect.stringContaining('filter: blur(1px)') }),
@@ -129,7 +129,7 @@ describe.skipIf(!browserAvailable)('convert and validate', () => {
         transform: scale(1.5); transform-origin: 0 0; opacity: .5 }</style></head><body>
       <section><div id="mixed">Before<p>Body</p>After</div></section></body></html>`);
     const output = join(dir, 'transformed.pptx');
-    const result = await convertHtmlToPptx(file, { ...options, browser, strict: true, output });
+    const result = await convertHtmlToPptx(file, { ...options, browser, strict: 'info', output });
     expect(result.exitCode).toBe(4);
     expect(result.report.entries).toContainEqual(expect.objectContaining({ code: 'SUBSTITUTE_OPACITY', locator: { selector: '#mixed' } }));
     const deck = await parsePptx(await readFile(output));
@@ -148,7 +148,7 @@ describe.skipIf(!browserAvailable)('convert and validate', () => {
       <svg width="24" height="24" viewBox="0 0 24 24"><rect width="24" height="24" fill="red"/></svg>
       <div>Before<p>Body</p>After</div></section></body></html>`);
     const output = join(dir, 'icon.pptx');
-    const result = await convertHtmlToPptx(file, { ...options, browser, strict: false, output });
+    const result = await convertHtmlToPptx(file, { ...options, browser, output });
     const deck = await parsePptx(await readFile(output));
     expect(deck.slides[0]!.elements.filter((el) => el.kind === 'picture')).toHaveLength(1);
     expect(result.report.entries).toContainEqual(expect.objectContaining({ code: 'SUBSTITUTE_SVG_PICTURE' }));
@@ -160,7 +160,7 @@ describe.skipIf(!browserAvailable)('convert and validate', () => {
       .mixed { display: flex; align-items: center; gap: 20px; height: 100px; width: 600px }</style>
       </head><body><section><div class="mixed">Before<p>Body</p>After</div></section></body></html>`);
     const output = join(dir, 'flex.pptx');
-    const result = await convertHtmlToPptx(file, { ...options, browser, strict: true, output });
+    const result = await convertHtmlToPptx(file, { ...options, browser, strict: 'info', output });
     expect(result.report.entries).toEqual([]);
     const deck = await parsePptx(await readFile(output));
     const shapes = deck.slides[0]!.elements.filter((el) => el.kind === 'shape');
@@ -177,7 +177,7 @@ describe.skipIf(!browserAvailable)('convert and validate', () => {
       p { position: absolute; left: 200px; top: 120px }</style></head><body>
       <section><div>AA<p>Block</p>ZZ</div></section></body></html>`);
     const output = join(dir, 'continuation.pptx');
-    const result = await convertHtmlToPptx(file, { ...options, browser, strict: true, output });
+    const result = await convertHtmlToPptx(file, { ...options, browser, strict: 'info', output });
     expect(result.report.entries).toEqual([]);
     const deck = await parsePptx(await readFile(output));
     const shapes = deck.slides[0]!.elements.filter((el) => el.kind === 'shape');
@@ -191,7 +191,7 @@ describe.skipIf(!browserAvailable)('convert and validate', () => {
   it('validate reports exactly the entries convert would, without writing a PPTX', async () => {
     const { dir, file } = await writeTempDeck(RASTER_DECK);
     const validated = await validateHtml(file, { ...options, browser });
-    const converted = await convertHtmlToPptx(file, { ...options, browser, strict: false, output: join(dir, 'out.pptx') });
+    const converted = await convertHtmlToPptx(file, { ...options, browser, output: join(dir, 'out.pptx') });
 
     expect(validated.exitCode).toBe(0);
     expect(validated.report.entries.map((entry) => [entry.code, entry.slide])).toEqual([
@@ -208,7 +208,7 @@ describe.skipIf(!browserAvailable)('convert and validate', () => {
   it('strict mode still writes the PPTX and the report but exits 4 when the report is non-empty', async () => {
     const { dir, file } = await writeTempDeck(RASTER_DECK);
     const output = join(dir, 'strict.pptx');
-    const converted = await convertHtmlToPptx(file, { ...options, browser, strict: true, output });
+    const converted = await convertHtmlToPptx(file, { ...options, browser, strict: 'info', output });
     expect(converted.exitCode).toBe(4);
     expect((await stat(output)).size).toBeGreaterThan(0);
     const sidecar = JSON.parse(await readFile(`${output}.report.json`, 'utf8')) as { entries: unknown[] };
@@ -218,7 +218,7 @@ describe.skipIf(!browserAvailable)('convert and validate', () => {
   it('a validation error exits 2 with the report written and no PPTX', async () => {
     const { dir, file } = await writeTempDeck(`<!doctype html><html><head><title>Deck</title></head><body><section><p style="hyphens:auto">x</p><iframe src="a.html"></iframe></section></body></html>`);
     const output = join(dir, 'bad.pptx');
-    const converted = await convertHtmlToPptx(file, { ...options, browser, strict: true, output });
+    const converted = await convertHtmlToPptx(file, { ...options, browser, strict: 'info', output });
     expect(converted.exitCode).toBe(2);
     expect(converted.report.entries.map((entry) => entry.code)).toEqual(['VALIDATE_ELEMENT']);
     await expect(stat(output)).rejects.toThrow();
@@ -230,9 +230,9 @@ describe.skipIf(!browserAvailable)('convert and validate', () => {
     const { dir, file } = await writeTempDeck(`<!doctype html><html><head><title>Lost</title>
       <style>body { font: 20px/28px Arial } .ghost { visibility: hidden } #shown { visibility: visible }</style></head><body>
       <section><p>Kept text</p><div class="ghost"><p id="shown">LOST_SENTINEL</p></div></section></body></html>`);
-    for (const strict of [false, true]) {
+    for (const strict of [undefined, 'info'] as const) {
       const output = join(dir, `lost-${strict}.pptx`);
-      const converted = await convertHtmlToPptx(file, { ...options, browser, strict, output });
+      const converted = await convertHtmlToPptx(file, { ...options, browser, ...(strict === undefined ? {} : { strict }), output });
       expect(converted.exitCode).toBe(5);
       expect(converted.report.entries).toEqual([
         expect.objectContaining({ code: 'VERIFY_TEXT_MISSING', severity: 'error', slide: 1, locator: { selector: '#shown' }, reason: expect.stringContaining('LOST_SENTINEL') }),
@@ -253,7 +253,7 @@ describe.skipIf(!browserAvailable)('convert and validate', () => {
       <div class="fits"><p>Short enough</p></div>
     </section></body></html>`);
     const output = join(dir, 'clip.pptx');
-    const converted = await convertHtmlToPptx(file, { ...options, browser, strict: true, output });
+    const converted = await convertHtmlToPptx(file, { ...options, browser, strict: 'info', output });
     expect(converted.report.entries).toEqual([
       expect.objectContaining({ code: 'FLATTEN_OVERFLOW_CLIP', kind: 'flattened', severity: 'warning', slide: 1, locator: { selector: '#clipped' }, reason: expect.stringContaining('overflow: hidden') }),
     ]);
@@ -328,7 +328,7 @@ describe.skipIf(!browserAvailable)('convert and validate', () => {
       <img src="pixel.png"><p id="over-image">Over the picture</p>
     </section></body></html>`);
     await writeFile(join(dir, 'pixel.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64'));
-    const converted = await convertHtmlToPptx(file, { ...options, browser, strict: true, output: join(dir, 'contrast.pptx') });
+    const converted = await convertHtmlToPptx(file, { ...options, browser, strict: 'info', output: join(dir, 'contrast.pptx') });
     expect(converted.report.entries).toEqual([
       expect.objectContaining({ code: 'LAYOUT_TEXT_ILLEGIBLE', kind: 'flagged', slide: 1, locator: { selector: '#faint' }, reason: expect.stringContaining('f4f4f4') }),
       expect.objectContaining({ code: 'LAYOUT_TEXT_ILLEGIBLE', kind: 'flagged', slide: 1, locator: { selector: '#lost' } }),
@@ -379,7 +379,7 @@ describe.skipIf(!browserAvailable)('convert and validate', () => {
       <p id="tight" style="top: 40px; width: ${width}px">A filled label without padding</p>
     </section></body></html>`);
     const output = join(dir, 'painted.pptx');
-    const converted = await convertHtmlToPptx(file, { ...options, browser, strict: false, output });
+    const converted = await convertHtmlToPptx(file, { ...options, browser, output });
     expect(converted.report.entries).toEqual([
       expect.objectContaining({ code: 'LAYOUT_WRAP_RISK', slide: 1, locator: { selector: '#tight' } }),
     ]);

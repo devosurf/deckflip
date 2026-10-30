@@ -20,7 +20,7 @@ Decided in [#13](https://github.com/devosurf/deckflip/issues/13).
 
 ## Text inside a rasterised region
 
-Not by the tool's choice: #11 makes any implicit raster text-free. The author can opt in with **`data-raster`** on any element, which rasterises that subtree text and all, entry `RASTER_EXPLICIT` (kind `rasterised`, severity `info`; like every Report entry, it makes `--strict` return 4 while retaining output). Use cases: an HTML-built chart, a diagram with effects, a logo lock-up. `inspect` marks such pictures `source: "raster"`, `explicit: true`.
+Not by the tool's choice: #11 makes any implicit raster text-free. The author can opt in with **`data-raster`** on any element, which rasterises that subtree text and all, entry `RASTER_EXPLICIT` (kind `rasterised`, severity `info`; it makes bare `--strict` or `--strict=info` return 4 while retaining output, but does not fail `--strict=warning`). Use cases: an HTML-built chart, a diagram with effects, a logo lock-up. `inspect` marks such pictures `source: "raster"`, `explicit: true`.
 
 `validate` refuses `data-raster` on a `section` (`VALIDATE_RASTER_SLIDE`, error): a fully rasterised Slide is a screenshot, which is what this tool exists to avoid; the hint points at `render` if a PNG is what the user wants.
 
@@ -36,6 +36,6 @@ Every raster produces one entry:
 ```
 
 - `code` names the trigger; the complete list: `RASTER_CSS_FILTER`, `RASTER_BACKDROP_FILTER`, `RASTER_BLEND_MODE`, `RASTER_MASK`, `RASTER_CLIP_PATH`, `RASTER_GRADIENT` (conic/repeating/multi-layer), `RASTER_SHADOW` (spread/multiple), `RASTER_BORDER_STYLE`, `RASTER_BORDER_IMAGE`, `RASTER_TRANSFORM` (skew/matrix/3D), `RASTER_OUTLINE`, `RASTER_EXPLICIT`. Each `FLATTEN_*` twin (same suffix) exists for the text-bearing case.
-- `reason` always quotes the offending declaration; `hint` is a fixed template per code, phrased as an edit to the HTML. `validate` produces exactly the same entries without converting, so the loop is validate -> edit -> validate until the entries the author does not accept are gone, then `convert --strict`.
+- `reason` always quotes the offending declaration; `hint` is a fixed template per code, phrased as an edit to the HTML. `validate` produces exactly the same entries without converting, so the loop is validate -> edit -> validate until the entries the author does not accept are gone, then `convert --strict=warning`.
 - Silencing: `data-raster` converts a warning into the `RASTER_EXPLICIT` info entry; there is no global "ignore rasters" flag, because a silent screenshot is the failure mode.
 - The `summary.rasterised` count and the per-Slide stderr line let a human see at a glance how much of a deck is not editable.

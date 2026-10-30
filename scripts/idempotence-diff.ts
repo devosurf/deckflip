@@ -10,7 +10,7 @@ import { launchChromium } from '../src/render/chromium.js';
 const [category, name] = process.argv.slice(2);
 const browser = await launchChromium({ offline: true });
 const workDir = await mkdtemp(join(tmpdir(), `deckflip-diff-${name}-`));
-const convert = { embedFonts: false as const, rasterDpi: 192, strict: false, offline: true, browser };
+const convert = { embedFonts: false as const, rasterDpi: 192, offline: true, browser };
 const firstPath = join(workDir, 'first.pptx');
 await convertHtmlToPptx(join('fixtures', 'corpus', category!, name!, 'deck.html'), { ...convert, output: firstPath });
 const { outputPath } = await convertPptxToHtml(firstPath, { output: join(workDir, 'first.html') });

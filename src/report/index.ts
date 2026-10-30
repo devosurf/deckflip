@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import type { Entry, EntryKind, Report } from './types.js';
+import type { Entry, EntryKind, Report, Severity } from './types.js';
 
 const KIND_ORDER: EntryKind[] = [
   'error',
@@ -20,6 +20,15 @@ const SEVERITY_STYLE: Record<'error' | 'warning' | 'info', string> = {
 };
 
 const RESET = '\u001b[0m';
+
+const SEVERITY_ORDER: Severity[] = ['error', 'warning', 'info'];
+
+/** Thresholds affect failure only: every occurrence remains in the Conversion report. */
+export function exceedsStrictThreshold(entries: readonly Entry[], strict?: Severity): boolean {
+  if (strict === undefined) return false;
+  const threshold = SEVERITY_ORDER.indexOf(strict);
+  return entries.some((entry) => SEVERITY_ORDER.indexOf(entry.severity) <= threshold);
+}
 
 function countEntries(entries: readonly Entry[]): Record<EntryKind, number> & { errors: number } {
   const counts: Record<EntryKind, number> & { errors: number } = {
@@ -117,12 +126,29 @@ export function formatSummary(report: Report, opts: { color: boolean }): string 
   const s = report.summary;
   lines.push(`${s.slides} slide(s), ${s.native} native element(s), ${report.entries.length} report entr${report.entries.length === 1 ? 'y' : 'ies'}`);
 
+  const groups = new Map<Severity, Map<string, Entry[]>>();
   for (const entry of report.entries) {
-    const head = colorize(`[${entry.severity}]`, entry.severity, opts.color);
-    const code = colorize(entry.code, entry.severity, opts.color);
-    const slide = entry.slide === undefined ? 'deck' : String(entry.slide);
-    const line = `${head} ${code} slide ${slide} ${locatorText(entry)}${entry.reason} -- ${entry.hint ?? ''}`;
-    lines.push(line.trimEnd());
+    let byCode = groups.get(entry.severity);
+    if (byCode === undefined) {
+      byCode = new Map();
+      groups.set(entry.severity, byCode);
+    }
+    const group = byCode.get(entry.code);
+    if (group === undefined) byCode.set(entry.code, [entry]);
+    else group.push(entry);
+  }
+  for (const severity of SEVERITY_ORDER) {
+    const byCode = groups.get(severity);
+    if (byCode === undefined) continue;
+    for (const code of [...byCode.keys()].sort()) {
+      const entries = byCode.get(code)!;
+      const locations = entries.slice(0, 3).map((entry) =>
+        `${entry.slide === undefined ? 'deck' : `slide ${entry.slide}`} ${locatorText(entry)}`.trimEnd());
+      if (entries.length > locations.length) locations.push(`+${entries.length - locations.length} more`);
+      const hints = [...new Set(entries.flatMap((entry) => entry.hint ? [entry.hint] : []))];
+      const head = colorize(`[${severity}] ${code}`, severity, opts.color);
+      lines.push(`${head} (${entries.length} occurrence${entries.length === 1 ? '' : 's'}): ${locations.join(', ')} -- ${entries[0]!.reason}${hints.length === 0 ? '' : ` -- ${hints.join(' | ')}`}`);
+    }
   }
 
   return lines.join('\n');

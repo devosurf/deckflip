@@ -90,7 +90,7 @@ describe.skipIf(!browserAvailable)('idempotence corpus: HTML -> PPTX -> HTML -> 
     test(`${category}/${name}`, async () => {
       const deckPath = join('fixtures', 'corpus', category, name, 'deck.html');
       const workDir = await mkdtemp(join(tmpdir(), `deckflip-idempotence-${name}-`));
-      const convert = { embedFonts: false as const, rasterDpi: 192, strict: false, offline: true, browser };
+      const convert = { embedFonts: false as const, rasterDpi: 192, offline: true, browser };
       const firstPath = join(workDir, 'first.pptx');
       await convertHtmlToPptx(deckPath, { ...convert, output: firstPath });
       const { outputPath: htmlPath, assetsDir } = await convertPptxToHtml(firstPath, { output: join(workDir, 'first.html') });

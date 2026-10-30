@@ -10,6 +10,10 @@ Three rules hold across families:
 - `VERIFY_*` are the other `severity: error` codes: Verification found the written output differs from what the source shows, a deckflip defect. They come from `convert` (after the output is written, which it keeps) and from `verify`, and exit 5 whatever Strict mode says.
 - Every `RASTER_<X>` has a `FLATTEN_<X>` twin with the same trigger, used when the element bears text (the effect is dropped, the text stays native).
 
+Strict-mode thresholds are based only on severity, never on code: bare `--strict` and `--strict=info` fail on any entry; `--strict=warning` ignores info for failure purposes; `--strict=error` fails only on errors. Validation (2) and Verification (5) retain precedence over threshold-only failure (4). New codes follow their declared severity automatically.
+
+Human stderr groups occurrences by severity, then code (errors first), showing the count, first three locations plus `+N more`, the first reason, and each distinct hint once per group. `--json` and report sidecars retain every occurrence; `--quiet` suppresses only the human summary. See [01-cli.md](01-cli.md) for the complete invocation and exit contract.
+
 ## VALIDATE_* (kind `error`, severity `error`)
 
 | Code | Trigger | Hint |
@@ -108,7 +112,7 @@ Three rules hold across families:
 
 ## LAYOUT_* (kind `flagged`, severity `warning`)
 
-Layout flags: the conversion is faithful, but the Slide shows something an author rarely intends. Read from what Chromium paints; HTML input only, from `validate` and `convert`. Strict mode counts them like any entry; accepting one is exiting 4 with only entries you meant.
+Layout flags: the conversion is faithful, but the Slide shows something an author rarely intends. Read from what Chromium paints; HTML input only, from `validate` and `convert`. Their warning severity reaches the `info` and `warning` Strict-mode thresholds, but not `error`; accepting one at warning-level strictness means exiting 4 with only entries you meant.
 
 | Code | Trigger | Hint |
 | --- | --- | --- |
