@@ -3,6 +3,7 @@ import { basename, dirname, extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { Canvas } from '../model/index.js';
 import type { Entry } from '../report/types.js';
+import { BUNDLED_STYLESHEET_URL } from '../bundled-fonts.js';
 import { baseStylesheet } from './base.css.js';
 import { staticEntries } from './validate.js';
 
@@ -174,7 +175,7 @@ async function readDocument(file: string, opts: { validateMeta: boolean }): Prom
 
 function assembleDocument(opts: { doctype: string; htmlAttrs: string; headInner: string; bodyInner: string; lang: string }): string {
   const canvas = extractCanvas(opts.headInner).canvas;
-  const head = `<style>${baseStylesheet(canvas.width, canvas.height)}</style>${opts.headInner}`;
+  const head = `<link rel="stylesheet" href="${BUNDLED_STYLESHEET_URL}"><style>${baseStylesheet(canvas.width, canvas.height)}</style>${opts.headInner}`;
   return `${opts.doctype}<html${ensureLangAttr(opts.htmlAttrs, opts.lang)}><head>${head}</head><body>${opts.bodyInner}</body></html>`;
 }
 

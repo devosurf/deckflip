@@ -47,6 +47,9 @@ For pictures and image fills, base64 and percent-encoded image data URIs use the
 Before author CSS, the tool injects, into every rendered document:
 
 ```css
+@layer {
+  :root { font-family: "Liberation Sans"; }
+}
 html, body { margin: 0; padding: 0; background: #fff; }
 body > section { position: relative; box-sizing: border-box; overflow: hidden; width: <W>px; height: <H>px; }
 aside.notes { display: none !important; }
@@ -54,11 +57,14 @@ aside.notes { display: none !important; }
 
 Authors need no boilerplate; they may override. After layout, every Slide's border box must equal the Canvas (`VALIDATE_SLIDE_SIZE`, error) and its offset is irrelevant (the tool measures relative to the section). This is a deliberate trade: a Deck opened directly in a browser shows the Slides stacked vertically at Canvas size, which is good enough for a glance; `deckflip render` is the real preview.
 
+The first anonymous cascade layer supplies bundled Liberation Sans 2.1.5 (static Regular, Bold, Italic and BoldItalic) only as an inherited root default. The bundled `@font-face` declarations are served through the font-source session ([07](07-fonts.md#bundled-default)). Authored root, body, Slide and text families, including declarations in author layers, take precedence. There is no body default and no family appended to explicit stacks: unresolved families and generics still fail validation. The default makes authoring reproducible without installed fonts, but remains `FONT_NOT_SAFE` until embedding is implemented.
+
 ## Absolute-positioned form (PPTX -> HTML)
 
 Same dialect, canonical single-file form, deterministic:
 
 - `<head>`: `<title>`, `deckflip:canvas`, one `<style>` holding the base rules plus theme tokens as custom properties (`--theme-accent1`, `--theme-major-font`, ...) and one class per distinct run/paragraph style set (`.t1`, `.t2`, ...). Geometry is never in the stylesheet.
+- No bundled default is emitted: text styles explicitly declare the source PPTX families.
 - One `<section id="slide-<n>" data-title data-layout>` per Slide. Each shape is a direct child of the section in z-order (backmost first), `style="position:absolute; left:..px; top:..px; width:..px; height:..px"` plus `transform: rotate(..deg)` when rotated. Groups are `<div data-group>` containers with their own absolute box and absolutely positioned children (relative to the group).
   - A group's layout box is its child coordinate space; its CSS transform maps that space to the outer placement with translation, rotation and per-axis scale (negative for flips). Nested groups compose these mappings. Child positions remain in source coordinates so Untouched children can be spliced back into an edited group without shifting or double-scaling.
 - Text bodies are `<div>` with one `<p>` per paragraph and `<span>` runs; `ul`/`ol` for bulleted/numbered paragraphs; `<br>` for line breaks. Pictures are `<img>`, tables `<table>`, media `<video>`/`<audio>`, vector shapes that HTML cannot express are inline `<svg>`.

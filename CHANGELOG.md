@@ -9,6 +9,7 @@
 - New report codes: `FONT_ASSET_UNAVAILABLE` and `FONT_ASSET_UNSUPPORTED` (errors) for faces a Slide needs that cannot be downloaded/pinned or decoded, and `FONT_GLYPH_FALLBACK` (warning), a font audit comparing each drawn text node's selected face and character coverage with the platform fonts Chromium actually used. Missing local stylesheets and font files are `VALIDATE_MISSING_ASSET`. `FONT_EMBED_RESTRICTED` now reports Deck-provided faces whose `fsType` rules out editable embedding.
 - The Conversion report lists each selected face as `fonts`, the same Resolved fonts `inspect` prints, with `asset.source` (`installed`, `file`, `remote` with its pinned copy, or `data`), acquired format and hashes. URLs never include credentials or query values.
 - Severity thresholds for Strict mode on `convert` and `validate` in both directions: `--strict=info|warning|error`. Bare `--strict` retains any-entry failure; warning-level strictness is recommended for the authoring loop. Invalid thresholds exit 3; validation (2) and Verification (5) retain precedence, and threshold-only failures (4) keep conversion output and the report (#40).
+- Bundle Liberation Sans 2.1.5 static Regular, Bold, Italic and BoldItalic faces as the default for unauthored text (#35). The manifest's SHA-256 hashes are checked through the same font-source session that serves Chromium; Resolved fonts record `source.kind: "bundled"`, family, version, file basename, format and acquired-byte hash.
 
 ### Changed
 
@@ -16,6 +17,8 @@
 - `render` of an HTML Deck loads the same pinned faces as measurement.
 - The `text/emoji` corpus report now records the CJK and emoji glyphs Verdana lacks as `FONT_GLYPH_FALLBACK`; its package digest is unchanged.
 - Human Conversion report summaries group repeated entries by severity and code, most important first, with occurrence counts, three representative locations plus remaining counts, and distinct hints once per group. JSON and report sidecars retain all occurrences; `--quiet` still suppresses only the human summary (#40).
+- Replace the transitional body Arial default with a root Liberation Sans declaration in the first anonymous cascade layer. Authored root, body, Slide and text families retain precedence; the bundled family is never appended to explicit stacks. Missing families and generics still fail explicitly.
+- The bundled default is reproducible for authoring, not a safe PowerPoint font: it remains `deck-provided` with `FONT_NOT_SAFE` until embedding is implemented. The strict template already authors Arial on `body` and remains unchanged. PPTX-to-HTML output keeps explicit source families and emits no bundled default; no PowerPoint Oracle evidence is implied.
 
 ### Fixed
 

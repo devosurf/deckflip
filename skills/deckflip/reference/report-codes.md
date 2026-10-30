@@ -26,13 +26,13 @@ Use `--strict=warning` in the authoring loop: warnings fail, info entries remain
 
 | Code | Severity | Trigger | Fix |
 | --- | --- | --- | --- |
-| `FONT_UNRESOLVED` | error | no family in the stack is deck-provided or installed | Install the family or add a safe family such as Arial to the stack |
+| `FONT_UNRESOLVED` | error | no family in the explicit stack resolves; the bundled default is not appended | Install or supply the family, or add a safe family such as Arial to the authored stack |
 | `FONT_GENERIC_ONLY` | error | the first resolvable entry is a generic family | Put a concrete family before the generic |
 | `FONT_IDENTITY_INVALID` | error | insufficient/conflicting Office identity metadata, unsupported legacy subfamily or variable instance | Choose a supported static face with consistent legacy names/style bits; do not edit font tables or remap weights |
 | `FONT_EMBED_UNSUPPORTED` | error | explicit embedding request; embedding is not implemented | Remove `--embed-fonts`; use a safe font or install the Resolved font on every viewing machine |
-| `FONT_ASSET_UNAVAILABLE` | error | a needed hosted stylesheet or font could not be downloaded and is not pinned, or its pin was removed or changed | Convert once with network access so it is pinned in `<name>.assets/fonts/`, or save the file next to the deck |
+| `FONT_ASSET_UNAVAILABLE` | error | a needed hosted stylesheet or font is unavailable or its pin changed; a bundled default is missing or fails its manifest hash check | Restore Deck assets or convert once with network access to pin them; for a bundled default failure, reinstall deckflip |
 | `FONT_ASSET_UNSUPPORTED` | error | a needed `@font-face` has only `local()` sources, no loadable format, or bytes that are no TTF/OTF/WOFF/WOFF2 font | Supply the face as a TTF, OTF, WOFF or WOFF2 file through `url()` |
-| `FONT_NOT_SAFE` | warning | Resolved font outside the safe set and not embedded, regardless of an embedding request | Use a safe font or install the Resolved font on every viewing machine |
+| `FONT_NOT_SAFE` | warning | Resolved font outside the safe set, including bundled Liberation Sans, and not embedded, regardless of an embedding request | Explicitly author a safe font or install the Resolved font on every viewing machine |
 | `FONT_GLYPH_FALLBACK` | warning | the selected face lacks characters the text uses (outside its glyphs or `unicode-range`); Chromium drew them with another font | Use a face that covers every character, or remove the characters |
 | `FONT_EMBED_RESTRICTED` | warning | a Deck-provided face's licence bits (`fsType`) rule out editable embedding | Choose another font |
 | `FONT_EMBED_FORMAT` | warning | reserved for the embedding milestone: WOFF2 or TTC source cannot be embedded | Provide the family as TTF, OTF or WOFF |

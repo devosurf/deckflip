@@ -123,3 +123,7 @@ _Avoid_: CSS weight, preferred family
 **Safe font**:
 A family present on every supported PowerPoint installation on Windows and macOS, so it needs no embedding.
 _Avoid_: Web-safe font, system font, standard font
+
+**Bundled default**:
+A font supplied with deckflip for text that inherits no authored family. It makes authoring independent of installed fonts, not proof of embedding or membership in the Safe font set.
+_Avoid_: Safe default, platform default, fallback font
